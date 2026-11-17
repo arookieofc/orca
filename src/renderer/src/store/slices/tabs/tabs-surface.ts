@@ -1,7 +1,6 @@
-import { workspaceEditorFiles } from '@/store/slices/editor/tabs/workspace-editor-files'
 import type { AppState } from '../../types'
-import { toVisibleTabType } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
-import type { WorkspaceVisibleTabType } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
+import { toVisibleTabType } from '../../../../../shared/tab-types'
+import type { WorkspaceVisibleTabType } from '../../../../../shared/tab-types'
 import { isEditorTabContentType } from '../editor/tabs/editor-tab-content-type'
 
 export type ActiveSurfaceSourceState = Pick<
@@ -48,9 +47,7 @@ export function deriveActiveSurfaceForWorktree(
   const browserTabs = state.browserTabsByWorktree[worktreeId] ?? []
   const terminalTabs = state.tabsByWorktree[worktreeId] ?? []
   const fileStillOpen = restoredFileId
-    ? workspaceEditorFiles(state.openFiles, state.unifiedTabsByWorktree[worktreeId]).some(
-        (file) => file.id === restoredFileId
-      )
+    ? state.openFiles.some((file) => file.id === restoredFileId && file.worktreeId === worktreeId)
     : false
   const browserTabStillOpen = restoredBrowserTabId
     ? browserTabs.some((tab) => tab.id === restoredBrowserTabId)
@@ -106,8 +103,7 @@ export function deriveActiveSurfaceForWorktree(
     activeBrowserTabId = browserTabs[0]?.id ?? null
     activeTabType = 'editor'
   } else {
-    const fallbackFile =
-      workspaceEditorFiles(state.openFiles, state.unifiedTabsByWorktree[worktreeId])[0] ?? null
+    const fallbackFile = state.openFiles.find((file) => file.worktreeId === worktreeId) ?? null
     const fallbackBrowserTab = browserTabs[0] ?? null
     activeFileId = fallbackFile?.id ?? null
     activeBrowserTabId = fallbackBrowserTab?.id ?? null

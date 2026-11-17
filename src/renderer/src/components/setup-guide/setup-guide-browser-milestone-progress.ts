@@ -1,14 +1,14 @@
 import { useEffect, useMemo } from 'react'
-import { useAppStore } from '@/store/index'
+import { useAppStore } from '@/store'
 import {
   FEATURE_WALL_SETUP_STEPS,
   type FeatureWallSetupStepId
-} from '../../../../shared/feature-education/explore/feature-wall-setup-steps'
-import type { FeatureWallSetupProgress } from '../feature-wall/setup/feature-wall-setup-progress'
+} from '../../../../shared/feature-wall-setup-steps'
+import type { FeatureWallSetupProgress } from '../feature-wall/feature-wall-setup-progress'
 
 export function useSetupGuideBrowserMilestoneProgress(
   rawProgress: FeatureWallSetupProgress,
-  preBrowserSetupComplete: boolean
+  historicalSplitTerminalDone: boolean
 ): FeatureWallSetupProgress {
   const setupGuideSidebarDismissed = useAppStore((s) => s.setupGuideSidebarDismissed)
   const browserMilestoneMigrated = useAppStore((s) => s.setupGuideBrowserMilestoneMigrated)
@@ -19,7 +19,8 @@ export function useSetupGuideBrowserMilestoneProgress(
   const pendingLegacyComplete =
     !browserMilestoneMigrated && rawProgress.ready
       ? shouldMarkBrowserMilestoneLegacyComplete({
-          preBrowserSetupComplete,
+          stepDone: rawProgress.stepDone,
+          historicalSplitTerminalDone,
           setupGuideSidebarDismissed
         })
       : false
@@ -44,10 +45,18 @@ export function useSetupGuideBrowserMilestoneProgress(
 }
 
 export function shouldMarkBrowserMilestoneLegacyComplete(input: {
-  preBrowserSetupComplete: boolean
+  stepDone: Partial<Record<FeatureWallSetupStepId, boolean>>
+  historicalSplitTerminalDone: boolean
   setupGuideSidebarDismissed: boolean
 }): boolean {
-  return input.setupGuideSidebarDismissed || input.preBrowserSetupComplete
+  if (input.setupGuideSidebarDismissed) {
+    return true
+  }
+  // The historical pre-browser checklist included the removed split-terminal milestone.
+  return (
+    input.historicalSplitTerminalDone &&
+    FEATURE_WALL_SETUP_STEPS.every((step) => step.id === 'browser' || input.stepDone[step.id])
+  )
 }
 
 export function getSetupGuideBrowserMilestoneAwareProgress(

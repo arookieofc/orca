@@ -1,22 +1,18 @@
-import { AgentHookServerStatusRowMutation } from './server-status-row-mutation'
-
-import { retainHookRootContext } from '../../../shared/agent-hook-listener/pane-provider-session'
 import { deriveCliWriterTopology } from './cli-writer-observation'
-import { previewHookPresence } from '../../../shared/agent-hook-listener/presence/agent-hook-presence-transition'
+import { transitionHookPresence } from '../../../shared/agent-hook-presence-transition'
 import {
-  needsHookRootEvidence,
-  readHookProcessVerdict
-} from '../../../shared/agent-hook-listener/presence/agent-hook-owner-presence'
-import { markCodexLeadTurnInterrupted } from '../../../shared/agent-hook-listener/providers/codex/codex-state'
-import { reconcileCodexStatusEvent } from '../../../shared/agent-hook-listener/providers/codex/codex-session-start'
+  reconcileRemoteCodexState,
+  markCodexLeadTurnInterrupted
+} from '../../../shared/agent-hook-listener/providers/codex-state'
 import {
   resolveAgentStatusIdentity,
   shouldSuppressInheritedTerminalStatus
-} from '../../../shared/agent-status/identity/agent-status-identity'
-import type { EnrichedAgentHookEventPayload, IncomingAgentHookEvent } from './server-types'
-import type { AgentStatusObservationOrigin } from '../../../shared/agent-status/contracts/agent-status-observation'
-
-import { setClaudeMainAgentTurnState } from '../../../shared/agent-hook-listener/providers/claude/lifecycle/claude-roster-state'
+} from '../../../shared/agent-status-identity'
+import type { EnrichedAgentHookEventPayload } from './server-types'
+import type { AgentHookEventPayload } from '../../../shared/agent-hook-listener/listener-event'
+import type { AgentStatusObservationOrigin } from '../../../shared/agent-status-observation'
+import { ClaudeOwedNotificationExpiryTimers } from '../../../shared/claude-owed-notification-expiry-timers'
+import { setClaudeMainAgentTurnState } from '../../../shared/agent-hook-listener/providers/claude-roster-state'
 import {
   attachClaudePermissionToolUseId,
   pairedClaudeNonAgentWork,
@@ -24,51 +20,51 @@ import {
   withHeldChildWaitMainAgent
 } from './server-claude-status-rules'
 import { isForeignTurnHook } from './server-foreign-turn-hook'
-import { resolveCancelVerdictLatch } from '../../../shared/agent-hook-listener/state/agent-hook-cancel-verdict-latch'
-
+import { resolveCancelVerdictLatch } from './server-cancel-verdict-latch'
+import { AgentHookServerStatusApplication } from './server-status-application'
 import { claimsPaneAfterExit } from './agent-exit-evidence'
 
-export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusRowMutation {
+export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusApplication {
+  protected readonly claudeOwedNotificationExpiry = new ClaudeOwedNotificationExpiryTimers(
+    this.state
+  )
+
+  // Every row mutation passes here, including cancellation and pane moves.
+  protected override commitStatusRowMutation(
+    before: EnrichedAgentHookEventPayload | null | undefined,
+    after: EnrichedAgentHookEventPayload | null | undefined,
+    emit = true
+  ): boolean {
+    if (after) {
+      this.claudeOwedNotificationExpiry.arm(after.paneKey, (row) => {
+        if (this.server) {
+          this.applyNormalizedStatus(row)
+        }
+      })
+    }
+    return super.commitStatusRowMutation(before, after, emit)
+  }
+
   protected applyNormalizedStatus(
-    incoming: IncomingAgentHookEvent,
+    incoming: AgentHookEventPayload & { authorityRestartId?: string },
     onAccepted?: () => void,
     origin: AgentStatusObservationOrigin = 'hook',
     observedAt?: number,
     mutationBefore?: EnrichedAgentHookEventPayload,
-    newRun = false,
-    retireBinding = false
+    newRun = false
   ): EnrichedAgentHookEventPayload | undefined {
-    const restated = this.restatingStatus
-    this.restatingStatus = false
-    const recordedRow = this.state.lastStatusByPaneKey.get(incoming.paneKey)
-    const sender = incoming.agentPresence?.process
-    const rootContext = previewHookPresence(
+    const transitioned = transitionHookPresence(
       incoming,
-      recordedRow,
-      (origin === 'hook' || origin === 'launch') && !restated,
-      retireBinding,
-      // A relay's owner is root proof only with the binding this link issued for the pane; its
-      // PID is never probed here. Without it the baseline never displaces a record.
-      incoming.connectionId
-        ? incoming.rooted && needsHookRootEvidence(recordedRow, sender)
-          ? 'root'
-          : undefined
-        : readHookProcessVerdict(this.state, recordedRow, {
-            paneKey: incoming.paneKey,
-            process: sender
-          })
+      this.state.lastStatusByPaneKey.get(incoming.paneKey)
     )
-    const { event: rootIdentityIncoming, statusAdmissionSession } = rootContext
-    const transitioned = rootContext.transitioned
     if (!transitioned) {
       return undefined
     }
-    const enrichedTransition = { ...rootIdentityIncoming, ...transitioned }
-    const { authorityRestartId, codexRosterAuthority, rooted: _, ...payload } = enrichedTransition
+    const { authorityRestartId, ...payload } = { ...incoming, ...transitioned }
     if (!this.canWriteLegacyStatusRow(payload)) {
       return undefined
     }
-    if (rootContext.exited) {
+    if (payload.agentPresence?.ended) {
       this.reconcileEndedProcessForPaneKeys([payload.paneKey], {
         preserveResumeIdentity: true,
         endedPresence: payload.agentPresence
@@ -90,24 +86,6 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusR
       | EnrichedAgentHookEventPayload
       | undefined
     const rowBefore = mutationBefore ?? previous
-    if (
-      previous?.paneSleep &&
-      !rootContext.acquired &&
-      !newRun &&
-      this.sameTerminalOwner(previous, payload) &&
-      previous.payload.agentType === payload.payload.agentType
-    ) {
-      return previous
-    }
-    if (
-      previous &&
-      payload.payload.sessionBoundary === true &&
-      !rootContext.acquired &&
-      this.sameTerminalOwner(previous, payload) &&
-      this.preservesStoppingDone(previous.paneKey)
-    ) {
-      return previous
-    }
     const terminalHandle =
       payload.terminalHandle ??
       (previous?.terminalHandle && this.sameTerminalOwner(previous, payload)
@@ -132,19 +110,19 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusR
     )
     const identity = resolveAgentStatusIdentity({
       existing:
-        previous && !rootContext.acquired && this.sameTerminalOwner(previous, terminalOwnedPayload)
+        previous && this.sameTerminalOwner(previous, terminalOwnedPayload)
           ? {
               agentType: previous.payload.agentType,
               state: previous.payload.state,
               updatedAt: previous.receivedAt,
               restoredUnconfirmed: previous.restoredUnconfirmed,
-              agentPresence: previous.providerSessionOnly ? undefined : rootContext.owner
+              agentPresence: previous.providerSessionOnly ? undefined : previous.agentPresence
             }
           : undefined,
       incoming: terminalOwnedPayload.payload.agentType,
-      // Relay process presence is the host's owner verdict; scoped session bytes only compare this hook.
+      // Relay presence is the execution host's owner verdict, not the sender's identity.
       incomingProcess: payload.connectionId ? undefined : incoming.agentPresence?.process,
-      incomingSession: statusAdmissionSession,
+      incomingSession: terminalOwnedPayload.providerSession?.id,
       now
     })
     if (
@@ -155,6 +133,10 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusR
     ) {
       this.commitStatusRowMutation(rowBefore, previous)
       return previous
+    }
+    // Any submitted prompt (incl. a replayed Codex start) opens a new turn; OSC must not inherit the old stamp.
+    if (payload.hookEventName === 'UserPromptSubmit' || payload.hasExplicitPrompt === true) {
+      this.activeHookTurnCompletedAtByPaneKey.delete(payload.paneKey)
     }
     if (terminalOwnedPayload.connectionId) {
       this.connectionTimestampWatermarkById.set(terminalOwnedPayload.connectionId, now)
@@ -183,26 +165,45 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusR
       this.emitEnrichedStatus(enriched)
       return enriched
     }
-    const stateReconciledPayload = reconcileCodexStatusEvent(
-      this.state,
-      terminalOwnedPayload,
-      previous,
-      codexRosterAuthority
-    )
-    if (!stateReconciledPayload) {
-      return undefined
-    }
-    if (previous && stateReconciledPayload === previous) {
-      return previous
-    }
+    const stateReconciledPayload =
+      (terminalOwnedPayload.connectionId || !terminalOwnedPayload.hookEventName) &&
+      terminalOwnedPayload.payload.agentType === 'codex' &&
+      (terminalOwnedPayload.hookEventName || terminalOwnedPayload.payload.mainAgent)
+        ? {
+            ...terminalOwnedPayload,
+            payload: reconcileRemoteCodexState(
+              this.state,
+              terminalOwnedPayload.paneKey,
+              terminalOwnedPayload.hookEventName,
+              terminalOwnedPayload.toolAgentId,
+              terminalOwnedPayload.payload,
+              previous?.payload
+            )
+          }
+        : terminalOwnedPayload
+    const previousCodexRoot =
+      stateReconciledPayload.payload.agentType === 'codex' &&
+      stateReconciledPayload.toolAgentId &&
+      previous?.payload.agentType === 'codex'
+        ? previous
+        : undefined
+    const preservedProviderSession = !stateReconciledPayload.providerSession
+      ? previousCodexRoot?.providerSession
+      : undefined
+    const preservedRootModel = !stateReconciledPayload.payload.model
+      ? previousCodexRoot?.payload.model
+      : undefined
     // Relay restart loses root context; child hooks must not erase persisted resume/model identity.
-    const rootContextPreservingPayload = retainHookRootContext(
-      stateReconciledPayload,
-      previous,
-      origin === 'hook',
-      !!previous && this.sameTerminalOwner(previous, stateReconciledPayload),
-      rootContext.returningProviderSession
-    )
+    const rootContextPreservingPayload =
+      preservedProviderSession || preservedRootModel
+        ? {
+            ...stateReconciledPayload,
+            ...(preservedProviderSession ? { providerSession: preservedProviderSession } : {}),
+            payload: preservedRootModel
+              ? { ...stateReconciledPayload.payload, model: preservedRootModel }
+              : stateReconciledPayload.payload
+          }
+        : stateReconciledPayload
     const identityResolvedPayload =
       identity.agentType === rootContextPreservingPayload.payload.agentType
         ? rootContextPreservingPayload

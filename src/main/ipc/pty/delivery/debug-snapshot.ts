@@ -1,9 +1,9 @@
-import { getAppEnvironment } from '../../../../shared/app-lifecycle/app-environment'
+import { getAppEnvironment } from '../../../../shared/app-environment'
 import {
   type PtyMainDeliveryDiagnostics,
   type PtyPerPtyDeliveryDiagnostics,
   redactPtyIdForDiagnostics
-} from '../../../../shared/terminal/pty/diagnostics/pty-delivery-diagnostics'
+} from '../../../../shared/pty-delivery-diagnostics'
 import {
   getHiddenRendererPtyDeliveryDebug,
   getHiddenRendererPtyIds,

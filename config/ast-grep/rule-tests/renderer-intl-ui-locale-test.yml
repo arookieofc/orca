@@ -1,5 +1,0 @@
-id: renderer-intl-ui-locale
-valid:
-  - 'Intl.DateTimeFormat().resolvedOptions().timeZone'
-invalid:
-  - 'Intl.DateTimeFormat()'

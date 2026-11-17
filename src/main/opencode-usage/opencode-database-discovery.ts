@@ -1,14 +1,11 @@
 import { stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-import {
-  wslGatedReaddir,
-  wslGatedStat
-} from '../native-chat/transcript-filesystem/wsl-transcript-fs-access'
-import { WslTranscriptFsError } from '../native-chat/transcript-filesystem/wsl-transcript-fs-error'
+import { wslGatedReaddir, wslGatedStat } from '../native-chat/wsl-transcript-fs-access'
+import { WslTranscriptFsError } from '../native-chat/wsl-transcript-fs-gate'
 import {
   resolveOpenCodeDataDirectory,
   resolveOpenCodeDatabasePath
-} from '../opencode/accounts/opencode-data-directory'
+} from '../opencode/opencode-data-directory'
 import type { OpenCodeUsageProcessedDatabase } from './types'
 
 type OpenCodeDatabaseOverride = {

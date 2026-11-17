@@ -19,10 +19,7 @@ import {
   waitForRenderedClientWebview
 } from './helpers/client-hosted-browser-fixture'
 import { startFreezableTcpProxy, type FreezableTcpProxy } from './helpers/freezable-tcp-proxy'
-import {
-  decodePairingOffer,
-  encodePairingOffer
-} from '../../src/shared/remote-runtime/pairing/pairing'
+import { decodePairingOffer, encodePairingOffer } from '../../src/shared/pairing'
 
 // Outlast the 15s lease grace; silent outages first need three missed 15s heartbeats to reap the socket.
 const OUTAGE_MS = { reset: 25_000, silent: 100_000 } as const

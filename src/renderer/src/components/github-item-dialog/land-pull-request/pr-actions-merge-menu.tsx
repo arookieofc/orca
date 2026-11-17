@@ -9,13 +9,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import type { presentGitHubPRMergeState } from '@/components/github-pr-merge-state'
-import type { resolveGitHubPRMergeMethods } from '../../../../../shared/github/pull-requests/merge/pull-request-merge-methods'
-import type { GitHubPRMergeMethod } from '../../../../../shared/github/pull-requests/pull-request-types'
-import { useTranslate } from '@/i18n/use-translate'
+import type { resolveGitHubPRMergeMethods } from '../../../../../shared/github/pull-request-merge-methods'
+import type { GitHubPRMergeMethod } from '../../../../../shared/github/pull-request-types'
+import { translate } from '@/i18n/i18n'
 import { getPullRequestMergeMethodLabel } from '@/components/github/pull-request-confirmation-copy'
-import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 
 export function PRActionsMergeMenu({
   itemUrl,
@@ -36,7 +35,6 @@ export function PRActionsMergeMenu({
   onMerge: (method: GitHubPRMergeMethod) => void
   onAutoMerge: () => void
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <DropdownMenu modal={false}>
       <Tooltip>
@@ -57,7 +55,7 @@ export function PRActionsMergeMenu({
               )}
               {mergePresentation.autoMergeAction?.label ??
                 (mergePresentation.directMergeAvailable
-                  ? getPullRequestMergeMethodLabel(mergeMethods.defaultMethod, t)
+                  ? getPullRequestMergeMethodLabel(mergeMethods.defaultMethod)
                   : mergePresentation.label)}
               <ChevronDown className="size-3 opacity-60" />
             </Button>
@@ -65,7 +63,7 @@ export function PRActionsMergeMenu({
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={6}>
           {!canMergeWithRepoContext
-            ? t(
+            ? translate(
                 'auto.components.GitHubItemDialog.5932578f51',
                 'Merge requires a registered local repo'
               )
@@ -86,12 +84,12 @@ export function PRActionsMergeMenu({
         {mergeMethods.methods.map((method) => (
           <DropdownMenuItem key={method} disabled={mergeDisabled} onSelect={() => onMerge(method)}>
             <GitMerge className="size-4" />
-            {getPullRequestMergeMethodLabel(method, t)}
+            {getPullRequestMergeMethodLabel(method)}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuItem onSelect={() => openAppHttpLink(itemUrl)}>
+        <DropdownMenuItem onSelect={() => window.api.shell.openUrl(itemUrl)}>
           <ExternalLink className="size-4" />
-          {t('auto.components.GitHubItemDialog.53fe19aefc', 'Open GitHub merge box')}
+          {translate('auto.components.GitHubItemDialog.53fe19aefc', 'Open GitHub merge box')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

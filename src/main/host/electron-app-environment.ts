@@ -1,9 +1,5 @@
 import { app } from 'electron'
-import type {
-  AppEnvironment,
-  AppPathName,
-  AppProcessMetric
-} from '../../shared/app-lifecycle/app-environment'
+import type { AppEnvironment, AppPathName, AppProcessMetric } from '../../shared/app-environment'
 
 export class ElectronAppEnvironment implements AppEnvironment {
   getPath(name: AppPathName): string {

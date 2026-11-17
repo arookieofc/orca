@@ -1,27 +1,18 @@
-import { mainI18n, translateMain } from '../i18n/main-i18n'
 import { app, BrowserWindow, nativeTheme, type WebContents, type Event } from 'electron'
 import { join } from 'node:path'
-import type { Store } from '../persistence/loading-store/store'
-import {
-  isBackgroundLaunch,
-  showWindowWithoutStealingFocus
-} from './activation/foreground-activation-policy'
-import { rectHasVisibleAreaOnAnyDisplay } from './presentation/window-bounds-validation'
+import type { Store } from '../persistence'
+import { isBackgroundLaunch, showWindowWithoutStealingFocus } from './foreground-activation-policy'
+import { rectHasVisibleAreaOnAnyDisplay } from './window-bounds-validation'
 import { sendToTrustedUIRenderer } from '../ipc/ui'
-import { installPrivilegedWindowNavigationPolicy } from './security/privileged-window-navigation'
+import { installPrivilegedWindowNavigationPolicy } from './privileged-window-navigation'
+import { stepUIZoomLevel, type UIZoomDirection } from '../../shared/ui-zoom-level'
+import { nativeZoomCommandMatchesKeybindings } from '../../shared/window-shortcut-policy'
 import {
-  stepUIZoomLevel,
-  type UIZoomDirection
-} from '../../shared/app-lifecycle/windows/ui-zoom-level'
-import { nativeZoomCommandMatchesKeybindings } from '../../shared/keybindings/window-shortcut-policy'
-import { keybindingMatchesAction } from '../../shared/keybindings/matching'
-import type {
-  KeybindingActionId,
-  KeybindingInput,
-  KeybindingOverrides
-} from '../../shared/keybindings/types'
-import { wslHostsWindowArguments } from '../wsl/host-lifecycle/wsl-host-gate'
-import { isMacAppPasteInput } from './editing/mac-app-paste-input'
+  keybindingMatchesAction,
+  type KeybindingActionId,
+  type KeybindingInput,
+  type KeybindingOverrides
+} from '../../shared/keybindings'
 
 const MIN_WIDTH = 480
 const MIN_HEIGHT = 360
@@ -134,9 +125,6 @@ export function createOrFocusDashboardPopout(
   options: { getKeybindings?: () => KeybindingOverrides | undefined } = {}
 ): BrowserWindow {
   if (dashboardPopoutWindow && !dashboardPopoutWindow.isDestroyed()) {
-    if (dashboardPopoutWindow.webContents.isCrashed()) {
-      dashboardPopoutWindow.webContents.reload()
-    }
     if (dashboardPopoutWindow.isMinimized()) {
       dashboardPopoutWindow.restore()
     }
@@ -148,15 +136,13 @@ export function createOrFocusDashboardPopout(
 
   const savedBounds = resolveRestoredBounds(store)
 
-  // Serve-only: this window lists saved WSL hosts and their Connect, as the main window does.
-  const wslArguments = wslHostsWindowArguments()
   const window = new BrowserWindow({
     width: savedBounds?.width ?? DEFAULT_WIDTH,
     height: savedBounds?.height ?? DEFAULT_HEIGHT,
     ...(savedBounds ? { x: savedBounds.x, y: savedBounds.y } : {}),
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
-    title: translateMain('native.dialog.dashboardTitle', 'Orca Agent Dashboard'),
+    title: 'Orca Agent Dashboard',
     show: false,
     autoHideMenuBar: true,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff',
@@ -167,8 +153,7 @@ export function createOrFocusDashboardPopout(
       // Chromium shares zoom by origin; isolate the session to keep popout zoom local.
       partition: DASHBOARD_POPOUT_PARTITION,
       // No webviews run here; disable embedding and omit host identity so client-placed pages stay mirrors.
-      webviewTag: false,
-      ...(wslArguments.length > 0 ? { additionalArguments: wslArguments } : {})
+      webviewTag: false
     }
   })
   installPrivilegedWindowNavigationPolicy(window.webContents)
@@ -199,14 +184,8 @@ export function createOrFocusDashboardPopout(
     }
   })
 
-  // No renderer shortcut routing exists here; handle paste and zoom chords and yield everything else.
+  // No renderer shortcut routing exists here; handle zoom chords and yield everything else.
   window.webContents.on('before-input-event', (event, input) => {
-    if (isMacAppPasteInput(input)) {
-      // Kitty-mode xterm encodes Cmd+V as CSI u and consumes it, so the Edit menu accelerator never fires.
-      event.preventDefault()
-      window.webContents.send('ui:appMenuPaste')
-      return
-    }
     if (input.type !== 'keyDown') {
       return
     }
@@ -269,18 +248,7 @@ export function createOrFocusDashboardPopout(
   window.on('close', freezeBounds)
   app.on('before-quit', freezeBounds)
 
-  window.on('page-title-updated', (event) => {
-    event.preventDefault()
-  })
-  const updateTitle = (): void => {
-    if (!window.isDestroyed()) {
-      window.setTitle(translateMain('native.dialog.dashboardTitle', 'Orca Agent Dashboard'))
-    }
-  }
-  mainI18n.on('languageChanged', updateTitle)
-
   window.on('closed', () => {
-    mainI18n.off('languageChanged', updateTitle)
     app.removeListener('before-quit', freezeBounds)
     unsubscribeUIChanged?.()
     if (dashboardPopoutWindow === window) {

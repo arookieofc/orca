@@ -1,4 +1,4 @@
-import type { RpcClient } from '../transport/rpc/rpc-client-contract'
+import type { RpcClient } from '../transport/rpc-client'
 import {
   fetchDictationSetup,
   setDictationConfig,

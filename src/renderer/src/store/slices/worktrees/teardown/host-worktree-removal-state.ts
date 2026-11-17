@@ -1,7 +1,7 @@
 import {
   LOCAL_EXECUTION_HOST_ID,
   type ExecutionHostId
-} from '../../../../../../shared/execution-host/execution-host'
+} from '../../../../../../shared/execution-host'
 import {
   isRecoverableRemoteRuntimeConnectionError,
   isRuntimeRpcQueueOverloadError,
@@ -13,7 +13,7 @@ import type { WorktreeSliceGet } from '../listing/worktree-slice-types'
 import {
   selectDetectedWorktreesByRepo,
   selectWorktreesByRepo
-} from '../../../workspaces/catalog/workspace-record-fields'
+} from '../../../workspace-record-selectors'
 
 export const UNFINISHED_WORKTREE_REMOVAL_ERROR = 'The delete did not finish. Try again.'
 

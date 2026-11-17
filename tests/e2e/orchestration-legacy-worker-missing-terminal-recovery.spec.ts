@@ -13,22 +13,12 @@ import {
   waitForSessionReady
 } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
-import { RuntimeClient } from '../../src/cli/runtime/client'
-import { DaemonClient } from '../../src/main/daemon/transport/client/daemon-client'
-import {
-  getDaemonSocketPath,
-  getDaemonTokenPath
-} from '../../src/main/daemon/launch/daemon-spawner'
+import { RuntimeClient } from '../../src/cli/runtime-client'
+import { DaemonClient } from '../../src/main/daemon/client'
+import { getDaemonSocketPath, getDaemonTokenPath } from '../../src/main/daemon/daemon-spawner'
 import Database from '../../src/main/sqlite/sync-database'
-import '../../src/main/runtime/orchestration/db/orchestration-db'
-import { LEGACY_CONTRACT_VERSION } from '../../src/main/runtime/orchestration/db/contract-constants'
-import '../../src/main/runtime/orchestration/db/messages/mailbox-routing-page'
-import '../../src/main/runtime/orchestration/db/dispatch-row-writer'
-import '../../src/main/runtime/orchestration/db/attempt-outcome-projection'
-import type {
-  RuntimeTerminalListResult,
-  RuntimeTerminalRead
-} from '../../src/shared/terminal/runtime/runtime-terminal-contracts'
+import { LEGACY_CONTRACT_VERSION } from '../../src/main/runtime/orchestration/db'
+import type { RuntimeTerminalListResult, RuntimeTerminalRead } from '../../src/shared/runtime-types'
 import {
   buildFakeAgentCommandOverride,
   FAKE_AGENT_WINDOWS_SHELL

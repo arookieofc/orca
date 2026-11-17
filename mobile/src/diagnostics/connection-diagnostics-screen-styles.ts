@@ -1,9 +1,18 @@
 import { StyleSheet } from 'react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
-import { themedStyleSheet } from '../theme/themed-styles'
+import { colors, spacing, typography } from '../theme/mobile-theme'
 
-export const connectionDiagnosticsScreenStyles = themedStyleSheet(() => ({
-  content: { flex: 1 },
+export const connectionDiagnosticsScreenStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bgBase, padding: spacing.lg },
+  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm
+  },
+  heading: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
   hostPicker: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -13,7 +22,7 @@ export const connectionDiagnosticsScreenStyles = themedStyleSheet(() => ({
   hostChip: {
     paddingVertical: spacing.xs + 2,
     paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
+    borderRadius: 16,
     backgroundColor: colors.bgRaised
   },
   hostChipActive: {
@@ -34,7 +43,7 @@ export const connectionDiagnosticsScreenStyles = themedStyleSheet(() => ({
     backgroundColor: colors.bgPanel,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle,
-    borderRadius: radii.surface,
+    borderRadius: 10,
     padding: spacing.md,
     marginBottom: spacing.md
   },
@@ -60,7 +69,7 @@ export const connectionDiagnosticsScreenStyles = themedStyleSheet(() => ({
     gap: spacing.xs,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: radii.control,
+    borderRadius: 8,
     backgroundColor: colors.bgRaised
   },
   sendButtonText: {
@@ -74,7 +83,7 @@ export const connectionDiagnosticsScreenStyles = themedStyleSheet(() => ({
     gap: spacing.xs + 2,
     paddingVertical: spacing.xs + 2,
     paddingHorizontal: spacing.md,
-    borderRadius: radii.control,
+    borderRadius: 8,
     backgroundColor: colors.bgRaised
   },
   copyButtonText: {
@@ -83,4 +92,4 @@ export const connectionDiagnosticsScreenStyles = themedStyleSheet(() => ({
     color: colors.textPrimary
   },
   emptyText: { fontSize: typography.metaSize, color: colors.textMuted, lineHeight: 18 }
-}))
+})

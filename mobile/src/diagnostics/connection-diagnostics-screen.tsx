@@ -12,9 +12,9 @@ import {
 import type { DiagnosticsDeviceOperations } from './diagnostics-device-operations'
 import type {
   ConnectionLogEntry,
+  ConnectionState,
   MobileConnectionDiagnosticPath
-} from './connection/connection-log-types'
-import type { ConnectionState } from '../transport/connection/connection-state'
+} from '../transport/types'
 
 export function ConnectionDiagnosticsScreen({
   device,
@@ -40,7 +40,7 @@ export function ConnectionDiagnosticsScreen({
   onBack: () => void
   hostPicker?: ReactNode
 }) {
-  const [copiedScope, setCopiedScope] = useState<{ hostId: string | null } | null>(null)
+  const [copiedHostId, setCopiedHostId] = useState<string | null>(null)
   const [submissionStates, setSubmissionStates] = useState<DiagnosticsSubmissionStates>({})
 
   const diagnosisArgs = host
@@ -51,19 +51,16 @@ export function ConnectionDiagnosticsScreen({
   const hostId = host?.id ?? null
   const submissionKey = hostId && incidentId ? `${hostId}:${incidentId}` : null
   const submissionState = getDiagnosticsSubmissionState(submissionStates, submissionKey)
-  const copied = copiedScope !== null && copiedScope.hostId === hostId
+  const copied = copiedHostId !== null && copiedHostId === hostId
 
   const copyDiagnostics = useCallback(async () => {
-    if (!device) {
+    if (!device || !hostId) {
       return
     }
     const { report } = await device.report()
     await writeClipboard(report)
-    setCopiedScope({ hostId })
-    setTimeout(
-      () => setCopiedScope((current) => (current?.hostId === hostId ? null : current)),
-      2000
-    )
+    setCopiedHostId(hostId)
+    setTimeout(() => setCopiedHostId((current) => (current === hostId ? null : current)), 2000)
   }, [device, hostId, writeClipboard])
 
   const sendDiagnostics = useCallback(async () => {

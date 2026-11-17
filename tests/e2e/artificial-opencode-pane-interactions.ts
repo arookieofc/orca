@@ -137,9 +137,6 @@ async function waitForActiveWorktreePaneLoad(
       }
     )
     .toBe(true)
-    .catch((error: unknown) => {
-      throw new Error(`${String(error)}\nLast pane snapshot: ${JSON.stringify(snapshot)}`)
-    })
   if (!snapshot) {
     throw new Error('Artificial load pane snapshot is unavailable')
   }

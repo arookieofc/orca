@@ -1,16 +1,16 @@
-import { TaskPageJiraStatusFilters } from './filters/TaskPageJiraStatusFilters'
-import { TaskPageJiraSavedFilters } from './filters/TaskPageJiraSavedFilters'
-import { TaskPageJiraFavouriteFilters } from './filters/TaskPageJiraFavouriteFilters'
+import { TaskPageJiraStatusFilters } from '../../TaskPageJiraStatusFilters'
+import { TaskPageJiraSavedFilters } from '../../TaskPageJiraSavedFilters'
+import { TaskPageJiraFavouriteFilters } from '../../TaskPageJiraFavouriteFilters'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
-import { useAppStore } from '@/store/index'
-import { getJiraProjectSelectionKey } from '@/components/task-page/jira/task-page-jira-project-selection'
-import { useTranslate } from '@/i18n/use-translate'
+import { useAppStore } from '@/store'
+import { getJiraProjectSelectionKey } from '@/components/task-page-jira-project-selection'
+import { translate } from '@/i18n/i18n'
 import { LoaderCircle, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { shouldSuppressEnterSubmit } from '@/lib/workspace/creation/new-workspace-enter-guard'
+import { shouldSuppressEnterSubmit } from '@/lib/new-workspace-enter-guard'
 import { JiraProjectPicker } from '@/components/jira-project-picker'
 import { matchesJiraProject } from '../../../../../shared/jira/jira-project-reference'
 export function TaskPageJiraFilters({
@@ -18,7 +18,6 @@ export function TaskPageJiraFilters({
 }: {
   model: TaskPageComposerActionsModel
 }): React.JSX.Element | null {
-  const t = useTranslate()
   const {
     jiraSavedFilters,
     jiraActiveSavedFilterId,
@@ -62,8 +61,8 @@ export function TaskPageJiraFilters({
               projects={sortedAvailableJiraProjects}
               value={model.jiraProjectFilter}
               onChange={model.setJiraProjectFilter}
-              label={t('components.jiraProjectPicker.label', 'Jira project')}
-              emptyLabel={t('components.jiraProjectPicker.all', 'All Jira projects')}
+              label={translate('components.jiraProjectPicker.label', 'Jira project')}
+              emptyLabel={translate('components.jiraProjectPicker.all', 'All Jira projects')}
               disabled={jiraProjectsLoading || jiraHasWorkspace}
             />
           </div>
@@ -112,7 +111,7 @@ export function TaskPageJiraFilters({
               setTaskResumeState({ jiraQuery: '' })
             }}
           >
-            {t('jira.workspace.mode', 'Has Workspace')}
+            {translate('jira.workspace.mode', 'Has Workspace')}
           </Button>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -158,7 +157,7 @@ export function TaskPageJiraFilters({
                   setNewJiraIssueOpen(true)
                 }}
                 disabled={sortedAvailableJiraProjects.length === 0 || jiraProjectsLoading}
-                aria-label={t('auto.components.TaskPage.0c11ca0b6d', 'New Jira issue')}
+                aria-label={translate('auto.components.TaskPage.0c11ca0b6d', 'New Jira issue')}
                 className="border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
               >
                 {jiraProjectsLoading ? (
@@ -169,7 +168,7 @@ export function TaskPageJiraFilters({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              {t('auto.components.TaskPage.0c11ca0b6d', 'New Jira issue')}
+              {translate('auto.components.TaskPage.0c11ca0b6d', 'New Jira issue')}
             </TooltipContent>
           </Tooltip>
           <Tooltip>
@@ -179,7 +178,7 @@ export function TaskPageJiraFilters({
                 size="icon"
                 onClick={() => setJiraRefreshNonce((n) => n + 1)}
                 disabled={jiraLoading}
-                aria-label={t('auto.components.TaskPage.2ff9fd71fd', 'Refresh Jira issues')}
+                aria-label={translate('auto.components.TaskPage.2ff9fd71fd', 'Refresh Jira issues')}
                 className="border-border/50 bg-transparent hover:bg-muted/50 backdrop-blur-md supports-[backdrop-filter]:bg-transparent"
               >
                 {jiraLoading ? (
@@ -190,7 +189,7 @@ export function TaskPageJiraFilters({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              {t('auto.components.TaskPage.2ff9fd71fd', 'Refresh Jira issues')}
+              {translate('auto.components.TaskPage.2ff9fd71fd', 'Refresh Jira issues')}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -238,8 +237,8 @@ export function TaskPageJiraFilters({
             }}
             placeholder={
               jiraHasWorkspace
-                ? t('jira.workspace.search', 'Search linked issues')
-                : t(
+                ? translate('jira.workspace.search', 'Search linked issues')
+                : translate(
                     'auto.components.TaskPage.99c2755218',
                     'Search issues or enter JQL, e.g. project = ABC'
                   )
@@ -249,7 +248,7 @@ export function TaskPageJiraFilters({
           {jiraSearchInput ? (
             <button
               type="button"
-              aria-label={t('auto.components.TaskPage.b797bdd7c3', 'Clear search')}
+              aria-label={translate('auto.components.TaskPage.b797bdd7c3', 'Clear search')}
               onClick={() => {
                 void clearJiraSavedFilterSelection().catch(() => {})
                 setJiraSearchInput('')

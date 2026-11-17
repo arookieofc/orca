@@ -1,16 +1,12 @@
-import { runAsAutomaticDeselection } from '@/store/workspaces/selection/active-worktree-deselection-intent'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../../../shared/workspace/identity/floating-workspace-id'
-import { getRepoExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
-import {
-  folderWorkspaceKey,
-  parseWorkspaceKey
-} from '../../../../../../shared/workspace/identity/workspace-scope'
+import { runAsAutomaticDeselection } from '@/store/active-worktree-deselection-intent'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../../../shared/constants'
+import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
+import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
-import { findWslMovedProjectForWorkspace } from '../../../repos/wsl-moved-projects'
 import {
   selectDetectedWorktreesByRepo,
   selectFolderWorkspaces
-} from '../../../workspaces/catalog/workspace-record-fields'
+} from '../../../workspace-record-selectors'
 import { worktreeListingRefusal } from './detected-worktree-refresh-admission'
 import { worktreeCatalogVersionKey } from './worktree-catalog-version-state'
 import type { WorktreeRefreshResult } from './worktree-refresh-result'
@@ -71,14 +67,6 @@ export function purgeHydratedWorktrees(
   for (const key of Object.keys(state.restoredRuntimeHostIdByWorkspaceSessionKey ?? {})) {
     if (parseWorkspaceKey(key)?.type === 'folder') {
       validIds.add(key)
-    }
-  }
-  // Why: hydration kept only a moved project's chats, which stay on this computer.
-  if ((state.wslMovedProjects ?? []).length > 0) {
-    for (const key of Object.keys(state.unifiedTabsByWorktree)) {
-      if (findWslMovedProjectForWorkspace(state, key)) {
-        validIds.add(key)
-      }
     }
   }
   for (const result of Object.values(selectDetectedWorktreesByRepo(state))) {

@@ -1,7 +1,7 @@
 import {
   pairedRuntimeConnectionFromOffer,
   type PairedRuntimeConnection
-} from '../pairing/paired-runtime-connection'
+} from '../../paired-runtime-connection'
 import type { AddressInfo } from 'node:net'
 import { WebSocketServer, type WebSocket } from 'ws'
 import {
@@ -11,9 +11,9 @@ import {
   generateKeyPair,
   publicKeyFromBase64,
   publicKeyToBase64
-} from '../e2ee/node/e2ee-crypto'
-import { encodePairingOffer, parsePairingCode } from '../pairing/pairing'
-import type { PairingOffer } from '../pairing/mobile-relay-pairing-offer'
+} from '../../e2ee-crypto'
+import { encodePairingOffer, parsePairingCode } from '../../pairing'
+import type { PairingOffer } from '../../mobile-relay-pairing-offer'
 
 export type SharedControlTestServer = {
   pairing: PairedRuntimeConnection
@@ -26,7 +26,6 @@ export type SharedControlTestServer = {
 }
 
 type ServerOptions = {
-  onClientClose?: () => void
   resultForRequest?: (method: string) => unknown
   delaySubscriptionReady?: boolean
   sendKeepaliveBeforeResponse?: boolean
@@ -43,12 +42,6 @@ type ServerOptions = {
   silentMethods?: string[]
   /** Refuses every auth the way a server that dropped this device does. */
   rejectAuth?: boolean
-  /** The server's host key, so a restarted server can keep (or change) its identity. */
-  keyPair?: { publicKey: Uint8Array; secretKey: Uint8Array }
-  /** The token printed in the server's pairing offer. */
-  deviceToken?: string
-  /** Accepts only the auths this returns true for; refused like `rejectAuth`. */
-  authorize?: (auth: unknown) => boolean
 }
 
 const servers: WebSocketServer[] = []
@@ -70,7 +63,7 @@ export async function closeSharedControlTestServers(): Promise<void> {
 export async function createSharedControlTestServer(
   options: ServerOptions = {}
 ): Promise<SharedControlTestServer> {
-  const serverKeyPair = options.keyPair ?? generateKeyPair()
+  const serverKeyPair = generateKeyPair()
   const requests: SharedControlTestServer['requests'] = []
   const auths: unknown[] = []
   const delayedResponses: (() => void)[] = []
@@ -85,9 +78,7 @@ export async function createSharedControlTestServer(
   servers.push(wss)
 
   wss.on('connection', (ws) => {
-    if (options.onClientClose) {
-      ws.once('close', options.onClientClose)
-    }
+    connectionCount += 1
     let sharedKey: Uint8Array | null = null
     let authenticated = false
     ws.on('message', (data, isBinary) => {
@@ -96,13 +87,7 @@ export async function createSharedControlTestServer(
       }
       const frame = data.toString()
       if (!sharedKey) {
-        const hello: { publicKeyB64?: string } = JSON.parse(frame)
-        if (!hello.publicKeyB64) {
-          // Legacy-only host: refuses a v2 hello the way hosts before v2 do.
-          ws.close(4001, 'Invalid e2ee_hello')
-          return
-        }
-        connectionCount += 1
+        const hello = JSON.parse(frame) as { publicKeyB64: string }
         sharedKey = deriveSharedKey(
           serverKeyPair.secretKey,
           publicKeyFromBase64(hello.publicKeyB64)
@@ -121,9 +106,8 @@ export async function createSharedControlTestServer(
         return
       }
       if (!authenticated) {
-        const auth: unknown = JSON.parse(plaintext)
-        auths.push(auth)
-        if (options.rejectAuth || (options.authorize && !options.authorize(auth))) {
+        auths.push(JSON.parse(plaintext))
+        if (options.rejectAuth) {
           sendEncrypted(ws, sharedKey, { type: 'e2ee_error', error: { code: 'unauthorized' } })
           return
         }
@@ -160,7 +144,7 @@ export async function createSharedControlTestServer(
     encodePairingOffer({
       v: 2,
       endpoint: `ws://127.0.0.1:${address.port}`,
-      deviceToken: options.deviceToken ?? 'device-token',
+      deviceToken: 'device-token',
       publicKeyB64: publicKeyToBase64(serverKeyPair.publicKey)
     })
   )

@@ -1,15 +1,13 @@
-import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
-import type { RuntimeMobileSessionTabsResult } from '../../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
+import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { RuntimeMobileSessionTabsResult } from '../../../../../shared/runtime-session-contracts'
+import { deleteStructuredAgentLaunchRecord } from './structured-agent-session-launch-persistence'
 import {
-  deleteStructuredAgentLaunchRecord,
-  readStructuredAgentLaunchRecord
-} from './structured-agent-session-launch-persistence'
-import { hasStructuredAgentSessionLaunchCancellationTombstone } from './structured-agent-session-launch-registry'
-import {
+  getPersistedStructuredAgentLaunchRecord,
   getStructuredLaunchStateBySessionId,
+  hasStructuredAgentSessionLaunchCancellationTombstone,
   notifyStructuredLaunchListeners
-} from './structured-agent-session-launch-state-store'
-import { forgetUnlistedCreatedChat } from './pane/structured-agent-session-unlisted-created-chats'
+} from './structured-agent-session-launch-registry'
+import { forgetUnlistedCreatedChat } from '../../structured-agent-session-unlisted-created-chats'
 
 function confirmStructuredLaunchFirstMessagePublication(
   worktreeId: string,
@@ -33,7 +31,7 @@ export function markStructuredAgentSessionLaunchPublished(
 ): boolean {
   const state = getStructuredLaunchStateBySessionId(sessionId)
   if (!state) {
-    const persisted = readStructuredAgentLaunchRecord(sessionId)
+    const persisted = getPersistedStructuredAgentLaunchRecord(sessionId)
     if (persisted?.executionHostId !== executionHostId) {
       return false
     }
@@ -45,7 +43,7 @@ export function markStructuredAgentSessionLaunchPublished(
       return false
     }
     deleteStructuredAgentLaunchRecord(sessionId)
-    notifyStructuredLaunchListeners(sessionId)
+    notifyStructuredLaunchListeners()
     return true
   }
   if (
@@ -73,7 +71,7 @@ export function markStructuredAgentSessionLaunchPublished(
   state.callers.outcome = 'published'
   deleteStructuredAgentLaunchRecord(sessionId)
   state.callers.onSettled()
-  notifyStructuredLaunchListeners(sessionId)
+  notifyStructuredLaunchListeners()
   return true
 }
 

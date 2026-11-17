@@ -1,5 +1,5 @@
 import type { IUnicodeHandling } from '@xterm/xterm'
-import type { XtermUnicodeServiceCore } from '../../../../src/shared/terminal/appearance/terminal-unicode-provider'
+import type { XtermUnicodeServiceCore } from '../../../../src/shared/terminal-unicode-provider'
 
 // Describe only xterm members the document consumes; native globals and embedded imports satisfy the same seam.
 
@@ -56,10 +56,6 @@ export type TerminalDocumentTerminalOptions = {
   theme: TerminalDocumentTheme
   minimumContrastRatio: number
   fontSize: number
-  fontFamily: string
-  fontWeight: string
-  fontWeightBold: string
-  lineHeight: number
 }
 
 export type TerminalDocumentTerminal = {

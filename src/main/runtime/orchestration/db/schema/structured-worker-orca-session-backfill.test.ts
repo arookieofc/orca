@@ -3,7 +3,7 @@ import {
   mintStructuredWorkerHandle,
   mintStructuredWorkerPaneKey,
   structuredWorkerProcessIncarnation
-} from '../../terminal-authority/structured-sessions/structured-worker-identity'
+} from '../../../structured-worker-identity'
 import { OrchestrationDb } from '../orchestration-db'
 import { backfillStructuredWorkerOrcaSessionIds } from './structured-worker-orca-session-backfill'
 

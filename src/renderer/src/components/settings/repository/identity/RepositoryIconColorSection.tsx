@@ -1,12 +1,9 @@
-import {
-  DEFAULT_REPO_BADGE_COLOR,
-  REPO_COLORS,
-  normalizeRepoBadgeColor
-} from '../../../../../../shared/repository/appearance/repo-badge-color'
+import { DEFAULT_REPO_BADGE_COLOR, REPO_COLORS } from '../../../../../../shared/constants'
+import { normalizeRepoBadgeColor } from '../../../../../../shared/repo-badge-color'
 import { Label } from '../../../ui/label'
 import { ColorPicker } from '../../../ui/color-picker'
-import { cn } from '@/lib/class-names'
-import { useTranslate } from '@/i18n/use-translate'
+import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
 
 type RepositoryIconColorSectionProps = {
   badgeColor: string | null | undefined
@@ -17,14 +14,13 @@ export function RepositoryIconColorSection({
   badgeColor,
   onBadgeColorChange
 }: RepositoryIconColorSectionProps): React.JSX.Element {
-  const t = useTranslate()
   const selectedBadgeColor = normalizeRepoBadgeColor(badgeColor) ?? DEFAULT_REPO_BADGE_COLOR
   const isPresetBadgeColor = REPO_COLORS.some((color) => color === selectedBadgeColor)
 
   return (
     <div className="space-y-2">
       <Label className="text-sm font-semibold">
-        {t('auto.components.settings.RepositoryIconPicker.642dc29c6d', 'Color')}
+        {translate('auto.components.settings.RepositoryIconPicker.642dc29c6d', 'Color')}
       </Label>
       <div className="flex flex-wrap items-center gap-2">
         {REPO_COLORS.map((color) => (
@@ -32,7 +28,7 @@ export function RepositoryIconColorSection({
             key={color}
             type="button"
             onClick={() => onBadgeColorChange(color)}
-            aria-label={t(
+            aria-label={translate(
               'auto.components.settings.RepositoryIconPicker.2b7d27b93c',
               'Use {{value0}} repo color',
               { value0: color }
@@ -52,18 +48,18 @@ export function RepositoryIconColorSection({
           onChange={onBadgeColorChange}
           label={
             isPresetBadgeColor
-              ? t(
+              ? translate(
                   'auto.components.settings.RepositoryIconPicker.0e5f0693c1',
                   'Choose custom repo color'
                 )
-              : t(
+              : translate(
                   'auto.components.settings.RepositoryIconPicker.913c55833d',
                   'Custom repo color {{value0}}',
                   { value0: selectedBadgeColor }
                 )
           }
           selected={!isPresetBadgeColor}
-          triggerLabel={t('auto.components.settings.RepositoryIconPicker.custom', 'Custom')}
+          triggerLabel="Custom"
           showHexInTrigger={!isPresetBadgeColor}
           className="h-7 px-2"
         />

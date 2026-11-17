@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 type SparseSelectedDirectoryListProps = {
   directories: string[]
@@ -13,11 +13,10 @@ export function SparseSelectedDirectoryList({
   disabled,
   onRemove
 }: SparseSelectedDirectoryListProps): React.JSX.Element {
-  const t = useTranslate()
   if (directories.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-        {t('sparsePreset.noDirectories', 'No folders added yet.')}
+        {translate('sparsePreset.noDirectories', 'No folders added yet.')}
       </div>
     )
   }
@@ -36,7 +35,7 @@ export function SparseSelectedDirectoryList({
             variant="ghost"
             disabled={disabled}
             onClick={() => onRemove(directory)}
-            aria-label={t('sparsePreset.removePath', 'Remove {{name}}', {
+            aria-label={translate('sparsePreset.removePath', 'Remove {{name}}', {
               name: directory
             })}
             className="shrink-0"

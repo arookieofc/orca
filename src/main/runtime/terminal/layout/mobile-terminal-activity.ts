@@ -1,17 +1,15 @@
 import { OrcaRuntimeWithMarkPtyLivenessUnverifiable } from './terminal-input-floor'
-import type { ApplyLayoutResult } from './terminal-layout-state'
-import type { RuntimeTerminalDriverState } from '../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
-import { clampTerminalViewport } from '../../../../shared/terminal/viewport/terminal-viewport'
+import type { ApplyLayoutResult, DriverState } from '../../orca-runtime-core'
+import { clampTerminalViewport } from '../../../../shared/terminal-viewport'
 
 export abstract class OrcaRuntimeWithMobileTookFloor extends OrcaRuntimeWithMarkPtyLivenessUnverifiable {
   abstract applyMobileDisplayMode(ptyId: string): Promise<boolean>
-  abstract setMobileDisplayMode(ptyId: string, mode: 'auto' | 'desktop'): void
 
   // Mobile gestures reclaim desktop take-back and fit the active viewport; mobile-to-mobile handoffs preserve resize.
   async mobileTookFloor(
     ptyId: string,
     clientId: string,
-    previousFloor?: RuntimeTerminalDriverState,
+    previousFloor?: DriverState,
     isCurrent?: () => boolean
   ): Promise<void> {
     if (!isCurrent) {
@@ -30,11 +28,11 @@ export abstract class OrcaRuntimeWithMobileTookFloor extends OrcaRuntimeWithMark
       sub.lastActedAt = Date.now()
     }
     const prev = previousFloor ?? this.getDriver(ptyId)
-    const currentMode = this.getMobileDisplayMode(ptyId)
+    const currentMode = this.mobileDisplayModes.get(ptyId)
     // A deliberate mobile gesture clears desktop mode so phone-fit can reclaim the PTY (docs/mobile-presence-lock.md).
     if (prev.kind === 'desktop' || currentMode === 'desktop') {
       if (currentMode === 'desktop') {
-        this.setMobileDisplayMode(ptyId, 'auto')
+        this.mobileDisplayModes.delete(ptyId)
       }
       await this.applyMobileDisplayMode(ptyId)
     }

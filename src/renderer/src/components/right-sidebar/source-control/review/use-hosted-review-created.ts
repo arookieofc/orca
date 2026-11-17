@@ -1,4 +1,3 @@
-import { useSourceControlScope } from '../panel/worktree-scope'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import {
@@ -6,7 +5,7 @@ import {
   resolveSupportedHostedReviewCopyProvider
 } from '@/i18n/hosted-review-localized-copy'
 import { translate } from '@/i18n/i18n'
-import { resolveCreatedHostedReviewLink } from './source-control-created-review-link'
+import { resolveCreatedHostedReviewLink } from '../../source-control-created-review-link'
 import type { SourceControlStoreActions } from '../listing/use-store-actions'
 import type { SourceControlWorktreeContext } from '../listing/use-worktree-context'
 import type { SourceControlStatusRefresh } from '../sync/use-status-refresh'
@@ -15,7 +14,6 @@ import type {
   CreatedHostedReview,
   HostedReviewCreatedContext
 } from './hosted-review-creation-state'
-import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 
 export function useSourceControlHostedReviewCreated({
   activeRepo,
@@ -50,8 +48,6 @@ export function useSourceControlHostedReviewCreated({
   setRightSidebarTab: SourceControlStoreActions['setRightSidebarTab']
   updateWorktreeMeta: SourceControlStoreActions['updateWorktreeMeta']
 }) {
-  const scope = useSourceControlScope()
-  const checksTab = scope ? 'pr-checks' : 'checks'
   const handlePullRequestCreated = useCallback(
     async (result: CreatedHostedReview, context?: HostedReviewCreatedContext): Promise<void> => {
       const repoPath = context?.repoPath ?? activeRepo?.path
@@ -67,7 +63,7 @@ export function useSourceControlHostedReviewCreated({
       )
       if (openChecks) {
         setRightSidebarOpen(true)
-        setRightSidebarTab(checksTab)
+        setRightSidebarTab('checks')
       }
       try {
         const createdLink = resolveCreatedHostedReviewLink(result.provider, result.number)
@@ -127,14 +123,13 @@ export function useSourceControlHostedReviewCreated({
                 'Open on {{value0}}',
                 { value0: copy.providerName }
               ),
-              onClick: () => openAppHttpLink(result.url, { worktreeId })
+              onClick: () => window.api.shell.openUrl(result.url)
             }
           }
         )
       }
     },
     [
-      checksTab,
       activeRepo,
       activeWorktreeId,
       branchName,
@@ -154,8 +149,8 @@ export function useSourceControlHostedReviewCreated({
 
   const openHostedReviewInChecks = useCallback(() => {
     setRightSidebarOpen(true)
-    setRightSidebarTab(checksTab)
-  }, [checksTab, setRightSidebarOpen, setRightSidebarTab])
+    setRightSidebarTab('checks')
+  }, [setRightSidebarOpen, setRightSidebarTab])
 
   const handleBranchChangedByPullRequestGeneration = useCallback(async (): Promise<void> => {
     // AI detail generation may rebase; refresh moved HEAD before the user submits.

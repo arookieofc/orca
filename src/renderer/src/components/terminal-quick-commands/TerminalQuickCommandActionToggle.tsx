@@ -1,8 +1,8 @@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import type { TerminalQuickCommandDialogAction } from './terminal-quick-command-dialog-draft'
 import { QUICK_COMMAND_TOGGLE_ITEM_CLASS } from './terminal-quick-command-toggle-style'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 type TerminalQuickCommandActionToggleProps = {
   selectedAction: TerminalQuickCommandDialogAction
@@ -13,7 +13,6 @@ export function TerminalQuickCommandActionToggle({
   selectedAction,
   onActionChange
 }: TerminalQuickCommandActionToggleProps): React.JSX.Element {
-  const t = useTranslate()
   return (
     <ToggleGroup
       type="single"
@@ -30,12 +29,12 @@ export function TerminalQuickCommandActionToggle({
       <ToggleGroupItem
         value="terminal-command"
         className={cn(QUICK_COMMAND_TOGGLE_ITEM_CLASS, 'w-full justify-center')}
-        aria-label={t(
+        aria-label={translate(
           'auto.components.terminal.quick.commands.TerminalQuickCommandActionToggle.b5ea4d64f6',
           'Terminal Command'
         )}
       >
-        {t(
+        {translate(
           'auto.components.terminal.quick.commands.TerminalQuickCommandActionToggle.terminal_short',
           'Terminal'
         )}
@@ -43,12 +42,12 @@ export function TerminalQuickCommandActionToggle({
       <ToggleGroupItem
         value="agent-prompt"
         className={cn(QUICK_COMMAND_TOGGLE_ITEM_CLASS, 'w-full justify-center')}
-        aria-label={t(
+        aria-label={translate(
           'auto.components.terminal.quick.commands.TerminalQuickCommandActionToggle.b0d58e37ed',
           'Agent Prompt'
         )}
       >
-        {t(
+        {translate(
           'auto.components.terminal.quick.commands.TerminalQuickCommandActionToggle.agent_short',
           'Agent'
         )}

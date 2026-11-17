@@ -3,7 +3,7 @@ import type {
   RelayLockOptions,
   RelayTransactionOptions,
   SqlRow
-} from '../database/database.js'
+} from '../database.js'
 
 // Count real round trips including BEGIN/COMMIT rather than inferring from query counts.
 export class StatementRecordingDatabase implements RelayDatabase {

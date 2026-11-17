@@ -5,25 +5,22 @@ import {
   ORCAD_NODE_RUNTIME_DIR_PREFIX,
   ORCAD_NODE_RUNTIME_WINDOWS_EXECUTABLE,
   ORCAD_RUNTIMES_DIRNAME
-} from '../../../shared/remote-runtime/orcad-distribution/orcad-artifacts'
-import {
-  pinnedNodeRuntimeAsset,
-  type NodeRuntimeTarget
-} from '../../../shared/node-runtime/node-runtime-pin'
+} from '../../../shared/orcad-artifacts'
+import { pinnedNodeRuntimeAsset, type NodeRuntimeTarget } from '../../../shared/node-runtime-pin'
 import { randomUUID } from 'node:crypto'
-import type { OrcadHostTransport } from './orcad-host-transport'
+import type { OrcadHostTransport } from '../../ssh/orcad-host-transport'
 import {
   execCommand,
   isUnconfirmedSshCommandTermination
 } from '../../ssh/remote-exec/remote-exec-command'
-import { RELAY_REMOTE_DIR } from './remote-install-root'
+import { RELAY_REMOTE_DIR } from '../../ssh/remote-exec/remote-frame-protocol'
 import {
   joinRemotePath,
   remoteDirname,
   type RemoteHostPlatform
-} from '../../ssh/remote-host/ssh-remote-platform'
-import { quotePowerShellLiteral as powerShellLiteral } from '../../../shared/shell/launch/powershell-native-argument'
-import { ORCAD_WINDOWS_COMMAND_LINE_UNSAFE_CODE } from '../../orcad/diagnostics/orcad-host-unavailable'
+} from '../../ssh/ssh-remote-platform'
+import { quotePowerShellLiteral as powerShellLiteral } from '../../../shared/powershell-native-argument'
+import { ORCAD_WINDOWS_COMMAND_LINE_UNSAFE_CODE } from '../../orcad/orcad-host-unavailable'
 import {
   ORCAD_WINDOWS_HOST_SCRIPT,
   ORCAD_WINDOWS_HOST_SCRIPT_FILENAME,

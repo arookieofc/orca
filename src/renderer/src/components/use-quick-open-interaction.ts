@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
-import { selectFileListWorktree } from '@/store/workspaces/selection/known-worktree-selection'
-import { getFileExplorerOperationOwnerFromState } from './right-sidebar/file-explorer/navigation/file-explorer-operation-owner'
+import { getFileExplorerOperationOwnerFromState } from './right-sidebar/file-explorer-operation-owner'
 import {
   selectDetectedWorktreesByRepo,
   selectFolderWorkspaces,
   selectWorktreesByRepo
-} from '@/store/workspaces/catalog/workspace-record-fields'
+} from '@/store/workspace-record-selectors'
 
 export function useQuickOpenInteraction(worktreeId: string | null): {
   opening: boolean
@@ -21,9 +20,9 @@ export function useQuickOpenInteraction(worktreeId: string | null): {
   }, [])
   useEffect(() => {
     const currentGeneration = generation.current
-    let rootPath = selectFileListWorktree(useAppStore.getState(), worktreeId)?.path
+    let rootPath = useAppStore.getState().getKnownWorktreeById(worktreeId ?? '')?.path
     const unsubscribe = useAppStore.subscribe((state, previous) => {
-      const nextRootPath = selectFileListWorktree(state, worktreeId)?.path
+      const nextRootPath = state.getKnownWorktreeById(worktreeId ?? '')?.path
       if (
         nextRootPath !== rootPath ||
         state.activeModal !== previous.activeModal ||

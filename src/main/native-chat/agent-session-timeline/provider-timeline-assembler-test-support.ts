@@ -1,10 +1,9 @@
-import { readTestJournalItems } from '../agent-session-journal/journal-observation.test-support'
 // Exercise grammar events through the real deferred sink and on-disk journal.
 
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { agentJournalItemKey } from '../../../shared/agent-session/journal/agent-session-journal-item-key'
+import { agentJournalItemKey } from '../../../shared/agent-session-journal-item-key'
 import type {
   AgentJournalApprovalItem,
   AgentJournalItemBody,
@@ -12,37 +11,35 @@ import type {
   AgentJournalRenderItem,
   AgentJournalToolCallItem,
   AgentJournalTurnLifecycle
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
-import { readAgentJournalTurn } from '../../../shared/agent-session/lifecycle/records/agent-session-turn-record'
-import { backgroundTaskFallbackText } from '../../../shared/native-chat/input/task-lists/native-chat-background-task-row'
+} from '../../../shared/agent-session-journal-types'
+import { readAgentJournalTurn } from '../../../shared/agent-session-turn-record'
+import { backgroundTaskFallbackText } from '../../../shared/native-chat/input/native-chat-background-task-row'
 import {
   isBackgroundTaskBlock,
   type NativeChatBackgroundTaskBlock
-} from '../../../shared/native-chat/native-chat-types'
+} from '../../../shared/native-chat-types'
 import {
   closeTestJournalHostDatabase,
   createTrackedJournalOpener,
   type TestJournalOptions
-} from '../agent-session-journal/store-lifecycle/journal-host-database-test-support'
+} from '../agent-session-journal/journal-host-database-test-support'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import {
   createDeferredStructuredAgentSessionEventSink,
   type StructuredAgentSessionEventSink
-} from '../agent-session-wire/journal-ingress/structured-agent-session-event-sink'
-import { testEventSinkLogging } from '../agent-session-wire/host/testing/structured-agent-session-logger.test-fixture'
+} from '../agent-session-wire/structured-agent-session-event-sink'
+import { testEventSinkLogging } from '../agent-session-wire/structured-agent-session-logger-test-support'
 import {
   createProviderTimelineAssembler,
   type ProviderTimelineAssembler,
   type ProviderTimelineAssemblerDeps
 } from './provider-timeline-assembler'
-import '../agent-session-wire/termination/structured-agent-session-dead-generation-settlement'
-import { settleStaleStructuredAgentSessionState } from '../agent-session-wire/termination/structured-agent-session-stale-state-settlement'
+import { settleStaleStructuredAgentSessionState } from '../agent-session-wire/structured-agent-session-dead-generation-settlement'
 import {
   createLegacyProviderTimelineIdentityScheme,
   type ProviderTimelineItemFamily
 } from './provider-timeline-identity'
 import { providerTimelineSink, type ProviderTimelineSink } from './provider-timeline-plan'
-import { boundTarget } from './provider-timeline-bound-target-test-support'
 
 export const SESSION = 'session-timeline'
 export const AGENT = 'grok'
@@ -179,7 +176,7 @@ export function openUnboundProviderTimelineAssembler(
   return {
     assembler,
     bind: async () => {
-      deferred.bind(boundTarget(journal))
+      deferred.bind({ journal, fence: 1, publish: () => {} })
       await deferred.drained()
     },
     drained: async () => {
@@ -235,9 +232,9 @@ export async function openProviderTimelineRig(
     stateDirectory: root,
     now: () => 1_000
   }
-  let journal = await journals.open(journalOptions)
+  const journal = await journals.open(journalOptions)
   const deferred = createDeferredStructuredAgentSessionEventSink(testEventSinkLogging())
-  deferred.bind(boundTarget(journal))
+  deferred.bind({ journal, fence: 1, publish: () => {} })
   cleanups.push(async () => {
     deferred.close()
   })
@@ -270,7 +267,7 @@ export async function openProviderTimelineRig(
   const rows = async () => {
     elapse()
     await deferred.drained()
-    return await readTestJournalItems(journal)
+    return journal.snapshot().items
   }
   const turns = async () =>
     (await rows()).flatMap((item) => {
@@ -286,10 +283,8 @@ export async function openProviderTimelineRig(
     reopenJournal: async () => {
       await rows()
       await journal.close()
-      await closeTestJournalHostDatabase(root)
-      journal = await journals.open(journalOptions)
-      rig.journal = journal
-      return journal
+      closeTestJournalHostDatabase(root)
+      return journals.open(journalOptions)
     },
     restart: async (more = {}) => {
       generations += 1

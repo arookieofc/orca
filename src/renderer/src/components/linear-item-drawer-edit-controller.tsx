@@ -1,9 +1,3 @@
-import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
-import { writeLinearIssue } from '@/lib/work-items/linear/linear-issue-write'
-import {
-  taskProviderErrorMessage,
-  taskProviderErrorText
-} from '@/lib/work-items/task-provider-error-copy'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -14,20 +8,22 @@ import {
   useTeamMembers,
   useImmediateMutation
 } from '@/hooks/useIssueMetadata'
-import { linearUpdateIssue } from '@/runtime/linear/runtime-linear-issue-client'
+import { linearUpdateIssue } from '@/runtime/runtime-linear-issue-mutations'
 import { translate } from '@/i18n/i18n'
 import { formatLinearEstimateInput } from '@/components/linear-item-drawer-edit-controls'
 import type { LinearIssueEditSectionProps } from '@/components/linear-item-drawer-types'
-import { defaultScopeSource } from '@/runtime/hosts/selection/default-creation-host'
+import { defaultScopeSource } from '@/lib/default-creation-host'
 
 export function useLinearIssueEditController({
   issue,
   editState,
+  onEditStateChange,
   layout = 'chips',
   sourceContext
 }: LinearIssueEditSectionProps) {
   const [labelPopoverOpen, setLabelPopoverOpen] = useState(false)
   const [estimatePopoverOpen, setEstimatePopoverOpen] = useState(false)
+  const patchLinearIssue = useAppStore((s) => s.patchLinearIssue)
   const settings = useAppStore((s) => s.settings)
   const providerSettings = sourceContext ?? defaultScopeSource(settings)
   const { isPending, run } = useImmediateMutation()
@@ -64,64 +60,104 @@ export function useLinearIssueEditController({
         return
       }
 
+      const prevState = localState
       const stateValue = { name: newState.name, type: newState.type, color: newState.color }
 
-      const scope = getLinearSourceScope(providerSettings)
       run('state', {
-        mutate: () =>
-          writeLinearIssue(
-            { ...issue, ...editState },
-            { state: stateValue },
-            providerSettings,
-            () => linearUpdateIssue(providerSettings, issue.id, { stateId }, issue.workspaceId)
-          ),
+        mutate: () => linearUpdateIssue(providerSettings, issue.id, { stateId }, issue.workspaceId),
+        onOptimistic: () => {
+          onEditStateChange({ state: stateValue })
+          patchLinearIssue(issue.id, { state: stateValue }, { sourceContext })
+        },
+        onRevert: () => {
+          onEditStateChange({ state: prevState })
+          patchLinearIssue(issue.id, { state: prevState }, { sourceContext })
+        },
         onSuccess: () => {
-          useAppStore.getState().invalidateLinearIssueLists({ scope })
+          useAppStore.getState().invalidateLinearIssueLists({ sourceContext })
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        formatError: taskProviderErrorMessage,
-        onError: (err) => toast.error(taskProviderErrorText(err))
+        onError: (err) => toast.error(err)
       })
     },
-    [issue, editState, providerSettings, states.data, run]
+    [
+      issue.id,
+      issue.workspaceId,
+      localState,
+      providerSettings,
+      states.data,
+      patchLinearIssue,
+      run,
+      onEditStateChange,
+      sourceContext
+    ]
   )
 
   const handlePriorityChange = useCallback(
     (value: string) => {
       const priority = Number.parseInt(value, 10)
-      const scope = getLinearSourceScope(providerSettings)
+      const prevPriority = localPriority
       run('priority', {
         mutate: () =>
-          writeLinearIssue({ ...issue, ...editState }, { priority }, providerSettings, () =>
-            linearUpdateIssue(providerSettings, issue.id, { priority }, issue.workspaceId)
-          ),
+          linearUpdateIssue(providerSettings, issue.id, { priority }, issue.workspaceId),
+        onOptimistic: () => {
+          onEditStateChange({ priority })
+          patchLinearIssue(issue.id, { priority }, { sourceContext })
+        },
+        onRevert: () => {
+          onEditStateChange({ priority: prevPriority })
+          patchLinearIssue(issue.id, { priority: prevPriority }, { sourceContext })
+        },
         onSuccess: () => {
-          useAppStore.getState().invalidateLinearIssueLists({ scope })
+          useAppStore.getState().invalidateLinearIssueLists({ sourceContext })
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        formatError: taskProviderErrorMessage,
-        onError: (err) => toast.error(taskProviderErrorText(err))
+        onError: (err) => toast.error(err)
       })
     },
-    [issue, editState, providerSettings, run]
+    [
+      issue.id,
+      issue.workspaceId,
+      localPriority,
+      providerSettings,
+      patchLinearIssue,
+      run,
+      onEditStateChange,
+      sourceContext
+    ]
   )
 
   const handleEstimateChange = useCallback(
     (estimate: number | null) => {
-      setEstimatePopoverOpen(false)
+      const prevEstimate = localEstimate
       run('estimate', {
         mutate: () =>
-          writeLinearIssue({ ...issue, ...editState }, { estimate }, providerSettings, () =>
-            linearUpdateIssue(providerSettings, issue.id, { estimate }, issue.workspaceId)
-          ),
+          linearUpdateIssue(providerSettings, issue.id, { estimate }, issue.workspaceId),
+        onOptimistic: () => {
+          onEditStateChange({ estimate })
+          patchLinearIssue(issue.id, { estimate }, { sourceContext })
+          setEstimatePopoverOpen(false)
+        },
+        onRevert: () => {
+          onEditStateChange({ estimate: prevEstimate })
+          patchLinearIssue(issue.id, { estimate: prevEstimate }, { sourceContext })
+        },
         onSuccess: () => {
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        formatError: taskProviderErrorMessage,
-        onError: (err) => toast.error(taskProviderErrorText(err))
+        onError: (err) => toast.error(err)
       })
     },
-    [issue, editState, providerSettings, run]
+    [
+      issue.id,
+      issue.workspaceId,
+      localEstimate,
+      providerSettings,
+      patchLinearIssue,
+      run,
+      onEditStateChange,
+      sourceContext
+    ]
   )
 
   const handleEstimateSubmit = useCallback(() => {
@@ -149,32 +185,45 @@ export function useLinearIssueEditController({
     (memberId: string) => {
       const assigneeId = memberId === '__unassign__' ? null : memberId
       const member = members.data.find((m) => m.id === memberId)
+      const prevAssignee = localAssignee
       const newAssignee = member
         ? { id: member.id, displayName: member.displayName, avatarUrl: member.avatarUrl }
         : undefined
-      const scope = getLinearSourceScope(providerSettings)
       run('assignee', {
         mutate: () =>
-          writeLinearIssue(
-            { ...issue, ...editState },
-            { assignee: newAssignee },
-            providerSettings,
-            () => linearUpdateIssue(providerSettings, issue.id, { assigneeId }, issue.workspaceId)
-          ),
+          linearUpdateIssue(providerSettings, issue.id, { assigneeId }, issue.workspaceId),
+        onOptimistic: () => {
+          onEditStateChange({ assignee: newAssignee })
+          patchLinearIssue(issue.id, { assignee: newAssignee }, { sourceContext })
+        },
+        onRevert: () => {
+          onEditStateChange({ assignee: prevAssignee })
+          patchLinearIssue(issue.id, { assignee: prevAssignee }, { sourceContext })
+        },
         onSuccess: () => {
-          useAppStore.getState().invalidateLinearIssueLists({ scope })
+          useAppStore.getState().invalidateLinearIssueLists({ sourceContext })
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        formatError: taskProviderErrorMessage,
-        onError: (err) => toast.error(taskProviderErrorText(err))
+        onError: (err) => toast.error(err)
       })
     },
-    [issue, editState, providerSettings, members.data, run]
+    [
+      issue.id,
+      issue.workspaceId,
+      localAssignee,
+      providerSettings,
+      members.data,
+      patchLinearIssue,
+      run,
+      onEditStateChange,
+      sourceContext
+    ]
   )
 
   const handleLabelToggle = useCallback(
     (labelId: string) => {
       const prevLabelIds = localLabelIds
+      const prevLabels = localLabels
       const isRemoving = prevLabelIds.includes(labelId)
       const newLabelIds = isRemoving
         ? prevLabelIds.filter((id) => id !== labelId)
@@ -183,30 +232,49 @@ export function useLinearIssueEditController({
         .map((id) => labels.data.find((l) => l.id === id)?.name)
         .filter((n): n is string => !!n)
 
-      const scope = getLinearSourceScope(providerSettings)
       run('labels', {
         mutate: () =>
-          writeLinearIssue(
-            { ...issue, ...editState },
-            { labelIds: newLabelIds, labels: newLabels },
+          linearUpdateIssue(
             providerSettings,
-            () =>
-              linearUpdateIssue(
-                providerSettings,
-                issue.id,
-                { labelIds: newLabelIds },
-                issue.workspaceId
-              )
+            issue.id,
+            { labelIds: newLabelIds },
+            issue.workspaceId
           ),
+        onOptimistic: () => {
+          onEditStateChange({ labelIds: newLabelIds, labels: newLabels })
+          patchLinearIssue(
+            issue.id,
+            { labelIds: newLabelIds, labels: newLabels },
+            { sourceContext }
+          )
+        },
+        onRevert: () => {
+          onEditStateChange({ labelIds: prevLabelIds, labels: prevLabels })
+          patchLinearIssue(
+            issue.id,
+            { labelIds: prevLabelIds, labels: prevLabels },
+            { sourceContext }
+          )
+        },
         onSuccess: () => {
-          useAppStore.getState().invalidateLinearIssueLists({ scope })
+          useAppStore.getState().invalidateLinearIssueLists({ sourceContext })
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
         },
-        formatError: taskProviderErrorMessage,
-        onError: (err) => toast.error(taskProviderErrorText(err))
+        onError: (err) => toast.error(err)
       })
     },
-    [issue, editState, localLabelIds, providerSettings, labels.data, run]
+    [
+      issue.id,
+      issue.workspaceId,
+      localLabelIds,
+      localLabels,
+      providerSettings,
+      labels.data,
+      patchLinearIssue,
+      run,
+      onEditStateChange,
+      sourceContext
+    ]
   )
 
   const currentStateId = states.data.find(

@@ -22,14 +22,8 @@ fragment FieldConfig on ProjectV2FieldConfiguration {
 }
 `
 
-export function itemContentSelection(
-  includeParent: boolean,
-  includeSubIssuesSummary: boolean
-): string {
+export function itemContentSelection(includeParent: boolean): string {
   const parentFrag = includeParent ? 'parent { number title url }' : ''
-  const subIssuesSummaryFrag = includeSubIssuesSummary
-    ? 'subIssuesSummary { completed total percentCompleted }'
-    : ''
   return `
     __typename
     ... on Issue {
@@ -44,7 +38,6 @@ export function itemContentSelection(
       labels(first:10) { nodes { name color } }
       issueType { id name color description }
       ${parentFrag}
-      ${subIssuesSummaryFrag}
     }
     ... on PullRequest {
       id
@@ -61,19 +54,7 @@ export function itemContentSelection(
   `
 }
 
-// At 100 items × 100 fields, ten linked PRs add at most 100k nodes to the 500k query budget.
-export function fieldValuesSelection(includeLinkedPullRequests: boolean): string {
-  const linkedPullRequestsFrag = includeLinkedPullRequests
-    ? `
-      ... on ProjectV2ItemFieldPullRequestValue {
-        pullRequests(first:10) {
-          totalCount
-          nodes { number title url }
-        }
-      }
-    `
-    : ''
-  return `
+export const FIELD_VALUES_SELECTION = `
   fieldValues(first:${FIELD_VALUES_PAGE_SIZE}) {
     pageInfo { hasNextPage }
     nodes {
@@ -85,8 +66,6 @@ export function fieldValuesSelection(includeLinkedPullRequests: boolean): string
       ... on ProjectV2ItemFieldDateValue         { field { ...FieldConfig } date }
       ... on ProjectV2ItemFieldLabelValue        { field { ...FieldConfig } labels(first:10) { nodes { name color } } }
       ... on ProjectV2ItemFieldUserValue         { field { ...FieldConfig } users(first:5) { nodes { login name avatarUrl } } }
-      ${linkedPullRequestsFrag}
     }
   }
 `
-}

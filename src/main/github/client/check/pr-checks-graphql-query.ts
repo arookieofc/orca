@@ -6,7 +6,6 @@ query($owner: String!, $repo: String!, $pr: Int!) {
       commits(last: 1) {
         nodes {
           commit {
-            oid
             statusCheckRollup {
               contexts(first: 100) {
                 nodes {
@@ -18,8 +17,6 @@ query($owner: String!, $repo: String!, $pr: Int!) {
                     conclusion
                     detailsUrl
                     url
-                    startedAt
-                    completedAt
                     checkSuite {
                       databaseId
                       workflowRun {
@@ -31,7 +28,6 @@ query($owner: String!, $repo: String!, $pr: Int!) {
                     context
                     state
                     targetUrl
-                    createdAt
                   }
                 }
               }
@@ -57,8 +53,6 @@ query($owner: String!, $repo: String!, $pr: Int!) {
 `
 
 export type GraphQLPRChecksResponse = {
-  errors?: unknown[]
-
   data?: {
     repository?: {
       pullRequest?: {
@@ -72,8 +66,6 @@ export type GraphQLPRChecksResponse = {
 }
 
 export type GraphQLPRChecksCommit = {
-  oid?: string | null
-
   statusCheckRollup?: {
     contexts?: {
       nodes?: GraphQLStatusCheckContext[] | null
@@ -92,8 +84,6 @@ export type GraphQLCheckRunContext = {
   conclusion?: string | null
   detailsUrl?: string | null
   url?: string | null
-  startedAt?: string | null
-  completedAt?: string | null
   checkSuite?: {
     databaseId?: number | null
     workflowRun?: { databaseId?: number | null } | null
@@ -105,7 +95,6 @@ export type GraphQLStatusContext = {
   context?: string | null
   state?: string | null
   targetUrl?: string | null
-  createdAt?: string | null
 }
 
 export type GraphQLStatusCheckContext =
@@ -128,15 +117,12 @@ export type RestCheckRun = {
   conclusion: string | null
   html_url: string
   details_url: string | null
-  started_at?: string | null
-  completed_at?: string | null
 }
 
 export type RestCommitStatus = {
   context?: string
   state?: string
   target_url?: string | null
-  created_at?: string | null
 }
 
 export type RestCheckSuite = {

@@ -1,21 +1,41 @@
-import { issueBrowserGuestNavigation } from '../host-guest/metadata/browser-guest-metadata-cache'
-import type { BrowserPage as BrowserPageState } from '../../../../../shared/browser/workspaces/browser-workspace-types'
-import '../../../../../shared/orca-profiles/constants'
+import type { BrowserPage as BrowserPageState } from '../../../../../shared/browser-workspace-types'
+import { ORCA_BROWSER_BLANK_URL } from '../../../../../shared/constants'
 import {
   normalizeBrowserNavigationUrl,
   normalizeExternalBrowserUrl,
   redactKagiSessionToken
-} from '../../../../../shared/browser/navigation/browser-url'
-import { isBlankBrowserUrl } from '@/lib/browser/palette/browser-palette-search'
+} from '../../../../../shared/browser-url'
+import { isBlankBrowserUrl } from '@/lib/browser-palette-search'
 import { browserFileUrlToAbsolutePath } from './browser-artifact-upload'
 import type { BrowserTabPageState } from './browser-page-types'
+
+export function getBrowserPageRuntimeEnvironmentId(
+  page: BrowserPageState,
+  inferredRuntimeEnvironmentId: string | null | undefined
+): string | null {
+  if (page.browserRuntimeEnvironmentId !== undefined) {
+    return page.browserRuntimeEnvironmentId?.trim() || null
+  }
+  return inferredRuntimeEnvironmentId?.trim() || null
+}
 
 /** A blank tab shows an empty bar, so typing never merges into placeholder text. */
 export function toDisplayUrl(url: string): string {
   return isBlankBrowserUrl(url) ? '' : redactKagiSessionToken(url)
 }
 
-export { getBrowserDisplayTitle } from '../../../../../shared/browser/browser-display-title'
+export function getBrowserDisplayTitle(title: string | null | undefined, url: string): string {
+  if (
+    url === 'about:blank' ||
+    url === ORCA_BROWSER_BLANK_URL ||
+    title === 'about:blank' ||
+    title === ORCA_BROWSER_BLANK_URL ||
+    !title
+  ) {
+    return 'New Tab'
+  }
+  return title
+}
 
 export function isChromiumErrorPage(url: string): boolean {
   return url.startsWith('chrome-error://')
@@ -51,7 +71,5 @@ export function retryBrowserTabLoad(
     loading: true,
     title: retryUrl
   })
-  issueBrowserGuestNavigation(webview, () => {
-    webview.src = retryUrl
-  })
+  webview.src = retryUrl
 }

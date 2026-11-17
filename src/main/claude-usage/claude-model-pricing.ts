@@ -30,13 +30,6 @@ const SONNET_4_LONG_CONTEXT = {
 }
 
 // Mythos models are billed at their Fable counterparts' rates.
-const FABLE_5_2_PRICING: ClaudeModelPricing = {
-  input: 8,
-  output: 40,
-  cacheRead: 0.2,
-  cacheWrite: 10,
-  cacheWrite1h: 16
-}
 const FABLE_5_1_PRICING: ClaudeModelPricing = {
   input: 10,
   output: 50,
@@ -54,8 +47,6 @@ const FABLE_5_PRICING: ClaudeModelPricing = {
 
 // Unknown model versions stay unpriced until explicitly added.
 export const MODEL_PRICING: Record<string, ClaudeModelPricing> = {
-  'claude-fable-5-2': FABLE_5_2_PRICING,
-  'claude-mythos-5-2': FABLE_5_2_PRICING,
   'claude-fable-5-1': FABLE_5_1_PRICING,
   'claude-mythos-5-1': FABLE_5_1_PRICING,
   'claude-fable-5': FABLE_5_PRICING,

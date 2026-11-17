@@ -1,11 +1,10 @@
-import { projectGhExecOptions } from './project-host-execution'
-import { runGraphql, type GraphqlVars } from './project-graphql'
-import type { GitHubProjectFieldMutationValue } from '../../../shared/github/projects/project-types'
-import type { GitHubProjectMutationResult } from '../../../shared/github/projects/project-result-types'
+import { projectGhExecOptions, runGraphql, type GraphqlVars } from './internals'
+import type { GitHubProjectFieldMutationValue } from '../../../shared/github/project-types'
+import type { GitHubProjectMutationResult } from '../../../shared/github/project-result-types'
 import type {
   ClearProjectItemFieldArgs,
   UpdateProjectItemFieldArgs
-} from '../../../shared/github/projects/project-request-types'
+} from '../../../shared/github/project-request-types'
 
 class UnknownFieldMutationKindError extends Error {
   constructor(kind: string) {
@@ -52,10 +51,7 @@ export async function updateProjectItemFieldValue(
   args: UpdateProjectItemFieldArgs
 ): Promise<GitHubProjectMutationResult> {
   if (!args.projectId || !args.itemId || !args.fieldId) {
-    return {
-      ok: false,
-      error: { type: 'validation_error', message: 'Missing ids.', reason: 'missing_ids' }
-    }
+    return { ok: false, error: { type: 'validation_error', message: 'Missing ids.' } }
   }
   let valueFragment: string
   let valueVariable: { type: string; val: string | number }
@@ -92,10 +88,7 @@ export async function clearProjectItemFieldValue(
   args: ClearProjectItemFieldArgs
 ): Promise<GitHubProjectMutationResult> {
   if (!args.projectId || !args.itemId || !args.fieldId) {
-    return {
-      ok: false,
-      error: { type: 'validation_error', message: 'Missing ids.', reason: 'missing_ids' }
-    }
+    return { ok: false, error: { type: 'validation_error', message: 'Missing ids.' } }
   }
   const result = await runGraphql<unknown>(
     `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!) {

@@ -1,9 +1,8 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import {
   buildLocalBlockerHostedReviewCreationEligibility,
   resolveHostedReviewCreationProviderForTarget
 } from './hosted-review-creation-eligibility-snapshot'
-import type { HostedReviewProvider } from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
 import type { SourceControlStoreActions } from '../listing/use-store-actions'
 import type { SourceControlWorktreeContext } from '../listing/use-worktree-context'
 import type { SourceControlHostedReviewState } from './use-hosted-review-state'
@@ -17,7 +16,6 @@ export function useSourceControlHostedReviewEligibility({
   activeRepoPath,
   activeWorktreeId,
   branchName,
-  currentHeadOid,
   effectiveBaseRef,
   fallbackGitHubPRNumber,
   getHostedReviewCreationEligibility,
@@ -45,7 +43,6 @@ export function useSourceControlHostedReviewEligibility({
   activeRepoPath: SourceControlWorktreeContext['activeRepoPath']
   activeWorktreeId: string | null
   branchName: string
-  currentHeadOid: string | null
   effectiveBaseRef: string | null
   fallbackGitHubPRNumber: SourceControlLinkedReviews['fallbackGitHubPRNumber']
   getHostedReviewCreationEligibility: SourceControlStoreActions['getHostedReviewCreationEligibility']
@@ -67,21 +64,14 @@ export function useSourceControlHostedReviewEligibility({
   setHostedReviewCreationState: SourceControlHostedReviewState['setHostedReviewCreationState']
   worktreePath: string | null
 }): void {
-  const resolveProvider = (): HostedReviewProvider =>
+  const resolveCurrentHostedReviewCreationProvider = useEffectEvent(() =>
     resolveHostedReviewCreationProviderForTarget(
       hostedReviewCreationProviderHintRef.current,
       { repoId: activeRepoId, worktreeId: activeWorktreeId ?? null, branch: branchName },
       // Preserve the inferred provider during loading rather than falling back to unsupported.
       provisionalHostedReviewProvider
     )
-  // The provider can settle after the probe starts; a failure must read the latest one without restarting it.
-  const resolveProviderRef = useRef(resolveProvider)
-  // Commits already rerun this probe through status/upstream changes; HEAD alone must not add lookups.
-  const currentHeadOidRef = useRef(currentHeadOid)
-  useLayoutEffect(() => {
-    resolveProviderRef.current = resolveProvider
-    currentHeadOidRef.current = currentHeadOid
-  })
+  )
 
   useEffect(() => {
     if (
@@ -125,8 +115,7 @@ export function useSourceControlHostedReviewEligibility({
       linkedGitLabMR,
       linkedBitbucketPR,
       linkedAzureDevOpsPR,
-      linkedGiteaPR,
-      currentHeadOid: currentHeadOidRef.current
+      linkedGiteaPR
     })
       .then((result) => {
         if (!stale) {
@@ -146,7 +135,7 @@ export function useSourceControlHostedReviewEligibility({
         }
         // Remote failure permits local guidance, never hosted-review creation.
         const localBlocker = buildLocalBlockerHostedReviewCreationEligibility(
-          resolveProviderRef.current(),
+          resolveCurrentHostedReviewCreationProvider(),
           {
             branch: branchName,
             baseRef: effectiveBaseRef,

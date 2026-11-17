@@ -1,30 +1,28 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { SFTPWrapper } from 'ssh2'
-import type {
-  AgentHookInstallState,
-  AgentHookInstallStatus
-} from '../../shared/agent-hook-listener/configuration/agent-hook-types'
-import { buildWindowsAgentHookPostCommand } from '../agent-hooks/installation/commands/windows-agent-hook-post-command'
-import { createManagedCommandMatcher } from '../agent-hooks/installation/commands/managed-hook-command-matching'
-import { writeManagedScript } from '../agent-hooks/installation/scripts/managed-hook-script-write'
-import { refreshManagedScriptIfPresent } from '../agent-hooks/installation/scripts/managed-hook-script-refresh'
-import { buildPosixAgentHookPostCommand } from '../agent-hooks/installation/scripts/hook-post-command'
+import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
+import {
+  buildWindowsAgentHookPostCommand,
+  createManagedCommandMatcher,
+  writeManagedScript
+} from '../agent-hooks/installer-utils'
+import { refreshManagedScriptIfPresent } from '../agent-hooks/managed-hook-script-refresh'
+import { buildPosixAgentHookPostCommand } from '../agent-hooks/hook-post-command'
 import {
   readTextFileRemote,
+  writeManagedScriptRemote,
   writeTextFileRemoteAtomic
-} from '../agent-hooks/installation/remote/hook-text-files-remote'
-import { writeManagedScriptRemote } from '../agent-hooks/installation/scripts/managed-script-write-remote'
+} from '../agent-hooks/installer-utils-remote'
 import {
   buildWindowsHookEnvironmentGuardLines,
   POSIX_HOOK_STDIN_DRAIN_COMMAND,
   WINDOWS_HOOK_STDIN_DRAIN_COMMAND
-} from '../agent-hooks/installation/scripts/hook-stdin-contract'
+} from '../agent-hooks/hook-stdin-contract'
 import {
   applyJcodeManagedHooks,
   parseJcodeHooksTable,
-  removeJcodeManagedHooks,
-  type JcodeHooksTable
+  removeJcodeManagedHooks
 } from './hook-config'
 import {
   getJcodeConfigPath,
@@ -117,17 +115,14 @@ export class JcodeHookService {
     let managedCount = 0
     for (const event of JCODE_HOOK_EVENTS) {
       const value = table[event]
-      const commands = typeof value === 'string' ? [value] : (value ?? [])
-      // A stale duplicate beside the current command still runs, so only a lone current entry counts.
-      if (commands.includes(managedCommand) && commands.filter(isManaged).length === 1) {
+      if (value === managedCommand) {
         managedCount += 1
-      } else if (commands.some(isManaged)) {
+      } else if (isManaged(value)) {
         outdated.push(event)
-      } else if (typeof value === 'string') {
-        userOwned.push(event)
-      } else {
-        // Install appends Orca to user arrays, so they count as missing rather than user-owned.
+      } else if (value === undefined) {
         missing.push(event)
+      } else {
+        userOwned.push(event)
       }
     }
     const hasManagedEntries = managedCount > 0 || outdated.length > 0
@@ -251,7 +246,7 @@ export class JcodeHookService {
 
 export const jcodeHookService = new JcodeHookService()
 
-function readJcodeHooksTable(configPath: string): JcodeHooksTable | null {
+function readJcodeHooksTable(configPath: string): Record<string, string> | null {
   if (!existsSync(configPath)) {
     return {}
   }

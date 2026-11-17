@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { detectUiLanguage, type UiLanguageDetection } from '../../shared/i18n/ui-locale'
+import { detectUiLanguage, type UiLanguageDetection } from '../../shared/ui-locale'
 
 let snapshot: UiLanguageDetection | null | undefined
 
@@ -9,10 +9,10 @@ export function getSystemLanguageDetection(
   if (snapshot === undefined) {
     try {
       if (!app.isReady()) {
-        // Pre-ready startup-failure dialogs still need a language; cache only the post-ready read.
-        return readNativeLanguageDetection()
+        return null
       }
-      snapshot = readNativeLanguageDetection()
+      const preferences = app.getPreferredSystemLanguages()
+      snapshot = preferences.length ? detectUiLanguage(preferences, 'native') : null
     } catch {
       snapshot = null
     }
@@ -21,13 +21,4 @@ export function getSystemLanguageDetection(
     snapshot = detectUiLanguage(browserPreferences, 'browser-fallback')
   }
   return snapshot
-}
-
-function readNativeLanguageDetection(): UiLanguageDetection | null {
-  try {
-    const preferences = app.getPreferredSystemLanguages()
-    return preferences.length ? detectUiLanguage(preferences, 'native') : null
-  } catch {
-    return null
-  }
 }

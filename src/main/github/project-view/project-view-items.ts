@@ -1,15 +1,11 @@
-import type {
-  GitHubProjectOwnerType,
-  GitHubProjectRow
-} from '../../../shared/github/projects/project-types'
-import type { GitHubProjectViewError } from '../../../shared/github/projects/project-result-types'
-import { projectGhExecOptions } from './project-host-execution'
-import { runGraphql } from './project-graphql'
-import { driftError, unsupportedItemFieldsFromErrors } from './project-error-classification'
+import type { GitHubProjectOwnerType, GitHubProjectRow } from '../../../shared/github/project-types'
+import type { GitHubProjectViewError } from '../../../shared/github/project-result-types'
+import { projectGhExecOptions, runGraphql } from './internals'
+import { driftError, errorsIndicateParentField } from './project-error-classification'
 import {
-  getUnsupportedItemFields,
+  hasParentFieldRetried,
   hasParentFieldWarningLogged,
-  markItemFieldsUnsupported,
+  markParentFieldRetried,
   markParentFieldWarningLogged,
   ownerScopeKey,
   parentFieldProbeInFlight
@@ -33,59 +29,77 @@ export async function fetchAllItems(args: {
 > {
   const scopeKey = ownerScopeKey(args.owner, args.ownerType, args.host)
   const inFlight = parentFieldProbeInFlight.get(scopeKey)
-  if (inFlight && getUnsupportedItemFields(scopeKey).size < 3) {
+  if (inFlight) {
     await inFlight.catch(() => {})
   }
-  const unsupportedFields = new Set(getUnsupportedItemFields(scopeKey))
-  const fetchPage = (after: string | null) =>
-    fetchItemsPageWithRaw({
-      ...args,
-      first: ITEM_PAGE_SIZE,
-      after,
-      unsupportedFields
-    })
-  const fetchFirstPage = async () => {
-    let result = await fetchPage(null)
-    while (!result.ok) {
-      const missing = unsupportedItemFieldsFromErrors(result.rawErrors, result.stderr).filter(
-        (field) => !unsupportedFields.has(field)
-      )
-      if (missing.length === 0) {
-        break
-      }
-      missing.forEach((field) => unsupportedFields.add(field))
-      markItemFieldsUnsupported(scopeKey, missing)
-      if (missing.includes('parent') && !hasParentFieldWarningLogged(scopeKey)) {
-        console.warn(
-          `[project-view] Issue.parent is not available for ${args.owner} on this token — retrying without the parent selection.`
-        )
-        markParentFieldWarningLogged(scopeKey)
-      }
-      // Each validation retry removes at least one of the three optional selections.
-      result = await fetchPage(null)
-    }
-    return result
-  }
+  let includeParent = !hasParentFieldRetried(scopeKey)
+  let parentFieldDropped = !includeParent
+  // Register the shared parent probe synchronously so concurrent callers cannot duplicate it.
   let first: Awaited<ReturnType<typeof fetchItemsPageWithRaw>>
-  if (unsupportedFields.size < 3 && !parentFieldProbeInFlight.has(scopeKey)) {
+  let probePromise: Promise<Awaited<ReturnType<typeof fetchItemsPageWithRaw>>> | null = null
+  if (includeParent && !parentFieldProbeInFlight.has(scopeKey)) {
     let resolveProbe: () => void = () => {}
-    parentFieldProbeInFlight.set(
-      scopeKey,
-      new Promise<void>((resolve) => {
-        resolveProbe = resolve
-      })
-    )
-    try {
-      first = await fetchFirstPage()
-    } finally {
-      resolveProbe()
-      parentFieldProbeInFlight.delete(scopeKey)
-    }
+    const probe = new Promise<void>((resolve) => {
+      resolveProbe = resolve
+    })
+    parentFieldProbeInFlight.set(scopeKey, probe)
+    probePromise = (async () => {
+      try {
+        const result = await fetchItemsPageWithRaw({
+          owner: args.owner,
+          ownerType: args.ownerType,
+          projectNumber: args.projectNumber,
+          query: args.query,
+          first: ITEM_PAGE_SIZE,
+          after: null,
+          includeParent: true,
+          host: args.host
+        })
+        // Publish unsupported capability before releasing probe waiters.
+        if (!result.ok && errorsIndicateParentField(result.rawErrors, result.stderr)) {
+          markParentFieldRetried(scopeKey)
+        }
+        return result
+      } finally {
+        resolveProbe()
+        parentFieldProbeInFlight.delete(scopeKey)
+      }
+    })()
+    first = await probePromise
   } else {
-    first = await fetchFirstPage()
+    first = await fetchItemsPageWithRaw({
+      owner: args.owner,
+      ownerType: args.ownerType,
+      projectNumber: args.projectNumber,
+      query: args.query,
+      first: ITEM_PAGE_SIZE,
+      after: null,
+      includeParent,
+      host: args.host
+    })
   }
-  const parentFieldDropped = unsupportedFields.has('parent')
-
+  if (!first.ok && includeParent && errorsIndicateParentField(first.rawErrors, first.stderr)) {
+    // Retry only this owner without parent; other owner scopes retain capability.
+    markParentFieldRetried(scopeKey)
+    includeParent = false
+    parentFieldDropped = true
+    if (!hasParentFieldWarningLogged(scopeKey)) {
+      console.warn(
+        `[project-view] Issue.parent is not available for ${args.owner} on this token — retrying without the parent selection.`
+      )
+      markParentFieldWarningLogged(scopeKey)
+    }
+    first = await fetchItemsPageWithRaw({
+      owner: args.owner,
+      ownerType: args.ownerType,
+      projectNumber: args.projectNumber,
+      query: args.query,
+      first: ITEM_PAGE_SIZE,
+      after: null,
+      includeParent: false,
+      host: args.host
+    })
+  }
   if (!first.ok) {
     return { ok: false, error: first.error }
   }
@@ -132,15 +146,24 @@ export async function fetchAllItems(args: {
 
   let hasNext = first.page.pageInfo.hasNextPage === true
   let cursor: string | null | undefined = first.page.pageInfo.endCursor
-  while (hasNext) {
-    if (typeof cursor !== 'string') {
-      return {
-        ok: false,
-        error: driftError('items.pageInfo.endCursor missing with hasNextPage=true'),
-        totalCount
-      }
+  if (hasNext && typeof cursor !== 'string') {
+    return {
+      ok: false,
+      error: driftError('items.pageInfo.endCursor missing with hasNextPage=true'),
+      totalCount
     }
-    const next = await fetchPage(cursor)
+  }
+  while (hasNext) {
+    const next = await fetchItemsPageWithRaw({
+      owner: args.owner,
+      ownerType: args.ownerType,
+      projectNumber: args.projectNumber,
+      query: args.query,
+      first: ITEM_PAGE_SIZE,
+      after: cursor as string,
+      includeParent,
+      host: args.host
+    })
     if (!next.ok) {
       return { ok: false, error: next.error, totalCount }
     }
@@ -160,6 +183,13 @@ export async function fetchAllItems(args: {
     }
     hasNext = next.page.pageInfo.hasNextPage === true
     cursor = next.page.pageInfo.endCursor
+    if (hasNext && typeof cursor !== 'string') {
+      return {
+        ok: false,
+        error: driftError('items.pageInfo.endCursor missing with hasNextPage=true'),
+        totalCount
+      }
+    }
   }
   return { ok: true, rows, totalCount, parentFieldDropped }
 }

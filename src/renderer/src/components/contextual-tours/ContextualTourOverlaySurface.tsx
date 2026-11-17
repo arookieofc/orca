@@ -9,17 +9,15 @@ import {
   type RefObject
 } from 'react'
 import { ArrowLeft, ArrowRight, X } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/class-names'
-import { useAppStore } from '@/store/index'
-import {
-  getContextualTour,
-  type ContextualTourId,
-  type ContextualTourStepPlacement,
-  type ContextualTourStepControl,
-  type ContextualTourStepAction
-} from '../../../../shared/feature-education/contextual-tours/contextual-tours'
+import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store'
+import type {
+  ContextualTourId,
+  ContextualTourStepPlacement,
+  ContextualTourStepControl,
+  ContextualTourStepAction
+} from '../../../../shared/contextual-tours'
 import { ContextualTourArrow } from './ContextualTourArrow'
 import { ContextualTourControl } from './ContextualTourControl'
 import { ContextualTourProgressDots } from './ContextualTourProgressDots'
@@ -27,21 +25,18 @@ import {
   watchContextualTourFloatingPosition,
   type ContextualTourFloatingPosition
 } from './contextual-tour-floating-position'
-import { useTranslate } from '@/i18n/use-translate'
-import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
-import { hasVisibleOverlay } from '@/lib/overlay-interaction/visible-overlay'
-import { getMeasurableContextualTourTarget } from './contextual-tour-gate'
+import { translate } from '@/i18n/i18n'
+import { addAppKeyListener, removeAppKeyListener } from '@/lib/app-keyboard-router'
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-const SKIP_BUTTON_SELECTOR = '[data-contextual-tour-dismiss]'
+const SKIP_BUTTON_SELECTOR = 'button[aria-label^="Skip"], button[aria-label="Dismiss tour"]'
 
 export type ActiveTourRenderState = {
   rect: DOMRect
   targetElement: Element
   progress: { current: number; total: number }
   title: string
-  badge?: 'new'
   body: string
   control?: ContextualTourStepControl
   primaryAction?: ContextualTourStepAction
@@ -111,7 +106,6 @@ export function ContextualTourOverlaySurface({
   onStepAction,
   onOverlayKeyDownCapture
 }: ContextualTourOverlaySurfaceProps): JSX.Element {
-  const t = useTranslate()
   const arrowRef = useRef<SVGSVGElement | null>(null)
   const [floatingPosition, setFloatingPosition] = useState<ContextualTourFloatingPosition | null>(
     null
@@ -134,8 +128,11 @@ export function ContextualTourOverlaySurface({
   const defaultPrimaryAction = {
     kind: renderState.isLastStep ? 'complete' : 'next',
     label: renderState.isLastStep
-      ? t('auto.components.contextual.tours.ContextualTourOverlaySurface.complete', 'Done')
-      : t('auto.components.contextual.tours.contextual.tour.overlay.measurement.38b3155418', 'Next')
+      ? translate('auto.components.contextual.tours.ContextualTourOverlaySurface.complete', 'Done')
+      : translate(
+          'auto.components.contextual.tours.contextual.tour.overlay.measurement.38b3155418',
+          'Next'
+        )
   } satisfies ContextualTourStepAction
   const primaryAction =
     renderState.primaryAction ?? (renderState.hidePrimaryAction ? null : defaultPrimaryAction)
@@ -179,7 +176,7 @@ export function ContextualTourOverlaySurface({
       ref={panelRef}
       aria-live="polite"
       aria-label={renderState.title}
-      data-contextual-tour-panel={activeTourId}
+      data-contextual-tour-panel=""
       data-placement={floatingPosition?.panelPlacement ?? undefined}
       role="dialog"
       tabIndex={-1}
@@ -196,14 +193,13 @@ export function ContextualTourOverlaySurface({
           type="button"
           variant="ghost"
           size="icon-xs"
-          data-contextual-tour-dismiss=""
           aria-label={
             renderState.isLastStep
-              ? t(
+              ? translate(
                   'auto.components.contextual.tours.ContextualTourOverlaySurface.d974f32a83',
                   'Dismiss tour'
                 )
-              : t(
+              : translate(
                   'auto.components.contextual.tours.ContextualTourOverlaySurface.4f86e2a10b',
                   'Skip tour'
                 )
@@ -213,11 +209,8 @@ export function ContextualTourOverlaySurface({
         >
           <X />
         </Button>
-        <h2 className="flex items-center gap-2 pr-6 text-sm font-semibold tracking-tight text-foreground">
-          {renderState.badge === 'new' ? (
-            <Badge variant="secondary">{t('components.contextualTours.badgeNew', 'New')}</Badge>
-          ) : null}
-          <span className="min-w-0">{renderState.title}</span>
+        <h2 className="pr-6 text-sm font-semibold tracking-tight text-foreground">
+          {renderState.title}
         </h2>
         <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{renderState.body}</p>
         {renderState.control ? <ContextualTourControl control={renderState.control} /> : null}
@@ -232,14 +225,14 @@ export function ContextualTourOverlaySurface({
                 type="button"
                 variant="ghost"
                 size="xs"
-                aria-label={t(
+                aria-label={translate(
                   'auto.components.contextual.tours.ContextualTourOverlaySurface.4a9568f773',
                   'Back'
                 )}
                 onClick={onBack}
               >
                 <ArrowLeft />
-                {t(
+                {translate(
                   'auto.components.contextual.tours.ContextualTourOverlaySurface.4a9568f773',
                   'Back'
                 )}
@@ -282,7 +275,7 @@ export function ContextualTourOverlaySurface({
         // Tours leave underlying UI interactive; only the callout panel captures pointer events.
         'fixed inset-0 z-[70] pointer-events-none'
       )}
-      data-contextual-tour-overlay={activeTourId}
+      data-contextual-tour-overlay=""
       role="presentation"
       onKeyDownCapture={onOverlayKeyDownCapture}
     >
@@ -313,8 +306,7 @@ export function handleContextualTourOverlayKeyDown(event: KeyboardEvent<HTMLDivE
 }
 
 export function handleContextualTourGlobalKeyDown(event: globalThis.KeyboardEvent): void {
-  const { activeContextualTourId: activeTourId, activeContextualTourStepIndex } =
-    useAppStore.getState()
+  const activeTourId = useAppStore.getState().activeContextualTourId
   if (!activeTourId || event.key !== 'Escape') {
     return
   }
@@ -322,12 +314,6 @@ export function handleContextualTourGlobalKeyDown(event: globalThis.KeyboardEven
   const overlay = document.querySelector<HTMLElement>('[data-contextual-tour-overlay]')
   const focusRoot = document.querySelector<HTMLElement>('[data-contextual-tour-panel]') ?? overlay
   if (!overlay || !focusRoot) {
-    return
-  }
-  const step = getContextualTour(activeTourId).steps[activeContextualTourStepIndex]
-  const target = step ? getMeasurableContextualTourTarget(step.targetSelector)?.element : null
-  // A menu containing the lesson's target belongs to the tour; other popups own Escape first.
-  if (hasVisibleOverlay({ ignoreContaining: target ? [focusRoot, target] : focusRoot })) {
     return
   }
 

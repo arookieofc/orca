@@ -1,11 +1,11 @@
-import type { BrowserCookieImportResult } from '../../../../shared/browser/workspaces/browser-workspace-types'
+import type { BrowserCookieImportResult } from '../../../../shared/browser-workspace-types'
 import {
   isGoogleSourceBoundCookie,
-  isNonTransplantableCookieDomain
-} from '../policy/cookie-import-exclusions'
-import { normalizeCookieImportDomain } from '../policy/cookie-domain'
+  isNonTransplantableCookieDomain,
+  normalizeCookieImportDomain
+} from '../browser-cookie-import-policy'
 import { isExpiredImportRow } from '../browser-cookie-import-write'
-import { chromiumTimestampToUnix } from '../sources/chromium-cookie-time'
+import { chromiumTimestampToUnix } from '../sources/browser-cookie-sqlite'
 import { databaseSameSite } from '../sources/browser-cookie-validation'
 import {
   buildUndecryptableWarning,

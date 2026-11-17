@@ -1,8 +1,8 @@
 import type { PostHog } from 'posthog-node'
 import { vi } from 'vitest'
-import type { CommonProps } from '../../shared/telemetry/telemetry-event-classification'
-import type { GlobalSettings } from '../../shared/settings/global-settings-types'
-import type { Store } from '../persistence/loading-store/store'
+import type { CommonProps } from '../../shared/telemetry-events'
+import type { GlobalSettings } from '../../shared/global-settings-types'
+import type { Store } from '../persistence'
 import {
   _enableTransportForTests,
   _resetFirstAppOpenedFiredForTests,
@@ -79,11 +79,8 @@ export function makeFakeSettings(telemetry: GlobalSettings['telemetry']): Global
 }
 
 export function makeFakeStore(settings: GlobalSettings): Store {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: fakes every Store method telemetry reads or writes; other methods are never called.
   return {
     getSettings: vi.fn(() => settings),
-    getUI: vi.fn(() => ({ featureTipsSeenIds: [] })),
-    getChatUiLaunchTipVariant: vi.fn(() => 'none'),
     updateSettings: vi.fn((updates: Partial<GlobalSettings>) => {
       if (updates.telemetry) {
         settings.telemetry = {
@@ -109,7 +106,7 @@ const CONSENT_ENV_VARS = [
   'TEAMCITY_VERSION'
 ] as const
 
-export function stashAndClearConsentEnv(): Record<string, string | undefined> {
+function stashAndClearConsentEnv(): Record<string, string | undefined> {
   const stash: Record<string, string | undefined> = {}
   for (const name of CONSENT_ENV_VARS) {
     stash[name] = process.env[name]
@@ -118,7 +115,7 @@ export function stashAndClearConsentEnv(): Record<string, string | undefined> {
   return stash
 }
 
-export function restoreConsentEnv(stash: Record<string, string | undefined>): void {
+function restoreConsentEnv(stash: Record<string, string | undefined>): void {
   for (const name of CONSENT_ENV_VARS) {
     const prior = stash[name]
     if (prior === undefined) {
@@ -142,7 +139,7 @@ export function setupTelemetryClientTest(
   const mock = makeMockPostHog()
   const settings = makeFakeSettings(telemetry)
   const store = makeFakeStore(settings)
-  initTelemetry(store, () => {})
+  initTelemetry(store)
   _setPostHogClientForTests(mock as unknown as PostHog)
   _setCommonPropsForTests(BASE_COMMON)
   _setStoreForTests(store)

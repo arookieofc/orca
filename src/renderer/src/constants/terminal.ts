@@ -1,5 +1,4 @@
-import type { TerminalPaneSplitSource } from '../../../shared/feature-education/feature-education-telemetry'
-import type { TerminalTabCloseIntent } from '@/components/terminal/tab-lifecycle/terminal-tab-close-intent'
+import type { TerminalPaneSplitSource } from '../../../shared/feature-education-telemetry'
 
 export const TOGGLE_TERMINAL_PANE_EXPAND_EVENT = 'orca-toggle-terminal-pane-expand'
 export const FOCUS_TERMINAL_PANE_EVENT = 'orca-focus-terminal-pane'
@@ -27,8 +26,6 @@ export type FocusTerminalPaneDetail = {
   flashFocusedPane?: boolean
   /** Follow live agent output when activation is explicitly about that agent. */
   scrollToBottomIfOutputSinceLastView?: boolean
-  /** Collapse another expanded pane first, so the target is not hidden behind it. */
-  collapseExpandedPane?: boolean
 }
 
 export type PasteTerminalTextDetail = {
@@ -48,8 +45,6 @@ export type SplitTerminalPaneDetail = {
   telemetrySource?: TerminalPaneSplitSource
   newLeafId?: string
   ptyId?: string
-  /** An agent's split: the new pane leaves the user's active pane and keyboard focus alone. */
-  activate?: false
 }
 
 export type RequestActiveTerminalPaneSplitDetail = {
@@ -64,8 +59,6 @@ export type RequestActiveTerminalPaneCloseDetail = {
 
 export type CloseTerminalPaneDetail = {
   tabId: string
-  /** Who asked, for when the pane is its tab's last and the whole tab closes. */
-  lastPaneCloseReason: TerminalTabCloseIntent
   paneRuntimeId?: number
   leafId?: string
   preservePty?: boolean

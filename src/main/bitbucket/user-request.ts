@@ -11,7 +11,7 @@ export type RawBitbucketUser = {
 
 /** Network, server and decode failures do not prove the credentials are invalid. */
 export type BitbucketUserResult =
-  | { ok: true; user: RawBitbucketUser | null }
+  | { ok: true; user: RawBitbucketUser }
   | { ok: false; reason: 'rejected' | 'unreachable' }
 
 export function accountNameFromUser(user: RawBitbucketUser | null): string | null {
@@ -35,30 +35,14 @@ export async function fetchBitbucketUserResult(
   } catch {
     return { ok: false, reason: 'unreachable' }
   }
-  // Bitbucket answers 401 to bad credentials; its 403 means it accepted them without account access
-  // (every access token, and API tokens without read:user:bitbucket).
-  if (response.status === 403) {
-    return (await isBitbucketErrorBody(response))
-      ? { ok: true, user: null }
-      : { ok: false, reason: 'unreachable' }
-  }
   if (!response.ok) {
     await cancelUnreadResponseBody(response)
-    return { ok: false, reason: response.status === 401 ? 'rejected' : 'unreachable' }
+    const rejected = response.status === 401 || response.status === 403
+    return { ok: false, reason: rejected ? 'rejected' : 'unreachable' }
   }
   try {
     return { ok: true, user: (await response.json()) as RawBitbucketUser }
   } catch {
     return { ok: false, reason: 'unreachable' }
-  }
-}
-
-// A proxy or non-Bitbucket base URL can answer 403 without checking the credential.
-async function isBitbucketErrorBody(response: Response): Promise<boolean> {
-  try {
-    const body: unknown = await response.json()
-    return typeof body === 'object' && body !== null && 'type' in body && body.type === 'error'
-  } catch {
-    return false
   }
 }

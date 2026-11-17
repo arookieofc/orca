@@ -1,29 +1,28 @@
 import React, { useCallback, useMemo } from 'react'
 import GitHubItemDialog from '@/components/GitHubItemDialog'
-import { launchWorkItemDirect } from '@/lib/workspace/creation/work-item/launch-work-item-direct'
+import { launchWorkItemDirect } from '@/lib/launch-work-item-direct'
 import { useAppStore } from '@/store'
-import { projectViewCacheKeyTarget } from '@/store/github/cache/cache-identity'
-import { useTranslate } from '@/i18n/use-translate'
-import ProjectViewList from './table/ProjectViewList'
-import ProjectBoard from './board/ProjectBoard'
-import ProjectRoadmap from './roadmap/ProjectRoadmap'
-import ProjectItemSlugDialog from './slug-dialog/ProjectItemSlugDialog'
-import { ProjectMissingRepoDialog } from './row-actions/ProjectMissingRepoDialog'
-import { ProjectViewToolbar } from './view/ProjectViewToolbar'
+import { projectViewCacheKeyTarget } from '@/store/github/cache-identity'
+import { translate } from '@/i18n/i18n'
+import ProjectViewList from './ProjectViewList'
+import ProjectBoard from './ProjectBoard'
+import ProjectRoadmap from './ProjectRoadmap'
+import ProjectItemSlugDialog from './ProjectItemSlugDialog'
+import { ProjectMissingRepoDialog } from './ProjectMissingRepoDialog'
+import { ProjectViewToolbar } from './ProjectViewToolbar'
 import {
   ProjectTableSkeleton,
   ProjectViewErrorState,
   ProjectViewTabStrip
-} from './view/ProjectViewStates'
-import { useProjectRowActions } from './row-actions/useProjectRowActions'
-import { useProjectViewTable } from './view/useProjectViewTable'
+} from './ProjectViewStates'
+import { useProjectRowActions } from './useProjectRowActions'
+import { useProjectViewTable } from './useProjectViewTable'
 import type {
   GitHubProjectFieldMutationValue,
   GitHubProjectRow
-} from '../../../../shared/github/projects/project-types'
-import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
-import { taskSourceRuntimeTarget } from '@/lib/work-items/task-source-runtime-target'
-import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
+} from '../../../../shared/github/project-types'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
+import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 
 type Props = {
   selectedRepoIds: ReadonlySet<string>
@@ -86,7 +85,6 @@ function ProjectViewBody({
   tableState: ReturnType<typeof useProjectViewTable>
   rowActions: ReturnType<typeof useProjectRowActions>
 }): React.JSX.Element | null {
-  const t = useTranslate()
   const { activeProject, error, loading, table, visibleTable } = tableState
   // Keep the board's document drop subscription stable across wrapper renders.
   const { editField } = rowActions
@@ -98,7 +96,7 @@ function ProjectViewBody({
   if (!activeProject) {
     return (
       <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
-        {t(
+        {translate(
           'auto.components.github.project.ProjectViewWrapper.512fc171d6',
           'Choose a project to get started.'
         )}
@@ -116,7 +114,9 @@ function ProjectViewBody({
         host={activeProject.host}
         onOpenInGitHub={() => {
           if (table) {
-            openAppHttpLink(`${table.project.url}/views/${table.selectedView.number ?? ''}`)
+            void window.api.shell.openUrl(
+              `${table.project.url}/views/${table.selectedView.number ?? ''}`
+            )
           }
         }}
       />
@@ -131,7 +131,7 @@ function ProjectViewBody({
         repoId={dialogItem.repoId}
         sourceContext={rowActions.dialogSourceContext}
         projectOrigin={dialogItem.origin}
-        backLabel={t(
+        backLabel={translate(
           'auto.components.github.project.ProjectViewWrapper.1aa7c952b9',
           'Project view'
         )}
@@ -145,7 +145,7 @@ function ProjectViewBody({
             telemetrySource: 'sidebar',
             openModalFallback: () => {
               if (item.url) {
-                openAppHttpLink(item.url)
+                void window.api.shell.openUrl(item.url)
               }
             }
           })
@@ -167,7 +167,7 @@ function ProjectViewBody({
       onEditIssueType={(row, issueType) => void rowActions.editIssueType(row, issueType)}
       onOpenInBrowser={(row) => {
         if (row.content.url) {
-          openAppHttpLink(row.content.url)
+          void window.api.shell.openUrl(row.content.url)
         }
       }}
       onStartWork={rowActions.startWork}

@@ -22,6 +22,7 @@ function isGpuDll(name) {
   return GPU_DLLS.has(name.toLowerCase())
 }
 
+// Select tier DLLs purely from inventory for offline selftests.
 export function selectTierDlls(topLevelDlls, tier) {
   const def = TIER_DEFINITIONS[tier]
   if (!def || def.dlls === 'none') {

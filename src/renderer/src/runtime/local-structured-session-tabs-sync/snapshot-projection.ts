@@ -1,4 +1,4 @@
-import type { RuntimeMobileSessionTabsResult } from '../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
+import type { RuntimeMobileSessionTabsResult } from '../../../../shared/runtime-types'
 
 /** Narrow a host inventory snapshot to the structured agent-session tabs it publishes. */
 export function projectLocalStructuredSessionTabs(

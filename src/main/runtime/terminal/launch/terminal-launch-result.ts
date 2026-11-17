@@ -1,15 +1,9 @@
-import { terminalLaunchFacts } from '../../../../shared/agent-session/lifecycle/agent-session-resume'
-import { admitStablePaneAdoption } from '../identity/runtime-terminal-pane-identity'
-import type { RuntimePtyController } from '../lifecycle/runtime-pty-controller-contract'
-import type { TerminalCreateOptions } from './terminal-create-options'
-import type { RuntimePtyWorktreeRecord } from '../records/runtime-terminal-state-records'
-import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
-import { recordFreshLaunch } from './launch-evidence'
-import {
-  copySleepingAgentLaunchConfig,
-  resolveLaunchCommandPaneAgent,
-  resolveLaunchedAgent
-} from './runtime-agent-launch-resolution'
+import { terminalLaunchFacts } from '../../../../shared/agent-session-resume'
+import { admitStablePaneAdoption } from '../../runtime-terminal-pane-identity'
+import type { RuntimePtyController } from '../../runtime-pty-controller-contract'
+import type { TerminalCreateOptions } from '../../runtime-terminal-contracts'
+import type { RuntimePtyWorktreeRecord } from '../../runtime-terminal-state-records'
+import { copySleepingAgentLaunchConfig } from '../../runtime-agent-launch-resolution'
 
 type TerminalSpawnResult = Awaited<ReturnType<NonNullable<RuntimePtyController['spawn']>>>
 
@@ -47,16 +41,14 @@ export function resolveTerminalLaunchResult(
   }
 }
 
-/** Returns the agent a fresh launch's command starts; null for an adopted pane, whose process was already running. */
 export function recordTerminalLaunchMetadata(
   pty: RuntimePtyWorktreeRecord,
   result: TerminalSpawnResult,
-  launch: ReturnType<typeof resolveTerminalLaunchResult>,
-  command: string | undefined
-): TuiAgent | null {
+  launch: ReturnType<typeof resolveTerminalLaunchResult>
+): void {
   if (launch.adoptedStablePane) {
-    // A lower owner can supply facts before this runtime has a launch record, unless its launch ended.
-    if (!pty.launchConfig && result.launchConfig && pty.launchEvidence?.kind !== 'gone') {
+    // A lower owner can supply facts before this runtime has a launch record.
+    if (!pty.launchConfig && result.launchConfig) {
       pty.launchConfig = copySleepingAgentLaunchConfig(result.launchConfig)
     }
     pty.launchToken ??= result.launchToken ?? null
@@ -64,23 +56,14 @@ export function recordTerminalLaunchMetadata(
     if (pty.launchToken && !pty.launchIncarnationId) {
       pty.launchIncarnationId = pty.incarnationId
     }
-    return null
+  } else {
+    pty.launchConfig = launch.launchConfig
+      ? copySleepingAgentLaunchConfig(launch.launchConfig)
+      : null
+    pty.launchToken = launch.launchToken ?? null
+    pty.launchIncarnationId = launch.launchToken ? pty.incarnationId : null
+    pty.launchAgent = launch.launchAgent ?? null
   }
-  pty.launchConfig = launch.launchConfig ? copySleepingAgentLaunchConfig(launch.launchConfig) : null
-  pty.launchToken = launch.launchToken ?? null
-  pty.launchIncarnationId = launch.launchToken ? pty.incarnationId : null
-  pty.launchAgent = launch.launchAgent ?? null
-  recordFreshLaunch(pty, {
-    agent: pty.launchAgent ?? undefined,
-    token: pty.launchToken ?? undefined,
-    config: pty.launchConfig ?? undefined
-  })
-  if (result.agentResumeRefused) {
-    pty.launchCommandAgent = null
-    return null
-  }
-  pty.launchCommandAgent = resolveLaunchCommandPaneAgent(command)
-  return resolveLaunchedAgent(command, pty.launchAgent)
 }
 
 export function terminalLaunchPublicFacts(

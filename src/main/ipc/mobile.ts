@@ -1,48 +1,43 @@
-import { usesLegacyE2EE } from '../runtime/rpc/server/pairing/device-sighting'
 import { app, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
-import type { RuntimeAccessGrant } from '../../shared/remote-runtime/host-catalog/runtime-access-grants'
-import type { MobilePairingConnectionMode } from '../../shared/remote-runtime/pairing/mobile-pairing-connection-mode'
-import type { RuntimePairingReach } from '../../shared/remote-runtime/pairing/runtime-pairing-reach'
-import type { DeviceEntry } from '../runtime/rpc/server/pairing/device-entry'
+import type { RuntimeAccessGrant } from '../../shared/runtime-access-grants'
+import type { MobilePairingConnectionMode } from '../../shared/mobile-pairing-connection-mode'
+import { classifyRemotePairingHostname } from '../../shared/remote-pairing-address'
+import type { RuntimePairingReach } from '../../shared/runtime-pairing-reach'
+import type { DeviceEntry } from '../runtime/device-registry'
+import { NETWORK_EXPOSURE_FAILED_GUIDANCE } from '../runtime/network-exposure-guidance'
 import {
-  requestMobilePairingOffer,
-  requestRuntimePairingOffer
-} from '../runtime/rpc/server/pairing/pairing-offer-requests'
-import {
+  getDefaultPairingAddress,
   getPairingNetworkInterfaces,
   type DefaultRouteInterfaceLookup,
   type NetworkInterface
-} from '../runtime/rpc/server/pairing/network/pairing-network-interfaces'
-import type { OrcaRuntimeRpcServer } from '../runtime/rpc/server/runtime-rpc'
-import type { MobileRelayStatusDetail } from '../../shared/remote-runtime/relay/mobile-relay-status'
-import {
-  encodeMobilePairingQr,
-  type MobilePairingQrResult
-} from '../runtime/rpc/server/pairing/mobile-pairing-qr'
-import { usesOlderPairingMethod } from '../runtime/rpc/server/pairing/pairing-ticket-exchange'
-import {
-  MOBILE_PAIRING_OFFER_TTL_MS,
-  RUNTIME_PAIRING_OFFER_TTL_MS
-} from '../runtime/rpc/server/pairing/pairing-offer-expiry'
-import { getWindowsDefaultRouteInterfaceNames } from '../runtime/rpc/server/pairing/network/windows-default-route-interfaces'
+} from '../runtime/pairing-network-interfaces'
+import { resolveAdvertisedPairingHostname } from '../runtime/pairing-endpoint'
+import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
+import type { MobileRelayStatusDetail } from '../../shared/mobile-relay-status'
+import { encodeMobilePairingQr, type MobilePairingQrResult } from '../runtime/mobile-pairing-qr'
+import { getWindowsDefaultRouteInterfaceNames } from '../runtime/windows-default-route-interfaces'
 import {
   getWebSocketPort,
   inspectWindowsMobileFirewall,
   repairWindowsMobileFirewall,
   type WindowsMobileFirewallEnvironment
-} from '../runtime/rpc/server/pairing/network/windows-mobile-firewall'
+} from '../runtime/windows-mobile-firewall'
 
-function toRuntimeAccessGrant(
-  device: DeviceEntry,
-  devices: readonly DeviceEntry[]
-): RuntimeAccessGrant {
+// Only explicit this-computer intent plus a loopback address avoids widening; custom tunnel endpoints still need remote reach.
+function servesThisComputerOnly(reach: RuntimePairingReach | undefined, address: string): boolean {
+  if (reach !== 'this-computer') {
+    return false
+  }
+  const hostname = resolveAdvertisedPairingHostname(address)
+  return hostname !== null && classifyRemotePairingHostname(hostname) === 'loopback'
+}
+
+function toRuntimeAccessGrant(device: DeviceEntry): RuntimeAccessGrant {
   return {
     deviceId: device.deviceId,
     name: device.name,
     createdAt: device.pairedAt,
-    lastSeenAt: device.lastSeenAt > 0 ? device.lastSeenAt : null,
-    usesLegacyEncryption: usesLegacyE2EE(device),
-    ...(usesOlderPairingMethod(device, devices) ? { olderPairingMethod: true as const } : {})
+    lastSeenAt: device.lastSeenAt > 0 ? device.lastSeenAt : null
   }
 }
 
@@ -87,16 +82,30 @@ export function registerMobileHandlers(
         rotate?: boolean
       }
     ) => {
-      const offer = await requestMobilePairingOffer(
-        rpcServer,
-        {
-          address: args?.address,
-          connectionMode: args?.connectionMode,
-          rotate: args?.rotate,
-          offerTtlMs: MOBILE_PAIRING_OFFER_TTL_MS
-        },
-        getDefaultRouteInterfaceNames
-      )
+      // Explicit interfaces support overlay networks unreachable through the default LAN candidate.
+      const ip =
+        args?.address ??
+        (await getDefaultPairingAddress(
+          rpcServer.getNetworkExposureBindHost(),
+          getDefaultRouteInterfaceNames
+        ))
+      // Relay works without a direct candidate; LAN-only must refuse when none is usable.
+      if (!ip && args?.connectionMode === 'local-only') {
+        return {
+          available: false as const,
+          reason: 'invalid_advertised_endpoint',
+          guidance:
+            'No reachable network address is available for pairing. Connect to Wi‑Fi or Tailscale, or pick an address manually.'
+        }
+      }
+
+      // Reuse never-scanned tokens until explicit rotation; authenticated entries remain independent.
+      const offer = await rpcServer.createMobilePairingOffer({
+        address: ip,
+        connectionMode: args?.connectionMode,
+        rotate: args?.rotate,
+        name: `Mobile ${new Date().toLocaleDateString()}`
+      })
       if (!offer.available) {
         // Preserve relay mint failures instead of silently presenting a LAN offer under the Relay label.
         return {
@@ -115,10 +124,10 @@ export function registerMobileHandlers(
         qrSize: qr.ok ? qr.qrSize : null,
         ...(!qr.ok ? { qrError: qr.reason } : {}),
         pairingUrl: offer.pairingUrl,
-        endpoint: offer.endpoint,
+        // Unadvertised loopback fallback points at the scanning device; omit it from UI endpoints.
+        endpoint: ip ? offer.endpoint : null,
         deviceId: offer.deviceId,
-        connectionMode: offer.connectionMode,
-        expiresAt: offer.offerExpiresAt
+        connectionMode: offer.connectionMode
       }
     }
   )
@@ -126,21 +135,46 @@ export function registerMobileHandlers(
   ipcMain.handle(
     'mobile:getRuntimePairingUrl',
     async (_event, args?: { address?: string; rotate?: boolean; reach?: RuntimePairingReach }) => {
-      const offer = await requestRuntimePairingOffer(
-        rpcServer,
-        {
-          address: args?.address,
-          rotate: args?.rotate,
-          reach: args?.reach,
-          offerTtlMs: RUNTIME_PAIRING_OFFER_TTL_MS
-        },
-        getDefaultRouteInterfaceNames
-      )
+      const ip =
+        args?.address ??
+        (await getDefaultPairingAddress(
+          rpcServer.getNetworkExposureBindHost(),
+          getDefaultRouteInterfaceNames
+        ))
+      if (!ip) {
+        return { available: false as const }
+      }
+
+      // Widen before advertising remote reach; this-computer intent must not trigger the irreversible widening (STA-2370).
+      const thisComputerOnly = servesThisComputerOnly(args?.reach, ip)
+      if (!thisComputerOnly) {
+        try {
+          await rpcServer.ensureNetworkExposure()
+        } catch (error) {
+          console.error(
+            '[mobile] Network exposure failed while creating a runtime pairing offer:',
+            error
+          )
+          // Preserve actionable widening failure guidance rather than generic unavailability.
+          return {
+            available: false as const,
+            reason: 'network_exposure_failed' as const,
+            guidance: NETWORK_EXPOSURE_FAILED_GUIDANCE
+          }
+        }
+      }
+
+      // Web/desktop runtime clients need full access instead of the phone allow-list.
+      const offer = rpcServer.createPairingOffer({
+        address: ip,
+        rotate: args?.rotate,
+        name: `Runtime ${new Date().toLocaleDateString()}`,
+        scope: 'runtime',
+        // Persist local reach so local authentication cannot expose the next launch to the LAN.
+        reach: thisComputerOnly ? 'this-computer' : 'network'
+      })
       if (!offer.available) {
-        // Preserve actionable widening failure guidance rather than generic unavailability.
-        return offer.reason === 'network_exposure_failed'
-          ? { available: false as const, reason: offer.reason, guidance: offer.guidance }
-          : { available: false as const }
+        return { available: false as const }
       }
 
       return {
@@ -148,8 +182,7 @@ export function registerMobileHandlers(
         pairingUrl: offer.pairingUrl,
         webClientUrl: offer.webClientUrl,
         endpoint: offer.endpoint,
-        deviceId: offer.deviceId,
-        expiresAt: offer.offerExpiresAt
+        deviceId: offer.deviceId
       }
     }
   )
@@ -159,18 +192,16 @@ export function registerMobileHandlers(
     if (!registry) {
       return { devices: [] }
     }
-    const all = registry.listDevices()
     // Never-scanned QR tokens are not paired devices.
     return {
-      devices: all
+      devices: registry
+        .listDevices()
         .filter((d) => d.scope === 'mobile' && d.lastSeenAt > 0)
         .map((d) => ({
           deviceId: d.deviceId,
           name: d.name,
           pairedAt: d.pairedAt,
-          lastSeenAt: d.lastSeenAt,
-          usesLegacyEncryption: usesLegacyE2EE(d),
-          ...(usesOlderPairingMethod(d, all) ? { olderPairingMethod: true as const } : {})
+          lastSeenAt: d.lastSeenAt
         }))
     }
   })
@@ -181,12 +212,12 @@ export function registerMobileHandlers(
       return { grants: [] }
     }
     // Runtime links are bearer credentials immediately, so unconnected grants must remain revocable.
-    const all = registry.listDevices()
     return {
-      grants: all
+      grants: registry
+        .listDevices()
         .filter((d) => d.scope === 'runtime')
         .sort((a, b) => b.pairedAt - a.pairedAt)
-        .map((d) => toRuntimeAccessGrant(d, all))
+        .map(toRuntimeAccessGrant)
     }
   })
 

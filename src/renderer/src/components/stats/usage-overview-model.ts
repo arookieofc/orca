@@ -10,15 +10,13 @@ import {
   createMuseProvider,
   createOpenCodeProvider
 } from './usage-provider-normalization'
-import { getIntlLocale } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
 
-export function buildUsageOverview(input: UsageOverviewInput, t?: Translate): UsageOverviewModel {
+export function buildUsageOverview(input: UsageOverviewInput): UsageOverviewModel {
   const providers = [
-    createClaudeProvider(input.claude, t),
-    createCodexProvider(input.codex, t),
-    createOpenCodeProvider(input.opencode, t),
-    createMuseProvider(input.muse, t)
+    createClaudeProvider(input.claude),
+    createCodexProvider(input.codex),
+    createOpenCodeProvider(input.opencode),
+    createMuseProvider(input.muse)
   ]
   const daily = buildDailyOverview(input)
   const bestDay =
@@ -79,7 +77,7 @@ export function buildUsageOverview(input: UsageOverviewInput, t?: Translate): Us
   }
 }
 
-export function formatUsageTokens(value: number, intlLocale: string = getIntlLocale()): string {
+export function formatUsageTokens(value: number): string {
   if (value >= 1_000_000_000) {
     return `${(value / 1_000_000_000).toFixed(1)}B`
   }
@@ -89,7 +87,7 @@ export function formatUsageTokens(value: number, intlLocale: string = getIntlLoc
   if (value >= 1_000) {
     return `${(value / 1_000).toFixed(1)}k`
   }
-  return value.toLocaleString(intlLocale)
+  return value.toLocaleString()
 }
 
 export function formatUsageCost(value: number | null): string {

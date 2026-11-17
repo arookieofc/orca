@@ -1,53 +1,40 @@
-import React, { useCallback, useRef } from 'react'
-import { FolderPlus, Plus } from 'lucide-react'
+import React, { useCallback } from 'react'
+import { FolderPlus, PanelLeftClose, Plus, Search } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatOptionalPrimaryShortcutLabel } from '@/hooks/useShortcutLabel'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import { openWorkspaceCreationComposerWithTourHandoff } from '../contextual-tours/workspace-creation-tour-handoff'
-import type { AddRepoDialogEntryRequest } from './project-admission/dialog/add-repo-dialog-types'
-import { AddProjectMenu } from './project-admission/menu/AddProjectMenu'
-import SidebarWorkspaceOptionsMenu from './worktree-list/controls/SidebarWorkspaceOptionsMenu'
+import SidebarWorkspaceOptionsMenu from './SidebarWorkspaceOptionsMenu'
 
 function AddProjectButton({
-  preserveWorkspaceBoardOpen,
-  onMenuOpenChange
+  preserveWorkspaceBoardOpen
 }: {
   preserveWorkspaceBoardOpen: boolean
-  onMenuOpenChange?: (open: boolean) => void
 }): React.JSX.Element {
-  const t = useTranslate()
   const openModal = useAppStore((s) => s.openModal)
-  const label = t('auto.components.sidebar.SidebarHeader.addProject', 'Add project')
-  const handleOpenEntryRequest = useCallback(
-    (entryRequest: AddRepoDialogEntryRequest) => {
-      openModal('add-repo', { entryRequest })
-    },
-    [openModal]
-  )
+  const label = translate('auto.components.sidebar.SidebarHeader.addProject', 'Add project')
 
   return (
-    <AddProjectMenu
-      side="bottom"
-      align="start"
-      tooltipLabel={label}
-      tooltipSide="bottom"
-      preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen}
-      onOpenChange={onMenuOpenChange}
-      onOpenEntryRequest={handleOpenEntryRequest}
-    >
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        type="button"
-        className="text-muted-foreground"
-        aria-label={label}
-        data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
-      >
-        <FolderPlus className="size-3.5" strokeWidth={2.25} />
-      </Button>
-    </AddProjectMenu>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          type="button"
+          className="text-muted-foreground"
+          aria-label={label}
+          data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
+          onClick={() => openModal('add-repo')}
+        >
+          <FolderPlus className="size-3.5" strokeWidth={2.25} />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={6}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -56,11 +43,10 @@ function NewWorkspaceButton({
 }: {
   preserveWorkspaceBoardOpen: boolean
 }): React.JSX.Element {
-  const t = useTranslate()
   const keybindings = useAppStore((s) => s.keybindings)
   // Show the primary create shortcut so aliases do not crowd the tooltip.
   const shortcutLabel = formatOptionalPrimaryShortcutLabel('workspace.create', keybindings)
-  const label = t('auto.components.sidebar.SidebarHeader.92154beb7e', 'New workspace')
+  const label = translate('auto.components.sidebar.SidebarHeader.92154beb7e', 'New workspace')
 
   const handleCreateWorkspace = useCallback(() => {
     openWorkspaceCreationComposerWithTourHandoff()
@@ -93,37 +79,93 @@ function NewWorkspaceButton({
 export function SidebarHeaderActions({
   onWorkspaceBoardMenuOpenChange,
   agentsViewActive = false,
-  activityOptionsTarget
+  onCollapseSidebar,
+  showWorkspaceSearch = false,
+  workspaceSearchOpen = false,
+  onToggleWorkspaceSearch
 }: {
   onWorkspaceBoardMenuOpenChange: (open: boolean) => void
   agentsViewActive?: boolean
-  activityOptionsTarget?: React.Ref<HTMLDivElement>
+  /** Work mode only; absent in Code mode so the rail never appears there. */
+  onCollapseSidebar?: () => void
+  /** dsh-style collapsed search; only offered on the Work workspaces view. */
+  showWorkspaceSearch?: boolean
+  workspaceSearchOpen?: boolean
+  onToggleWorkspaceSearch?: () => void
 }): React.JSX.Element {
-  const openMenusRef = useRef({ options: false, addProject: false })
-  const updateMenuOpen = useCallback(
-    (menu: 'options' | 'addProject', open: boolean) => {
-      openMenusRef.current[menu] = open
-      onWorkspaceBoardMenuOpenChange(
-        openMenusRef.current.options || openMenusRef.current.addProject
-      )
-    },
-    [onWorkspaceBoardMenuOpenChange]
+  const keybindings = useAppStore((s) => s.keybindings)
+  // Why primary: Toggle Sidebar binds one default (Mod+B); when the user
+  // unbinds it the tooltip falls back to the bare label like dsh does.
+  const toggleSidebarShortcut = formatOptionalPrimaryShortcutLabel(
+    'sidebar.left.toggle',
+    keybindings
   )
-
+  const collapseLabel = translate(
+    'auto.components.sidebar.SidebarHeaderActions.collapseSidebar',
+    'Collapse sidebar'
+  )
   return (
     <div className="flex shrink-0 items-center gap-1" data-sidebar-header-actions="">
-      <div ref={activityOptionsTarget} className="flex size-6 shrink-0 items-center">
-        {agentsViewActive ? null : (
-          <SidebarWorkspaceOptionsMenu
-            preserveWorkspaceBoardOpen
-            onMenuOpenChange={(open) => updateMenuOpen('options', open)}
-          />
-        )}
-      </div>
-      <AddProjectButton
-        preserveWorkspaceBoardOpen
-        onMenuOpenChange={(open) => updateMenuOpen('addProject', open)}
-      />
+      {onCollapseSidebar ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              type="button"
+              className="text-muted-foreground"
+              aria-label={collapseLabel}
+              aria-keyshortcuts={toggleSidebarShortcut ?? undefined}
+              aria-expanded={true}
+              onClick={onCollapseSidebar}
+            >
+              <PanelLeftClose className="size-3.5" strokeWidth={2.25} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>
+            {collapseLabel}
+            {toggleSidebarShortcut ? (
+              <span className="ml-1.5 text-background/60">{toggleSidebarShortcut}</span>
+            ) : null}
+          </TooltipContent>
+        </Tooltip>
+      ) : null}
+      {showWorkspaceSearch && !agentsViewActive ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              type="button"
+              className="text-muted-foreground"
+              aria-label={translate(
+                'auto.components.sidebar.SidebarHeaderActions.searchWorkspaces',
+                'Search workspaces'
+              )}
+              aria-expanded={workspaceSearchOpen}
+              aria-pressed={workspaceSearchOpen}
+              onClick={onToggleWorkspaceSearch}
+            >
+              <Search className="size-3.5" strokeWidth={2.25} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>
+            {translate(
+              'auto.components.sidebar.SidebarHeaderActions.searchWorkspaces',
+              'Search workspaces'
+            )}
+          </TooltipContent>
+        </Tooltip>
+      ) : null}
+      {/* Why only options swap: the activity view portals its own options button into this slot
+          (SidebarHeader), and keeping Add project means no header button shifts between views. */}
+      {agentsViewActive ? null : (
+        <SidebarWorkspaceOptionsMenu
+          preserveWorkspaceBoardOpen
+          onMenuOpenChange={onWorkspaceBoardMenuOpenChange}
+        />
+      )}
+      <AddProjectButton preserveWorkspaceBoardOpen />
       <NewWorkspaceButton preserveWorkspaceBoardOpen />
     </div>
   )

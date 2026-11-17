@@ -1,5 +1,4 @@
-import { getLinuxDisplayServer } from '../renderer/renderer-runtime'
-import { parseWindowMaterialArgument } from '../../shared/app-lifecycle/windows/window-material'
+import { getLinuxDisplayServer } from '../preload-runtime-support'
 import type { PreloadApi } from '../api-types'
 
 type PlatformInfo = ReturnType<PreloadApi['platform']['get']>
@@ -15,8 +14,7 @@ function resolvePlatformInfo(): PlatformInfo {
       (process as NodeJS.Process & { getSystemVersion?: () => string }).getSystemVersion?.() ?? '',
     arch: process.arch,
     shell: process.env.SHELL?.trim() || process.env.ComSpec?.trim() || '',
-    displayServer: getLinuxDisplayServer(),
-    windowMaterial: parseWindowMaterialArgument(process.argv)
+    displayServer: getLinuxDisplayServer()
   })
 }
 

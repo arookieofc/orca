@@ -1,99 +1,81 @@
-import { awaitSshStartupReady } from './ssh-startup-ready'
 import { appendFileSync } from 'node:fs'
-import type { SshConnectionState } from '../../../shared/remote-runtime/ssh/ssh-types'
-import { createCancelledConnectAttemptError } from '../../ssh/connection/reconnect/ssh-connect-attempt-cancellation'
+import type { SshConnectionState } from '../../../shared/ssh-types'
+import { createCancelledConnectAttemptError } from '../../ssh/ssh-connect-attempt-cancellation'
 import {
   getSshProviderAuthority,
   isCurrentSshProviderAuthority,
   rotateSshProviderAuthority
-} from '../../ssh/connection/authority/ssh-provider-authority'
+} from '../../ssh/ssh-provider-authority'
 import {
   adoptSshConnection,
   runAttributedToSshOwner
 } from '../../ssh/connection/ssh-connection-attribution'
 import { getSshTargetRegistryStore } from '../../ssh/targets/ssh-target-registry'
-import { getManagedOrcadFenceEnvironmentId } from '../../../shared/remote-runtime/ssh/managed-orcad-ssh-owner'
-import { noteRuntimeEnvironmentConnectRequested } from '../runtime-environments/pairing/runtime-environment-pairing-refusal-registry'
+import { getManagedOrcadFenceEnvironmentId } from '../../../shared/managed-orcad-ssh-owner'
+import { noteRuntimeEnvironmentConnectRequested } from '../runtime-environments/runtime-environment-pairing-refusal-registry'
 import {
   decideHostServer,
   recheckWhenManagedFenceClears,
   publishHostServerDecisionFailure,
   publishBridgedUnservedHostServer,
-  restoreKeptHostServer,
   publishManagedServerConnect,
   publishUnservedHostServer
 } from './ssh-host-server-connect'
 import {
-  admittedConnectAuthority,
   assertSshConnectsNotFenced,
-  type ConnectAttempt,
-  type QuietConnect,
   connectInFlight,
   isCurrentConnectAttempt
 } from './ssh-connect-attempt-registry'
 import { connectionManager } from './ssh-ipc-context'
 import { abandonDecisionTransport } from './ssh-session-teardown'
 import { awaitTargetLifecycle } from './ssh-target-lifecycle-queue'
-import { startLegacyRelayBridge } from '../../ssh/legacy-relay/bridge/legacy-relay-bridge-registry'
-import {
-  getSshHostServerStatus,
-  isSshHostKeptForBridgedTerminals
-} from '../../ssh/host-server/ssh-host-server-status'
-import type { HostServerOnConnectResult } from '../../ssh/host-server/ssh-host-server-on-connect'
-import { clearSshCredentialDeclined } from '../../ssh/authentication/ssh-credential-decline'
+import { startLegacyRelayBridge } from '../../ssh/legacy-relay/legacy-relay-bridge-registry'
+import { clearSshCredentialDeclined } from '../../ssh/ssh-credential-decline'
 import {
   createSshUserDisconnectedError,
   isSshUserDisconnected
-} from '../../ssh/connection/ssh-user-disconnect'
+} from '../../ssh/ssh-user-disconnect'
 import {
   isManagedServerRemovalHeld,
   liftSshHostUserDisconnect,
   resumeRuntimeEnvironmentStatus
 } from './ssh-host-user-disconnect'
 
-/**
- * `automatic`: no user asked for this connect, so a cancelled sign-in or a Disconnect stays.
- * `quiet` (implies automatic): retry a bridged host's move; refusal keeps the host as it was.
- */
+/** `automatic`: no user asked for this connect, so a cancelled sign-in or a Disconnect stays. */
 export async function connectTarget(
   targetId: string,
-  options: { automatic?: boolean; quiet?: boolean } = {}
+  options: { automatic?: boolean } = {}
 ): Promise<SshConnectionState> {
-  await awaitSshStartupReady()
   const e2eProbePath = process.env.ORCA_E2E_FORBID_LOCAL_SSH_CONNECT_PROBE
   if (e2eProbePath) {
     appendFileSync(e2eProbePath, `${JSON.stringify(targetId)}\n`)
     throw new Error('e2e_forbidden_local_ssh_connect')
   }
-  if (options.automatic || options.quiet) {
+  if (options.automatic) {
     // Preserve disconnected status rather than publishing an unwanted failed connect.
     if (isSshUserDisconnected(targetId)) {
       const label = getSshTargetRegistryStore()?.getTarget(targetId)?.label ?? targetId
       throw createSshUserDisconnectedError(label)
     }
-    return admitConnect(targetId, true, options.quiet === true)
+    return admitConnect(targetId, true)
   }
   clearSshCredentialDeclined(targetId)
-  // Only explicit user connects may lift the re-pair and crash-loop caps.
+  // Only explicit user connects may lift the re-pair cap.
   const managedEnvironmentId = getManagedOrcadFenceEnvironmentId(
     getSshTargetRegistryStore()?.getTarget(targetId)
   )
   if (managedEnvironmentId) {
     noteRuntimeEnvironmentConnectRequested(managedEnvironmentId)
   }
-  const liftedEnvironments = await liftSshHostUserDisconnect(targetId)
+  const liftedEnvironments = liftSshHostUserDisconnect(targetId)
   try {
     return await admitConnect(targetId)
   } finally {
-    await resumeRuntimeEnvironmentStatus(liftedEnvironments)
+    resumeRuntimeEnvironmentStatus(liftedEnvironments)
   }
 }
 
-async function admitConnect(
-  targetId: string,
-  automatic = false,
-  quiet = false
-): Promise<SshConnectionState> {
+async function admitConnect(targetId: string, automatic = false): Promise<SshConnectionState> {
   // Fence requests that entered before disconnect/reset but resume after its cleanup.
   const admissionAuthority = getSshProviderAuthority(targetId)
   await awaitTargetLifecycle(targetId)
@@ -103,17 +85,13 @@ async function admitConnect(
   let replacePendingTransport = false
   if (existing) {
     if (isCurrentConnectAttempt(targetId, existing.authority)) {
-      // A user's connect joining a quiet retry makes it an ordinary connect (#29626).
-      if (!quiet && existing.quiet) {
-        existing.quiet.active = false
-      }
       return existing.promise
     }
   }
-  const observedAuthority = admittedConnectAuthority(targetId, admissionAuthority)
-  if (!observedAuthority) {
+  if (!isCurrentConnectAttempt(targetId, admissionAuthority)) {
     throw createCancelledConnectAttemptError()
   }
+  const observedAuthority = admissionAuthority
   if (existing) {
     if (connectInFlight.get(targetId) === existing) {
       connectInFlight.delete(targetId)
@@ -126,26 +104,8 @@ async function admitConnect(
   // Shutdown fences and snapshots synchronously; register below or fail here without an admission gap.
   assertSshConnectsNotFenced()
 
-  let registered: ConnectAttempt | undefined
-  const quietMode: QuietConnect | undefined = quiet
-    ? {
-        active: true,
-        rotated: (authority) => {
-          if (registered) {
-            registered.authority = authority
-          }
-        }
-      }
-    : undefined
-  const promise = quietMode
-    ? doQuietConnect(targetId, replacePendingTransport, quietMode)
-    : doConnect(targetId, replacePendingTransport, automatic)
-  const attempt: ConnectAttempt = {
-    authority: getSshProviderAuthority(targetId),
-    promise,
-    ...(quietMode ? { quiet: quietMode } : {})
-  }
-  registered = attempt
+  const promise = doConnect(targetId, replacePendingTransport, automatic)
+  const attempt = { authority: getSshProviderAuthority(targetId), promise }
   connectInFlight.set(targetId, attempt)
   try {
     return await promise
@@ -156,40 +116,21 @@ async function admitConnect(
   }
 }
 
-/** COMPAT(legacy-relay-bridge): only a finished move publishes; any other outcome restores the kept host. */
-async function doQuietConnect(
-  targetId: string,
-  replacePendingTransport: boolean,
-  quiet: QuietConnect
-): Promise<SshConnectionState> {
-  // Replacing a pending transport would hang up the session the kept host still uses.
-  if (
-    replacePendingTransport ||
-    !isSshHostKeptForBridgedTerminals(getSshHostServerStatus(targetId)) ||
-    connectionManager!.getState(targetId)?.status !== 'connected'
-  ) {
-    throw createCancelledConnectAttemptError()
-  }
-  return doConnect(targetId, false, true, quiet)
-}
-
 async function doConnect(
   targetId: string,
   replacePendingTransport = false,
-  automatic = false,
-  quiet?: QuietConnect
+  automatic = false
 ): Promise<SshConnectionState> {
   const target = getSshTargetRegistryStore()!.getTarget(targetId)
   if (!target) {
     throw new Error(`SSH target "${targetId}" not found`)
   }
   // Read after the lifecycle wait: a Stop or Forget this connect queued behind wrote the hold.
-  if (automatic && (await isManagedServerRemovalHeld(target))) {
+  if (automatic && isManagedServerRemovalHeld(target)) {
     throw createSshUserDisconnectedError(target.label)
   }
 
-  // A quiet retry rotates only once its move succeeds; a refusal must not cancel provider requests.
-  let authority = quiet ? getSshProviderAuthority(targetId) : rotateSshProviderAuthority(targetId)
+  const authority = rotateSshProviderAuthority(targetId)
   if (replacePendingTransport) {
     await connectionManager!.disconnect(targetId)
     if (!isCurrentConnectAttempt(targetId, authority)) {
@@ -201,16 +142,10 @@ async function doConnect(
   const owner = Symbol(targetId)
   // Deploy/conversion require teardown first; rotated authority still lets concurrent connects join.
   const server = await runAttributedToSshOwner(owner, () => decideHostServer(target)).catch(
-    async (error: unknown): Promise<HostServerOnConnectResult> => {
+    async (error: unknown) => {
       if (!isCurrentConnectAttempt(targetId, authority)) {
         await abandonDecisionTransport(targetId, owner, authority)
         throw createCancelledConnectAttemptError()
-      }
-      if (quiet?.active) {
-        // The host is still connected and bridged; a retry no one asked for surfaces no failure.
-        assertSshConnectsNotFenced()
-        console.warn(`[ssh] Retried move for ${targetId} failed; the host stays as it was:`, error)
-        return { route: 'unserved', reason: 'refused' }
       }
       // A failed setup leaves no relay to own the transport its decision dialed.
       await abandonDecisionTransport(targetId, owner, authority)
@@ -225,10 +160,6 @@ async function doConnect(
     throw createCancelledConnectAttemptError()
   }
   adoptCurrentTransport(targetId, owner)
-  if (quiet?.active && server.route === 'unserved' && !server.bridged) {
-    // COMPAT(legacy-relay-bridge): only a finished move replaces the kept host's status.
-    return restoreKeptHostServer(targetId)
-  }
   if (server.route === 'managed') {
     if (server.fenceHeld) {
       recheckWhenManagedFenceClears(target, server.environmentId)
@@ -240,10 +171,6 @@ async function doConnect(
     if (!isCurrentConnectAttempt(targetId, authority)) {
       await abandonDecisionTransport(targetId, owner, authority)
       throw createCancelledConnectAttemptError()
-    }
-    if (quiet) {
-      authority = rotateSshProviderAuthority(targetId)
-      quiet.rotated(authority)
     }
     const published = publishManagedServerConnect(
       targetId,

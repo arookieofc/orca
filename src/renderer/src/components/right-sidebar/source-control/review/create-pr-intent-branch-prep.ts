@@ -1,5 +1,6 @@
 import { translate } from '@/i18n/i18n'
-import { isBehindOnlyUpstream } from '../../../../../../shared/git/remotes/git-upstream-status'
+import { isBehindOnlyUpstream } from '../../../../../../shared/git-upstream-status'
+import { readCommitDraftForWorktree, writeCommitDraftForWorktree } from '../commit/commit-drafts'
 import {
   getCreatePrIntentCommitFailureNoticeMessage,
   type CreatePrIntentRunToken
@@ -7,32 +8,33 @@ import {
 import type { SourceControlOperationTarget } from '../listing/operation-target'
 import type { SourceControlCommitAction } from '../commit/use-commit-action'
 import type { SourceControlWorktreeOperationState } from '../panel/use-worktree-operation-state'
-import type { CreatePrIntentNotice } from '../commit/commit-area-types'
 import type { SourceControlRemoteActionRunner } from '../sync/use-remote-action-runner'
 import type { CreatePrIntentRunSnapshot } from './create-pr-intent-run-snapshot'
 import type { SourceControlCreatePrIntentCommitMessage } from './use-create-pr-intent-commit-message'
 
 /** Prepare a committed fast-forward-current branch; false stops the intent with only caller finally cleanup remaining. */
 export async function runCreatePrIntentBranchPrep({
+  commitDraftsRef,
+  commitErrorsRef,
   generateCommitMessageForCreatePrIntent,
   handleCommit,
-  operationStore,
   operationTarget,
   runRemoteAction,
-  setCreatePrIntentNotice,
+  setCreatePrIntentNoticeForWorktree,
   snapshot,
   token,
-  updateCommitDraft
+  updateCommitDrafts
 }: {
+  commitDraftsRef: SourceControlWorktreeOperationState['commitDraftsRef']
+  commitErrorsRef: SourceControlWorktreeOperationState['commitErrorsRef']
   generateCommitMessageForCreatePrIntent: SourceControlCreatePrIntentCommitMessage['generateCommitMessageForCreatePrIntent']
   handleCommit: SourceControlCommitAction['handleCommit']
-  operationStore: SourceControlWorktreeOperationState['operationStore']
   operationTarget: SourceControlOperationTarget
   runRemoteAction: SourceControlRemoteActionRunner['runRemoteAction']
-  setCreatePrIntentNotice: (notice: CreatePrIntentNotice | null) => void
+  setCreatePrIntentNoticeForWorktree: SourceControlWorktreeOperationState['setCreatePrIntentNoticeForWorktree']
   snapshot: CreatePrIntentRunSnapshot
   token: CreatePrIntentRunToken
-  updateCommitDraft: SourceControlWorktreeOperationState['updateCommitDraft']
+  updateCommitDrafts: SourceControlWorktreeOperationState['updateCommitDrafts']
 }): Promise<boolean> {
   const { abortIfStale, refreshIntentSnapshot, stageLatestIntentPaths } = snapshot
 
@@ -42,7 +44,7 @@ export async function runCreatePrIntentBranchPrep({
 
   // Fast-forward behind-only before commit to avoid creating divergence; ff-only never auto-merges.
   if (isBehindOnlyUpstream(snapshot.upstreamStatus)) {
-    setCreatePrIntentNotice({
+    setCreatePrIntentNoticeForWorktree(token.worktreeId, {
       tone: 'muted',
       message: translate(
         'auto.components.right.sidebar.SourceControl.createPrIntentFastForwarding',
@@ -59,7 +61,7 @@ export async function runCreatePrIntentBranchPrep({
       return false
     }
     if (earlyFfResult.status !== 'ok') {
-      setCreatePrIntentNotice({
+      setCreatePrIntentNoticeForWorktree(token.worktreeId, {
         tone: 'destructive',
         message: translate(
           'auto.components.right.sidebar.SourceControl.createPrIntentRemoteFailed',
@@ -82,9 +84,9 @@ export async function runCreatePrIntentBranchPrep({
     return true
   }
 
-  let message = operationStore.getState().draft.trim()
+  let message = readCommitDraftForWorktree(commitDraftsRef.current, token.worktreeId).trim()
   if (!message) {
-    setCreatePrIntentNotice({
+    setCreatePrIntentNoticeForWorktree(token.worktreeId, {
       tone: 'muted',
       message: translate(
         'auto.components.right.sidebar.SourceControl.8d8f5c6c94',
@@ -96,7 +98,7 @@ export async function runCreatePrIntentBranchPrep({
       return false
     }
     if (!generated.ok || !generated.message) {
-      setCreatePrIntentNotice({
+      setCreatePrIntentNoticeForWorktree(token.worktreeId, {
         tone: generated.reason === 'settings' ? 'muted' : 'destructive',
         message: translate(
           generated.reason === 'settings'
@@ -110,8 +112,12 @@ export async function runCreatePrIntentBranchPrep({
       })
       return false
     }
-    if (operationStore.getState().draft.trim()) {
-      setCreatePrIntentNotice({
+    const draftAfterGeneration = readCommitDraftForWorktree(
+      commitDraftsRef.current,
+      token.worktreeId
+    ).trim()
+    if (draftAfterGeneration) {
+      setCreatePrIntentNoticeForWorktree(token.worktreeId, {
         tone: 'muted',
         message: translate(
           'auto.components.right.sidebar.SourceControl.fda060d6ce',
@@ -121,10 +127,10 @@ export async function runCreatePrIntentBranchPrep({
       return false
     }
     message = generated.message
-    updateCommitDraft(message)
+    updateCommitDrafts((prev) => writeCommitDraftForWorktree(prev, token.worktreeId, message))
   }
 
-  setCreatePrIntentNotice({
+  setCreatePrIntentNoticeForWorktree(token.worktreeId, {
     tone: 'muted',
     message: translate(
       'auto.components.right.sidebar.SourceControl.b75cb1fd0c',
@@ -147,8 +153,8 @@ export async function runCreatePrIntentBranchPrep({
     if (abortIfStale()) {
       return false
     }
-    const commitFailure = operationStore.getState().commitError
-    setCreatePrIntentNotice({
+    const commitFailure = commitErrorsRef.current[token.worktreeId] ?? null
+    setCreatePrIntentNoticeForWorktree(token.worktreeId, {
       tone: 'destructive',
       message: getCreatePrIntentCommitFailureNoticeMessage(commitFailure, {
         fallback: translate(

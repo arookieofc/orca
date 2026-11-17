@@ -1,17 +1,24 @@
-import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
 import React, { useState } from 'react'
 import { Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
-import { gitHubSlugApiForTarget } from '@/runtime/repository-github/github-slug-owner-api'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import {
   getCommentBodySubmitState,
   hasBoundedCommentBodyText
-} from '@/lib/source-control/review/comments/comment-body-submit-state'
-import type { PRComment } from '../../../../../shared/github/comments/comment-types'
-import { useTranslate } from '@/i18n/use-translate'
-import { projectViewErrorMessage } from '../auth-errors/project-view-error-copy'
+} from '@/lib/comment-body-submit-state'
+import type { PRComment } from '../../../../../shared/github/comment-types'
+import type {
+  GitHubProjectCommentMutationResult,
+  GitHubProjectMutationResult
+} from '../../../../../shared/github/project-result-types'
+import { translate } from '@/i18n/i18n'
+
+function getRuntimeTarget(target: RuntimeClientTarget) {
+  return target.kind === 'environment' ? target : null
+}
 
 export function CommentsList({
   owner,
@@ -28,12 +35,14 @@ export function CommentsList({
   sourceTarget: RuntimeClientTarget
   onChange: (next: PRComment[]) => void
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div className="flex flex-col gap-3">
       {comments.length === 0 ? (
         <div className="text-xs italic text-muted-foreground">
-          {t('auto.components.github.project.slug.dialog.Comments.5f104bf855', 'No comments yet.')}
+          {translate(
+            'auto.components.github.project.slug.dialog.Comments.5f104bf855',
+            'No comments yet.'
+          )}
         </div>
       ) : (
         comments.map((c) => (
@@ -43,30 +52,46 @@ export function CommentsList({
             repo={repo}
             comment={c}
             onDelete={async () => {
-              const res = await gitHubSlugApiForTarget(sourceTarget).deleteIssueCommentBySlug({
+              const target = getRuntimeTarget(sourceTarget)
+              const args = {
                 owner,
                 repo,
                 ...(host ? { host } : {}),
-                commentId: c.id,
-                wakeWslDistro: true
-              })
+                commentId: c.id
+              }
+              const res = target
+                ? await callRuntimeRpc<GitHubProjectMutationResult>(
+                    target,
+                    'github.project.deleteIssueCommentBySlug',
+                    args,
+                    { timeoutMs: 30_000 }
+                  )
+                : await window.api.gh.deleteIssueCommentBySlug(args)
               if (!res.ok) {
-                toast.error(projectViewErrorMessage(res.error))
+                toast.error(res.error.message)
                 return
               }
               onChange(comments.filter((x) => x.id !== c.id))
             }}
             onEdit={async (next) => {
-              const res = await gitHubSlugApiForTarget(sourceTarget).updateIssueCommentBySlug({
+              const target = getRuntimeTarget(sourceTarget)
+              const args = {
                 owner,
                 repo,
                 ...(host ? { host } : {}),
                 commentId: c.id,
-                body: next,
-                wakeWslDistro: true
-              })
+                body: next
+              }
+              const res = target
+                ? await callRuntimeRpc<GitHubProjectMutationResult>(
+                    target,
+                    'github.project.updateIssueCommentBySlug',
+                    args,
+                    { timeoutMs: 30_000 }
+                  )
+                : await window.api.gh.updateIssueCommentBySlug(args)
               if (!res.ok) {
-                toast.error(projectViewErrorMessage(res.error))
+                toast.error(res.error.message)
                 return
               }
               onChange(comments.map((x) => (x.id === c.id ? { ...x, body: next } : x)))
@@ -89,7 +114,6 @@ function CommentRow({
   onDelete: () => void | Promise<void>
   onEdit: (next: string) => void | Promise<void>
 }): React.JSX.Element {
-  const t = useTranslate()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(comment.body)
   return (
@@ -105,10 +129,10 @@ function CommentRow({
               setEditing(true)
             }}
           >
-            {t('auto.components.github.project.slug.dialog.Comments.8564f58542', 'Edit')}
+            {translate('auto.components.github.project.slug.dialog.Comments.8564f58542', 'Edit')}
           </button>
           <button type="button" className="hover:underline" onClick={() => void onDelete()}>
-            {t('auto.components.github.project.slug.dialog.Comments.463d030ae4', 'Delete')}
+            {translate('auto.components.github.project.slug.dialog.Comments.463d030ae4', 'Delete')}
           </button>
         </div>
       </div>
@@ -128,10 +152,13 @@ function CommentRow({
                 void onEdit(draft)
               }}
             >
-              {t('auto.components.github.project.slug.dialog.Comments.c3e829b4d9', 'Save')}
+              {translate('auto.components.github.project.slug.dialog.Comments.c3e829b4d9', 'Save')}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-              {t('auto.components.github.project.slug.dialog.Comments.c0e576e96b', 'Cancel')}
+              {translate(
+                'auto.components.github.project.slug.dialog.Comments.c0e576e96b',
+                'Cancel'
+              )}
             </Button>
           </div>
         </div>
@@ -157,7 +184,6 @@ export function NewCommentForm({
   sourceTarget: RuntimeClientTarget
   onAdded: (c: PRComment) => void
 }): React.JSX.Element {
-  const t = useTranslate()
   const [draft, setDraft] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const canSubmitComment = hasBoundedCommentBodyText(draft)
@@ -166,7 +192,7 @@ export function NewCommentForm({
       <textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        placeholder={t(
+        placeholder={translate(
           'auto.components.github.project.slug.dialog.Comments.1c95937c8b',
           'Write a comment…'
         )}
@@ -183,7 +209,7 @@ export function NewCommentForm({
             }
             if (bodyState.status === 'too-large-leading-whitespace') {
               toast.error(
-                t(
+                translate(
                   'auto.components.github.project.slug.dialog.Comments.commentTooLarge',
                   'Comment is too large to submit safely.'
                 )
@@ -192,16 +218,24 @@ export function NewCommentForm({
             }
             setSubmitting(true)
             try {
-              const res = await gitHubSlugApiForTarget(sourceTarget).addIssueCommentBySlug({
+              const target = getRuntimeTarget(sourceTarget)
+              const args = {
                 owner,
                 repo,
                 ...(host ? { host } : {}),
                 number,
-                body: bodyState.body,
-                wakeWslDistro: true
-              })
+                body: bodyState.body
+              }
+              const res = target
+                ? await callRuntimeRpc<GitHubProjectCommentMutationResult>(
+                    target,
+                    'github.project.addIssueCommentBySlug',
+                    args,
+                    { timeoutMs: 30_000 }
+                  )
+                : await window.api.gh.addIssueCommentBySlug(args)
               if (!res.ok) {
-                toast.error(projectViewErrorMessage(res.error))
+                toast.error(res.error.message)
                 return
               }
               onAdded(res.comment)
@@ -212,7 +246,7 @@ export function NewCommentForm({
           }}
         >
           <Send className="mr-1 size-3.5" />{' '}
-          {t('auto.components.github.project.slug.dialog.Comments.fd5cccd138', 'Comment')}
+          {translate('auto.components.github.project.slug.dialog.Comments.fd5cccd138', 'Comment')}
         </Button>
       </div>
     </div>

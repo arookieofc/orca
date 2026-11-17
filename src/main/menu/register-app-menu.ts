@@ -1,13 +1,15 @@
 import { BrowserWindow, Menu, app } from 'electron'
-import { formatKeybindingList } from '../../shared/keybindings/formatting'
-import { getEffectiveKeybindingsForAction } from '../../shared/keybindings/effective'
-import type { KeybindingActionId, KeybindingOverrides } from '../../shared/keybindings/types'
-import type { UpdateCheckOptions } from '../../shared/updater/update-status-types'
+import {
+  formatKeybindingList,
+  getEffectiveKeybindingsForAction,
+  type KeybindingActionId,
+  type KeybindingOverrides
+} from '../../shared/keybindings'
+import type { UpdateCheckOptions } from '../../shared/update-status-types'
 import { translateMain } from '../i18n/main-i18n'
 import { createAppMenuSelectionItem, resolveNativeEditTarget } from './app-menu-selection-item'
-import { createAppMenuQuitItems, type AppMenuQuitHandlers } from './app-menu-quit-item'
+import { createAppMenuQuitItem } from './app-menu-quit-item'
 import { createAppMenuReloadAndDevToolsItems } from './app-menu-reload-devtools-items'
-import { labeledAppMenuRole } from './labeled-app-menu-role'
 import { createAppWindowMenu } from './app-menu-window'
 
 export type AppearanceMenuState = {
@@ -24,7 +26,7 @@ export function getNextDefaultOnAppearanceSettingValue(current: boolean | undefi
   return !(current !== false)
 }
 
-type RegisterAppMenuOptions = AppMenuQuitHandlers & {
+type RegisterAppMenuOptions = {
   onOpenSettings: () => void
   onOpenSetupGuide: (window?: Electron.BaseWindow | null) => void
   onOpenFeatureTour: (window?: Electron.BaseWindow | null) => void
@@ -42,6 +44,7 @@ type RegisterAppMenuOptions = AppMenuQuitHandlers & {
   toggleFocusedPageDevTools?: (focused: Electron.WebContents) => boolean
   // app.name stays stable for Keychain; menus use the per-branch development label.
   appMenuLabel?: string
+  onQuit?: () => void
 }
 
 function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
@@ -127,23 +130,23 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
   const macAppMenu: Electron.MenuItemConstructorOptions = {
     label: options.appMenuLabel ?? app.name,
     submenu: [
-      labeledAppMenuRole('about', 'menu.about', 'About Orca'),
+      { role: 'about' },
       checkForUpdatesItem,
       settingsItem,
       { type: 'separator' },
-      labeledAppMenuRole('services', 'menu.services', 'Services'),
+      { role: 'services' },
       { type: 'separator' },
-      labeledAppMenuRole('hide', 'menu.hide', 'Hide Orca'),
-      labeledAppMenuRole('hideOthers', 'menu.hideOthers', 'Hide Others'),
-      labeledAppMenuRole('unhide', 'menu.unhide', 'Show All'),
+      { role: 'hide' },
+      { role: 'hideOthers' },
+      { role: 'unhide' },
       { type: 'separator' },
-      ...createAppMenuQuitItems(options, options.appMenuLabel ?? app.name)
+      createAppMenuQuitItem(options.onQuit, options.appMenuLabel ?? app.name)
     ]
   }
 
   const fileMenu: Electron.MenuItemConstructorOptions = {
     label: translateMain('menu.file', 'File'),
-    submenu: [settingsItem, { type: 'separator' }, ...createAppMenuQuitItems(options)]
+    submenu: [settingsItem, { type: 'separator' }, createAppMenuQuitItem(options.onQuit)]
   }
 
   // Keep menu hints while non-macOS Ctrl+Z/Ctrl+Y reach focused terminal or DOM controls.
@@ -153,10 +156,10 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
   const editMenu: Electron.MenuItemConstructorOptions = {
     label: translateMain('menu.edit', 'Edit'),
     submenu: [
-      { role: 'undo', label: translateMain('menu.undo', 'Undo'), ...undoRedoOptions },
-      { role: 'redo', label: translateMain('menu.redo', 'Redo'), ...undoRedoOptions },
+      { role: 'undo', ...undoRedoOptions },
+      { role: 'redo', ...undoRedoOptions },
       { type: 'separator' },
-      labeledAppMenuRole('cut', 'menu.cut', 'Cut'),
+      { role: 'cut' },
       createAppMenuSelectionItem({
         action: 'copy',
         label: translateMain('menu.copy', 'Copy'),
@@ -266,7 +269,7 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
         label: `${translateMain('menu.openWorktreePalette', 'Open Worktree Palette')}\t${shortcutLabel('worktree.palette')}`
       },
       { type: 'separator' },
-      labeledAppMenuRole('togglefullscreen', 'menu.toggleFullScreen', 'Toggle Full Screen'),
+      { role: 'togglefullscreen' },
       { type: 'separator' },
       appearanceSubmenu
     ]
@@ -285,7 +288,7 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
         ? []
         : ([
             { type: 'separator' },
-            labeledAppMenuRole('about', 'menu.about', 'About Orca'),
+            { role: 'about' },
             checkForUpdatesItem
           ] satisfies Electron.MenuItemConstructorOptions[]))
     ]

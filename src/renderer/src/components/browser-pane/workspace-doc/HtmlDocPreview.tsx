@@ -1,27 +1,25 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import type {
   DocPreviewFileFailure,
   DocPreviewFileFailureReason
-} from '../../../../../shared/document-preview/doc-preview-scheme'
+} from '../../../../../shared/doc-preview-scheme'
 import type { HtmlDocPreviewProps } from './html-doc-preview-props'
 import {
   advanceAcrossBrowserPageConversion,
   returnAcrossBrowserPageConversion
-} from '@/lib/browser/history/browser-page-conversion-history'
+} from '@/lib/browser-page-conversion-history'
 import { BrowserGuestAnnotateOverlays } from '@/components/browser-pane/annotate/browser-guest-annotate-overlays'
 import { attachDocPreviewWebview } from './doc-preview-webview-attach'
-import { setBrowserGuestVisible } from '../host-guest/browser-guest-activity'
 import {
   buildDocPreviewGrantRequest,
   ensureDocPreviewGrant,
   releaseDocPreviewGrant,
   type DocPreviewGrantHandle
-} from '@/lib/browser/documents/doc-preview-grants'
-import { selectWorktreeHostDisplayLabel } from '@/runtime/hosts/display/execution-host-display-label'
+} from '@/lib/doc-preview-grants'
+import { selectWorktreeHostDisplayLabel } from '@/lib/execution-host-display-label'
 import { translate } from '@/i18n/i18n'
-import { useTranslate } from '@/i18n/use-translate'
-import { useAppStore } from '@/store/index'
+import { useAppStore } from '@/store'
 import { openDocPreviewExternally, openDocPreviewSource } from './doc-preview-document-actions'
 import {
   DocPreviewDirectoryAccessBanner,
@@ -41,8 +39,6 @@ import {
 } from '@/runtime/runtime-direct-ssh-file-read'
 import { isTauriNativeHost } from '@/web/tauri-native-bridge'
 import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
-import { formatClipboardFilePath } from '@/lib/clipboard/clipboard-file-path'
-import { getOpenFileRevealOwner } from '@/lib/files/os-open/reveal-in-file-manager'
 import { subscribeDocPreviewExternalLinkConfirmation } from './doc-preview-external-link-confirmation'
 
 type PreviewState = 'loading' | 'ready' | 'unavailable'
@@ -62,14 +58,9 @@ export function HtmlDocPreview({
   convertedFrom = null,
   convertedTo = null
 }: HtmlDocPreviewProps): React.JSX.Element {
-  const t = useTranslate()
   const confirm = useConfirmationDialog()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const webviewRef = useRef<Electron.WebviewTag | null>(null)
-  const isActiveRef = useRef(isActive)
-  useLayoutEffect(() => {
-    isActiveRef.current = isActive
-  }, [isActive])
   const reloadRef = useRef<(() => void) | null>(null)
   const [state, setState] = useState<PreviewState>('loading')
   const [failureReason, setFailureReason] = useState<DocPreviewFileFailureReason | null>(null)
@@ -329,7 +320,6 @@ export function HtmlDocPreview({
         detach = attached.detach
         reloadRef.current = attached.reload
         webviewRef.current = attached.webview
-        setBrowserGuestVisible(previewId, isActiveRef.current)
         // Main binds the grant on first commit; tools need the attached guest pointed at it.
         setGrant(handle)
       })
@@ -364,7 +354,6 @@ export function HtmlDocPreview({
   ])
 
   useEffect(() => {
-    setBrowserGuestVisible(previewId, isActive)
     // Eviction removes the guest, not the retained pane; only the selected preview restores it.
     if (isActive && webviewRef.current && !webviewRef.current.isConnected) {
       setRemintCount((count) => count + 1)
@@ -400,7 +389,7 @@ export function HtmlDocPreview({
     reloadRef.current?.()
   }, [failureReason, handleHardReload, state])
 
-  const notices = docPreviewNotices(isUnavailable, downloadBlocked, assetFailures, t)
+  const notices = docPreviewNotices(isUnavailable, downloadBlocked, assetFailures)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-editor-surface">
@@ -411,14 +400,7 @@ export function HtmlDocPreview({
         history={historyWithConversionCrossings}
         onReload={handleReload}
         onHardReload={handleHardReload}
-        onCopyPath={() =>
-          void window.api.ui.writeClipboardText(
-            formatClipboardFilePath(
-              identity.absolutePath,
-              getOpenFileRevealOwner(useAppStore.getState(), previewDocument)
-            )
-          )
-        }
+        onCopyPath={() => void window.api.ui.writeClipboardText(identity.absolutePath)}
         onCopyRelativePath={() => void window.api.ui.writeClipboardText(relativePath)}
         onOpenSource={() => openDocPreviewSource(previewDocument)}
         onOpenExternally={() => openDocPreviewExternally(previewDocument)}
@@ -444,7 +426,7 @@ export function HtmlDocPreview({
         <DocPreviewDirectoryAccessBanner
           requests={accessRequests}
           busy={accessRequestBusy}
-          worktreeRoot={grant?.location.requestBase ?? worktreeRoot}
+          worktreeRoot={worktreeRoot}
           onDismiss={dismissDirectoryAccess}
           onAllow={allowDirectoryAccess}
         />
@@ -469,13 +451,13 @@ export function HtmlDocPreview({
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-editor-surface px-6 text-center">
             <AlertCircle className="size-6 text-muted-foreground" />
             <p className="text-sm font-medium">
-              {t(
+              {translate(
                 'auto.components.editor.HtmlDocPreview.previewUnavailableTitle',
                 'Preview unavailable'
               )}
             </p>
             <p className="max-w-sm text-xs text-muted-foreground">
-              {docPreviewFailureDetail(failureReason, t)}
+              {docPreviewFailureDetail(failureReason)}
             </p>
           </div>
         ) : null}

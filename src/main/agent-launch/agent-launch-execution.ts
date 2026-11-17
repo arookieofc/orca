@@ -1,19 +1,21 @@
 import type {
   AgentLaunchIntent,
   AgentLaunchResult,
-  AgentLaunchTarget,
-  AgentLaunchModeReceipt
-} from '../../shared/agent-launch/contracts/agent-launch-intent'
+  AgentLaunchTarget
+} from '../../shared/agent-launch-intent'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import type { readAgentLaunchModeSettings, AgentLaunchModeVocabulary } from './agent-launch-mode'
-
+import type {
+  readAgentLaunchModeSettings,
+  AgentLaunchModeReceipt,
+  AgentLaunchModeVocabulary
+} from './agent-launch-mode'
 import type {
   AgentLaunchSurfaceFactory,
   AgentLaunchWorkspaceFactory
 } from './agent-launch-surface-factories'
 
 /** Persist the surface result before delivery so a host crash leaves an honest prompt receipt. */
-type AgentLaunchPublishedSurface = AgentLaunchResult
+export type AgentLaunchPublishedSurface = AgentLaunchResult
 
 type AgentLaunchExecutionBase = {
   runtime: Pick<OrcaRuntimeService, 'getStructuredAgentSessionCreateSupport'> &

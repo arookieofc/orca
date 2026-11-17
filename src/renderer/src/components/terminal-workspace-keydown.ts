@@ -1,35 +1,33 @@
-import { reopenClosedWorkspaceTab } from './reopen-closed-workspace-tab'
 import { toast } from 'sonner'
-import { dispatchWorkspaceTabCommand } from '@/lib/workspace/tabs/workspace-tab-commands'
-import { keybindingMatchesAction } from '../../../shared/keybindings/matching'
-import type { KeybindingActionId } from '../../../shared/keybindings/types'
-import { matchesRecentTabSwitcherChord } from '../../../shared/keybindings/window-shortcut-policy'
-import { useAppStore } from '../store/index'
-import {
-  handleEmptyFloatingWorkspacePanelCloseShortcut,
-  isEventTargetInsideFloatingWorkspacePanel,
-  isFloatingWorkspacePanelFocused
-} from '@/components/floating-terminal/workspace/floating-workspace-terminal-actions'
+import { dispatchWorkspaceTabCommand } from '@/lib/workspace-tab-commands'
+import type { KeybindingActionId } from '../../../shared/keybindings'
+import type { TuiAgent } from '../../../shared/tui-agent'
+import { keybindingMatchesAction } from '../../../shared/keybindings'
+import { matchesRecentTabSwitcherChord } from '../../../shared/window-shortcut-policy'
+import { useAppStore } from '../store'
 import {
   createFloatingWorkspaceBrowserTab,
   createFloatingWorkspaceMarkdownTab,
-  createFloatingWorkspaceTerminalTab
-} from '@/components/floating-terminal/workspace/floating-workspace-tab-creation'
-import { showTerminalShortcutCaptureNotification } from '@/lib/notifications/terminal-shortcut-capture-notification'
+  createFloatingWorkspaceTerminalTab,
+  handleEmptyFloatingWorkspacePanelCloseShortcut,
+  isEventTargetInsideFloatingWorkspacePanel,
+  isFloatingWorkspacePanelFocused
+} from '@/lib/floating-workspace-terminal-actions'
+import { showTerminalShortcutCaptureNotification } from '@/lib/terminal-shortcut-capture-notification'
 import {
   ensureClientCreationActionAllowed,
   showClientCreationActionError
-} from '@/lib/workspace/creation/surface-policy/client-creation-action-error'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/workspace/identity/floating-workspace-id'
+} from '@/lib/client-creation-action-error'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 import { translate } from '@/i18n/i18n'
 import { getKeybindingContext } from './terminal-workspace-model'
-import { isAgentTerminalPreviewTarget } from './dashboard/terminal-preview/agent-terminal-preview-target'
+import { isAgentTerminalPreviewTarget } from './dashboard-popout/agent-terminal-preview-target'
 import { resolveTerminalAgentTabShortcut } from './terminal-agent-tab-shortcut'
-import { getDetectionTargetIdentityForWorktree } from '@/lib/agent-session/launch/inventory/agent-detection-target-inventory'
+import { getDetectionTargetIdentityForWorktree } from '@/lib/agent-detection-target-inventory'
 import {
-  launchAgentTabShortcut,
-  launchFloatingWorkspaceAgentShortcut
-} from './agent-tab-shortcut-launch'
+  captureAgentTabLaunchContext,
+  type AgentTabLaunchContext
+} from './agent-tab-launch-context'
 import { handleTerminalWorkspaceEditorShortcut } from './terminal-workspace-editor-shortcuts'
 import type { TerminalActivationController } from './use-terminal-activation-actions'
 
@@ -41,8 +39,8 @@ export function handleTerminalWorkspaceKeyDown(
   const {
     activeWorktreeId,
     handleCloseAllFiles,
+    handleNewAgentTab,
     handleNewBrowserTab,
-    handleNewBrowserTabSplitRight,
     handleNewFile,
     handleNewSimulatorTab,
     handleNewTab,
@@ -50,13 +48,11 @@ export function handleTerminalWorkspaceKeyDown(
     mobileEmulatorEnabled,
     terminalShortcutPolicy
   } = controller
-  // Let the focused Settings recorder capture shortcuts without executing them.
-  if (event.target instanceof Element && event.target.closest('[data-shortcut-recorder-active]')) {
+  if (!activeWorktreeId) {
     return
   }
   const context = getKeybindingContext(event.target)
-  const floatingWorkspaceFocused =
-    isEventTargetInsideFloatingWorkspacePanel(event.target) || isFloatingWorkspacePanelFocused()
+  const floatingWorkspaceFocused = isFloatingWorkspacePanelFocused()
   const matchShortcut = (actionId: KeybindingActionId): boolean =>
     keybindingMatchesAction(actionId, event, shortcutPlatform, keybindings, {
       context,
@@ -72,40 +68,58 @@ export function handleTerminalWorkspaceKeyDown(
       keybindings
     })
   }
-  if (activeWorktreeId && !event.repeat) {
+  if (!event.repeat && matchShortcut('tab.newTerminal')) {
+    event.preventDefault()
+    notifyTerminalCapture('tab.newTerminal')
+    if (floatingWorkspaceFocused) {
+      void createFloatingWorkspaceTerminalTab(useAppStore.getState())
+      return
+    }
+    handleNewTab()
+    return
+  }
+
+  if (!event.repeat) {
     const agentShortcut = resolveTerminalAgentTabShortcut({
-      activeWorktreeId: floatingWorkspaceFocused ? FLOATING_TERMINAL_WORKTREE_ID : activeWorktreeId,
+      activeWorktreeId,
       keybindings,
-      matchShortcut,
-      includeTerminal: true
+      matchShortcut
     })
     if (agentShortcut.actionId) {
       event.preventDefault()
       notifyTerminalCapture(agentShortcut.actionId)
-      if (agentShortcut.actionId === 'tab.newTerminal') {
-        if (floatingWorkspaceFocused) {
-          void createFloatingWorkspaceTerminalTab(useAppStore.getState())
-        } else {
-          handleNewTab()
+      const launchOrReport = (agent: TuiAgent | null, context?: AgentTabLaunchContext): void => {
+        if (agent) {
+          handleNewAgentTab(agent, context)
+          return
         }
-        return
-      }
-      if (floatingWorkspaceFocused) {
-        // Why: this capture listener usually runs before the floating panel's own, so it routes there too.
-        launchFloatingWorkspaceAgentShortcut(agentShortcut)
-        return
-      }
-      const detectionTarget = getDetectionTargetIdentityForWorktree(
-        useAppStore.getState(),
-        activeWorktreeId
-      )
-      launchAgentTabShortcut(activeWorktreeId, agentShortcut, () => {
-        const latest = useAppStore.getState()
-        return (
-          latest.activeWorktreeId === activeWorktreeId &&
-          getDetectionTargetIdentityForWorktree(latest, activeWorktreeId) === detectionTarget
+        toast.message(
+          translate(
+            'auto.components.Terminal.5b2c1a9e44',
+            'No agent CLI detected — install one or pick a default agent in Settings.'
+          )
         )
-      })
+      }
+      if (agentShortcut.pendingAgent) {
+        const detectionTarget = getDetectionTargetIdentityForWorktree(
+          useAppStore.getState(),
+          activeWorktreeId
+        )
+        // Why: the tab belongs in the pane the shortcut was pressed in, not one focused while waiting.
+        const launchContext = captureAgentTabLaunchContext(activeWorktreeId)
+        void agentShortcut.pendingAgent.then((agent) => {
+          // Why: a slow host probe must not open a tab in a workspace (or on a host) the user left.
+          const latest = useAppStore.getState()
+          if (
+            latest.activeWorktreeId === activeWorktreeId &&
+            getDetectionTargetIdentityForWorktree(latest, activeWorktreeId) === detectionTarget
+          ) {
+            launchOrReport(agent, launchContext)
+          }
+        })
+      } else {
+        launchOrReport(agentShortcut.agent)
+      }
       return
     }
   }
@@ -114,13 +128,10 @@ export function handleTerminalWorkspaceKeyDown(
     event.preventDefault()
     notifyTerminalCapture('tab.reopenClosed')
     try {
-      reopenClosedWorkspaceTab(activeWorktreeId)
+      useAppStore.getState().reopenClosedTab(activeWorktreeId)
     } catch (error) {
       showClientCreationActionError(error)
     }
-    return
-  }
-  if (!activeWorktreeId) {
     return
   }
   if (!event.repeat && matchShortcut('tab.newBrowser')) {
@@ -139,17 +150,6 @@ export function handleTerminalWorkspaceKeyDown(
       return
     }
     handleNewBrowserTab()
-    return
-  }
-  if (!event.repeat && matchShortcut('tab.newBrowserSplitRight')) {
-    event.preventDefault()
-    notifyTerminalCapture('tab.newBrowserSplitRight')
-    if (
-      !floatingWorkspaceFocused &&
-      ensureClientCreationActionAllowed(activeWorktreeId, 'managed-browser')
-    ) {
-      handleNewBrowserTabSplitRight()
-    }
     return
   }
   if (!event.repeat && mobileEmulatorEnabled && matchShortcut('tab.newSimulator')) {
@@ -239,10 +239,7 @@ export function handleTerminalWorkspaceKeyDown(
   }
   if (matchShortcut('tab.previousRecent')) {
     if (claimTabSwitch()) {
-      dispatchWorkspaceTabCommand({
-        type: 'previous-recent',
-        floatingPanelOwned: floatingWorkspaceFocused
-      })
+      dispatchWorkspaceTabCommand({ type: 'previous-recent' })
     }
     return
   }
@@ -272,8 +269,7 @@ export function handleTerminalWorkspaceKeyDown(
     dispatchWorkspaceTabCommand({
       type: 'switch',
       direction: switchAllTypesDirection ?? switchSameTypeDirection ?? 1,
-      scope: switchAllTypesDirection !== null ? 'all-types' : 'same-type',
-      floatingPanelOwned: floatingWorkspaceFocused
+      scope: switchAllTypesDirection !== null ? 'all-types' : 'same-type'
     })
   }
   const terminalTabDirection = matchShortcut('tab.nextTerminal')
@@ -285,21 +281,7 @@ export function handleTerminalWorkspaceKeyDown(
     dispatchWorkspaceTabCommand({
       type: 'switch',
       direction: terminalTabDirection,
-      scope: 'terminal',
-      floatingPanelOwned: floatingWorkspaceFocused
-    })
-  }
-  const moveTabDirection = matchShortcut('tab.moveRight')
-    ? 1
-    : matchShortcut('tab.moveLeft')
-      ? -1
-      : null
-  if (moveTabDirection !== null && claimTabSwitch()) {
-    notifyTerminalCapture(moveTabDirection === 1 ? 'tab.moveRight' : 'tab.moveLeft')
-    dispatchWorkspaceTabCommand({
-      type: 'move',
-      direction: moveTabDirection,
-      floatingPanelOwned: floatingWorkspaceFocused
+      scope: 'terminal'
     })
   }
 }

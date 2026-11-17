@@ -16,7 +16,7 @@ import {
   setPresenceGated
 } from './agent-auto-ack-presence'
 import type { AppState } from '@/store/types'
-import { selectFloatingWorkspacePanelVisible } from '@/store/workspaces/floating/floating-workspace-panel-selector'
+import { selectFloatingWorkspacePanelVisible } from '@/store/floating-workspace-panel-selector'
 import {
   acknowledgeViewedAutoAckTarget,
   readAgentAttentionTurnRecords,
@@ -29,9 +29,9 @@ import {
 import {
   isWorkspaceFlagSet,
   onScreenHostId
-} from '@/store/slices/workspace-attention/workspace-unread-flag-reads'
+} from '@/store/slices/workspace-attention/workspace-unread-flag'
 import { paneKeyTabId } from '@/store/slices/workspace-attention/workspace-live-markers'
-import { isOrcaWindowForegroundFocused } from '@/attention/orca-window-foreground-focus'
+import { isOrcaWindowForegroundFocused } from '@/components/terminal-pane/terminal-notification-pane-visibility'
 import type { ClientWorkspaceViewReporter } from './client-workspace-view-report'
 
 type ScanStore = {
@@ -63,7 +63,7 @@ function hasMarkersOnScreen(s: AppState, targets: readonly AutoAckTabTarget[]): 
   )
 }
 
-/** Visible/focused/present users acknowledge every visible live target and unread flag. */
+/** Visible/focused/present users acknowledge every visible target and unread flag. Scan live and retained rows because Codex exit can migrate done state mid-race (codex-agent-row-bold-stuck.md). */
 export function startOnScreenAttentionScan(
   store: ScanStore,
   env: OnScreenAttentionEnvironment
@@ -78,6 +78,7 @@ export function startOnScreenAttentionScan(
   let lastGroups: unknown = undefined
   let lastGroupLayouts: unknown = undefined
   let lastAgentStatus: unknown = undefined
+  let lastRetained: unknown = undefined
   let lastAcknowledged: unknown = undefined
   let lastLayouts: unknown = undefined
   let lastUnreadTerminalTabs: unknown = undefined
@@ -120,6 +121,7 @@ export function startOnScreenAttentionScan(
       s.groupsByWorktree === lastGroups &&
       s.layoutByWorktree === lastGroupLayouts &&
       s.agentStatusByPaneKey === lastAgentStatus &&
+      s.retainedAgentsByPaneKey === lastRetained &&
       s.acknowledgedAgentsByPaneKey === lastAcknowledged &&
       s.terminalLayoutsByTabId === lastLayouts &&
       s.unreadTerminalTabs === lastUnreadTerminalTabs &&
@@ -138,6 +140,7 @@ export function startOnScreenAttentionScan(
     lastGroups = s.groupsByWorktree
     lastGroupLayouts = s.layoutByWorktree
     lastAgentStatus = s.agentStatusByPaneKey
+    lastRetained = s.retainedAgentsByPaneKey
     lastAcknowledged = s.acknowledgedAgentsByPaneKey
     lastLayouts = s.terminalLayoutsByTabId
     lastUnreadTerminalTabs = s.unreadTerminalTabs
@@ -215,6 +218,7 @@ export function startOnScreenAttentionScan(
       const lapsedProtections = computeLapsedManualUnreadProtections(
         {
           liveTurns: s.agentStatusByPaneKey,
+          retainedTurns: s.retainedAgentsByPaneKey,
           manuallyUnreadTurnStartedAt: s.manuallyUnreadTurnsByPaneKey
         },
         activeSubjectKeys
@@ -224,7 +228,6 @@ export function startOnScreenAttentionScan(
       }
     }
 
-    const markersRead = hasMarkersOnScreen(store.getState(), targets)
     for (const target of targets) {
       // Reread after each acknowledgement: synchronous store re-entry may already have handled later targets.
       acknowledgeViewedAutoAckTarget(store.getState(), target, {
@@ -232,9 +235,7 @@ export function startOnScreenAttentionScan(
         readViewed: options?.force
       })
     }
-    store
-      .getState()
-      .readOnScreenAttention({ workspaceIds, targets }, { screenArrived: arrived, markersRead })
+    store.getState().readOnScreenAttention({ workspaceIds, targets }, { screenArrived: arrived })
   }
   // Why: run once on mount to catch a restored session that already has agents on the visible tab.
   maybeAck({ force: true })

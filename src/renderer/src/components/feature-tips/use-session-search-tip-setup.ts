@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { resolveAiVaultSearchSettings } from '../../../../shared/ai-vault/search/ai-vault-search-settings'
-import type { AiVaultSearchStatus } from '../../../../shared/ai-vault/search/ai-vault-search-types'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host/execution-host'
+import { resolveAiVaultSearchSettings } from '../../../../shared/ai-vault-search-settings'
+import type { AiVaultSearchStatus } from '../../../../shared/ai-vault-search-types'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import {
   isSessionSearchIndexReady,
   sessionSearchStatusMessage
-} from '@/components/session-search/session-search-status'
-import { useSessionSearchStatus } from '@/components/session-search/use-session-search-status'
+} from '@/components/settings/session-history-status-copy'
+import { useSessionSearchStatus } from '@/components/settings/use-session-search-status'
 import { translate } from '@/i18n/i18n'
-import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store'
 
 export type SessionSearchTipStage = 'offer' | 'indexing' | 'ready'
@@ -27,7 +26,6 @@ export function useSessionSearchTipSetup({
 }: {
   dialogOpen: boolean
 }): SessionSearchTipSetup {
-  const t = useTranslate()
   const showAiVaultSearch = useAppStore((s) => s.showAiVaultSearch)
   const searchEnabled = useAppStore((s) => resolveAiVaultSearchSettings(s.settings).enabled)
   const [wasOpen, setWasOpen] = useState(dialogOpen)
@@ -81,7 +79,7 @@ export function useSessionSearchTipSetup({
         })
       } catch {
         toast.error(
-          t(
+          translate(
             'featureTips.sessionSearch.enableFailed',
             'Could not turn on session search. Try again.'
           )

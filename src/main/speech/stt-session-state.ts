@@ -1,83 +1,48 @@
-import { voiceModelUnloadDelayMs } from '../../shared/speech/models/voice-model-unload'
+import type { Worker } from 'node:worker_threads'
 import type { ModelManager } from './model-manager'
 import type { OpenAiTranscriptionSession } from './openai-transcription-client'
 import type { SttEventSink } from './stt-service'
-import type { SpawnSttWorkerProcess, SttWorkerProcess } from './stt-worker-process'
 
-// Each session holds its own stream on the shared recognizer; this bounds decode load and memory.
-export const MAX_STT_SESSIONS = 4
-
-export type SttRecognizerConfig = {
-  modelId: string
-  language: string | undefined
-}
-
-/** One loaded recognizer process, shared by every local session with the same config. */
-export type SttEngine = SttRecognizerConfig & {
-  worker: SttWorkerProcess
-  ready: Promise<void>
-  detach: () => void
-  /** Torn down on purpose, so a load it cut short is not a failure of the model. */
-  retired: boolean
-  /** Absent when the VAD wasn't downloaded yet at load, so this process cuts text only at stop. */
-  vadModelPath: string | undefined
-  /** Called once this process is gone; set when it must not outlive its last dictation. */
-  onUnloaded: (() => void)[]
-  /** Set while a canceled stream's last decode finishes; a new dictation waits for it before reusing this process. */
-  draining: Promise<void> | null
-}
-
-export type SttSession = {
+export type StopInFlight = {
+  worker: Worker
   owner: string
-  streamId: string
-  sink: SttEventSink
-  /** null for cloud models, which load no recognizer. */
-  config: SttRecognizerConfig | null
-  modelId: string
-  /** Spellings this dictation's stream tells the engine to expect. */
-  vocabulary: string[]
-  engine: SttEngine | null
-  cloud: OpenAiTranscriptionSession | null
-  phase: 'starting' | 'active' | 'stopping'
-  stopPromise: Promise<void> | null
+  promise: Promise<void>
 }
 
 export type SttSessionState = {
-  spawnWorker: SpawnSttWorkerProcess
+  worker: Worker | null
+  cloudSession: OpenAiTranscriptionSession | null
   modelManager: ModelManager
-  engine: SttEngine | null
-  sessions: Map<string, SttSession>
-  nextStreamId: number
+  activeModelId: string | null
+  activeHotwordsFilePath: string | undefined
+  activeOwner: string | null
+  startingOwner: string | null
+  startingModelId: string | null
+  starting: boolean
+  canceledOwners: Set<string>
+  eventSink: SttEventSink | null
   idleTeardownTimer: NodeJS.Timeout | null
-  /** null keeps an idle recognizer loaded; 0 unloads it as soon as its last dictation ends. */
-  idleUnloadMs: number | null
-  /** Pre-warm skips a model that failed to load until a dictation loads it, so focus does not retry it forever. */
-  prewarmFailedModelId: string | null
-  /** Bumped by each pre-warm and unload; an older pre-warm that sees a newer one stops. */
-  prewarmGeneration: number
+  stopInFlight: StopInFlight | null
+  stopping: boolean
+  cleanupWorkerLifecycleListeners: (() => void) | null
 }
 
-export function createSttSessionState(
-  modelManager: ModelManager,
-  spawnWorker: SpawnSttWorkerProcess
-): SttSessionState {
+export function createSttSessionState(modelManager: ModelManager): SttSessionState {
   return {
-    spawnWorker,
+    worker: null,
+    cloudSession: null,
     modelManager,
-    engine: null,
-    sessions: new Map(),
-    nextStreamId: 0,
+    activeModelId: null,
+    activeHotwordsFilePath: undefined,
+    activeOwner: null,
+    startingOwner: null,
+    startingModelId: null,
+    starting: false,
+    canceledOwners: new Set(),
+    eventSink: null,
     idleTeardownTimer: null,
-    idleUnloadMs: voiceModelUnloadDelayMs(undefined),
-    prewarmFailedModelId: null,
-    prewarmGeneration: 0
+    stopInFlight: null,
+    stopping: false,
+    cleanupWorkerLifecycleListeners: null
   }
-}
-
-export function sameSttRecognizerConfig(a: SttRecognizerConfig, b: SttRecognizerConfig): boolean {
-  return a.modelId === b.modelId && a.language === b.language
-}
-
-export function sttEngineUsers(state: SttSessionState, engine: SttEngine): SttSession[] {
-  return [...state.sessions.values()].filter((session) => session.engine === engine)
 }

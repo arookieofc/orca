@@ -1,20 +1,11 @@
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
-import { readIpcErrorMessage } from '@/runtime/errors/ipc-error'
-import { useAppStore } from '@/store/index'
-import { isSourceControlScopeMounted } from '../panel/worktree-scope'
+import { readIpcErrorMessage } from '@/lib/ipc-error'
+import { useAppStore } from '@/store'
 
 export type SourceControlEntryOperation = 'stage' | 'unstage' | 'discard'
 
 const ENTRY_FAILURE_TOAST_ID = 'source-control-entry-mutation'
-
-// A mounted folder section shows the worktree even when the folder workspace is the active one.
-function entryRowsVisible(worktreeId: string | null): boolean {
-  return (
-    useAppStore.getState().activeWorktreeId === worktreeId ||
-    isSourceControlScopeMounted(worktreeId)
-  )
-}
 
 // Wrap nullable ownership to distinguish an empty slot from a null-owned one.
 let entryFailureSlotOwner: { worktreeId: string | null } | null = null
@@ -84,7 +75,7 @@ export function showSourceControlEntryFailureToast({
 }): void {
   const isActiveWorktree = useAppStore.getState().activeWorktreeId === worktreeId
   const title = entryFailureTitle(operation, filePath, deletesFile)
-  const offerRetry = Boolean(onRetry) && entryRowsVisible(worktreeId)
+  const offerRetry = Boolean(onRetry) && isActiveWorktree
   entryFailureSlotOwner = { worktreeId }
   toast.error(
     isActiveWorktree || !worktreeName
@@ -106,7 +97,7 @@ export function showSourceControlEntryFailureToast({
               onClick: (event) => {
                 // Own dismissal instead of Sonner's delayed ID removal, which could erase a fast retry failure in the same slot.
                 event.preventDefault()
-                if (!entryRowsVisible(worktreeId)) {
+                if (useAppStore.getState().activeWorktreeId !== worktreeId) {
                   dismissSourceControlEntryFailureToast(worktreeId)
                   return
                 }

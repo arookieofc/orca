@@ -4,7 +4,6 @@ import type {
 } from './foreign-sqlite-reader-protocol'
 import { readCursorProfile } from './readers/cursor-profile'
 import { readOpenCodeBinderSessions } from './readers/opencode-binder-sessions'
-import { readOpenCodePromptFailure } from './readers/opencode-prompt-failure'
 
 /** Structured-clone requests may carry unknown kinds despite the static type. */
 export function handleForeignSqliteReaderRequest(
@@ -18,8 +17,6 @@ export function handleForeignSqliteReaderRequest(
         return { id, ok: true, value: readCursorProfile(request.dbPath) }
       case 'openCodeBinderSessions':
         return { id, ok: true, value: readOpenCodeBinderSessions(request.dbPath, request.cursor) }
-      case 'openCodePromptFailure':
-        return { id, ok: true, value: readOpenCodePromptFailure(request) }
     }
     return unknownKind(id, kind)
   } catch (err) {

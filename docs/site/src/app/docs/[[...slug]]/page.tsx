@@ -6,7 +6,7 @@ import { findNeighbour } from 'fumadocs-core/page-tree'
 import { Prose } from '@/components/docs/prose'
 import { source } from '@/lib/source'
 
-const siteUrl = 'https://orca.dev'
+const siteUrl = 'https://www.onorca.dev'
 
 export function generateStaticParams() {
   return source.generateParams()

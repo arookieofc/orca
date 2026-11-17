@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process'
 import type { ExecFileException } from 'node:child_process'
 import { platform } from 'node:os'
 import { EmulatorError } from './emulator-errors'
-import { emulatorFailureText } from '../../shared/emulator/emulator-failure-copy'
 import { execServeSimCommand, type ServeSimExecutable } from './serve-sim-execution'
 
 export type SimulatorDevice = {
@@ -11,8 +10,6 @@ export type SimulatorDevice = {
   state: string
   runtime: string
   isAvailable?: boolean
-  lastUsedAt?: string
-  availabilityError?: string
 }
 
 type SimctlDevice = {
@@ -20,9 +17,6 @@ type SimctlDevice = {
   udid?: string
   state?: string
   isAvailable?: boolean
-  lastBootedAt?: string
-  lastUsedAt?: string
-  availabilityError?: string
 }
 
 type SimctlDeviceList = {
@@ -30,6 +24,9 @@ type SimctlDeviceList = {
 }
 
 const UDID_RE = /^[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}$/i
+const SIMCTL_UNAVAILABLE_MESSAGE =
+  'Xcode Simulator tools are unavailable. Install full Xcode, open it once, then select it with `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`.'
+
 function parseSimctlDevices(stdout: string): SimulatorDevice[] {
   const data = JSON.parse(stdout || '{}') as SimctlDeviceList
   const devices: SimulatorDevice[] = []
@@ -43,9 +40,7 @@ function parseSimctlDevices(stdout: string): SimulatorDevice[] {
         udid: device.udid,
         state: device.state ?? 'unknown',
         runtime,
-        isAvailable: device.isAvailable,
-        lastUsedAt: device.lastUsedAt ?? device.lastBootedAt,
-        availabilityError: device.availabilityError
+        isAvailable: device.isAvailable
       })
     }
   }
@@ -61,10 +56,7 @@ function mapSimctlError(error: ExecFileException, stderr?: string | Buffer): Emu
     lower.includes('not a developer tool')
   ) {
     // Translate raw xcrun setup errors into an actionable Xcode message.
-    return new EmulatorError(
-      'emulator_simctl_unavailable',
-      emulatorFailureText('simulatorToolsUnavailable')
-    )
+    return new EmulatorError('emulator_simctl_unavailable', SIMCTL_UNAVAILABLE_MESSAGE)
   }
   return new EmulatorError('emulator_error', raw.trim() || 'xcrun simctl command failed.')
 }
@@ -103,12 +95,9 @@ export async function resolveSimulatorUdid(
   try {
     const devices = await listSimulatorDevices()
     const needle = deviceOrName.toLowerCase()
-    // An exact name wins so `iPhone 17` cannot resolve to an earlier `iPhone 17e`.
-    const match =
-      devices.find((device) => device.name.toLowerCase() === needle) ??
-      devices.find(
-        (device) => device.name.toLowerCase().includes(needle) || device.udid === deviceOrName
-      )
+    const match = devices.find(
+      (device) => device.name.toLowerCase().includes(needle) || device.udid === deviceOrName
+    )
     if (match) {
       return match.udid
     }
@@ -133,14 +122,17 @@ export async function resolveSimulatorUdid(
 
 export async function ensureSimulatorBooted(udid: string): Promise<void> {
   if (platform() !== 'darwin') {
-    throw new EmulatorError('emulator_not_macos', emulatorFailureText('requiresMacosXcode'))
+    throw new EmulatorError(
+      'emulator_not_macos',
+      'iOS Simulator requires macOS with Xcode Command Line Tools.'
+    )
   }
   const devices = await listSimulatorDevices()
   const device = devices.find((candidate) => candidate.udid === udid)
   if (!device) {
     throw new EmulatorError(
       'emulator_device_not_found',
-      emulatorFailureText('simulatorNotFound', { udid })
+      `Simulator ${udid} not found. Create one via Xcode > Window > Devices and Simulators.`
     )
   }
   if (device.state === 'Booted') {
@@ -182,7 +174,10 @@ export async function ensureSimulatorBooted(udid: string): Promise<void> {
 
 export async function shutdownSimulatorDevice(udid: string): Promise<void> {
   if (platform() !== 'darwin') {
-    throw new EmulatorError('emulator_not_macos', emulatorFailureText('requiresMacosXcode'))
+    throw new EmulatorError(
+      'emulator_not_macos',
+      'iOS Simulator requires macOS with Xcode Command Line Tools.'
+    )
   }
 
   await new Promise<void>((resolve, reject) => {

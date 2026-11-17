@@ -1,7 +1,7 @@
 import React from 'react'
 import type { AutomationsPageController } from './use-automations-page-controller'
-import { AutomationsListPanel } from './listing/AutomationsListPanel'
-import { nextAutomationListSort } from './listing/automation-list-view'
+import { AutomationsListPanel } from './AutomationsListPanel'
+import { nextAutomationListSort } from './automation-list-view'
 
 export function AutomationsPageListPanel({
   controller,
@@ -15,6 +15,7 @@ export function AutomationsPageListPanel({
     local,
     list,
     destination,
+    sourceAvailability,
     pageRefresh,
     runActions,
     editorActions,
@@ -27,7 +28,6 @@ export function AutomationsPageListPanel({
     repoMap,
     worktreeMap,
     sshConnectionStates,
-    sshStateByEnvironment,
     runtimeStatusByEnvironmentId
   } = store
   const {
@@ -38,7 +38,8 @@ export function AutomationsPageListPanel({
     relativeNow,
     externalActionKey,
     setActivePaneTab,
-    isLoading
+    isLoading,
+    setPageView
   } = local
   const {
     hostCatalog,
@@ -90,12 +91,13 @@ export function AutomationsPageListPanel({
       worktreeForRow={store.worktreeForRow}
       projectHostSetups={projectHostSetups}
       sshConnectionStates={sshConnectionStates}
-      sshStateByEnvironment={sshStateByEnvironment}
       runtimeStatusByEnvironmentId={runtimeStatusByEnvironmentId}
       hostTargetFor={destination.automationHostTargetFor}
+      automationSourceHostAvailabilityByRowKey={
+        sourceAvailability.automationSourceHostAvailabilityByRowKey
+      }
       hostLabelById={presentation.hostLabelById}
       isActionEnabled={destination.isAutomationRowActionEnabled}
-      needsMigration={(row) => !!destination.rowRecoveryHost(row.key)?.servedBy}
       externalActionKey={externalActionKey}
       selectAutomationRow={list.selectAutomationRow}
       selectExternalKey={local.selectExternalKey}
@@ -103,16 +105,20 @@ export function AutomationsPageListPanel({
       runNow={(row) => void runActions.runNow(row)}
       openEditDialog={(row) => void editorActions.openEditDialog(row)}
       toggleAutomation={(row) => void managementActions.toggleAutomation(row)}
-      reviewSkippedSetup={managementActions.reviewSkippedSetup}
       requestDeleteAutomation={managementActions.requestDeleteAutomation}
       requestExternalAction={externalActions.requestExternalAction}
       openCreateDialog={editorActions.openCreateDialog}
+      canCreateAutomation={destination.canCreateAutomation}
       onOpenDetail={onOpenDetail}
       onRefresh={() => {
         hostCatalog.refreshHosts()
         void pageRefresh.refresh()
       }}
       isRefreshing={isLoading}
+      onOpenRuns={() => {
+        hostCatalog.selectHost({ kind: 'all' })
+        setPageView('runs')
+      }}
     />
   )
 }

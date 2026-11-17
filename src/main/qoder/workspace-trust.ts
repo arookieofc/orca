@@ -1,10 +1,6 @@
 import { realpathSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  isPlainObject,
-  readHooksJson
-} from '../agent-hooks/installation/configuration/hooks-json-read'
-import { writeHooksJson } from '../agent-hooks/installation/configuration/hooks-json-write'
+import { isPlainObject, readHooksJson, writeHooksJson } from '../agent-hooks/installer-utils'
 
 // Qoder 1.1.64 writes this exact shape after accepting its folder-trust prompt.
 export function withQoderTrustedWorkspace(

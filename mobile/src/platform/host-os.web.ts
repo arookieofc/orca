@@ -1,6 +1,8 @@
 import type { HostOs } from './host-os'
 
-// Platform.OS is web here: read the phone OS for keyboard/inset arithmetic (iPadOS needs the Mac-plus-touch heuristic) and a desktop Mac for Cmd chords.
+export type { HostOs } from './host-os'
+
+// Use the phone OS for keyboard/inset arithmetic: Platform.OS is web here; iPadOS needs the Mac-plus-touch heuristic.
 export function hostOs(): HostOs {
   const agent = globalThis.navigator?.userAgent ?? ''
   if (/iP(ad|hone|od)/.test(agent)) {
@@ -9,8 +11,5 @@ export function hostOs(): HostOs {
   if (globalThis.navigator?.platform === 'MacIntel' && globalThis.navigator.maxTouchPoints > 1) {
     return 'ios'
   }
-  if (agent.includes('Android')) {
-    return 'android'
-  }
-  return agent.includes('Macintosh') ? 'macos' : 'web'
+  return agent.includes('Android') ? 'android' : 'web'
 }

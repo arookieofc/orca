@@ -1,15 +1,12 @@
-import type { LegacyPaneKeyAliasEntry } from '../../../shared/orca-profiles/persisted-state-types'
-import type { MigrationUnsupportedPtyEntry } from '../../../shared/agent-status/contracts/agent-status-ipc-payload'
-import {
-  canRegisterPaneKeyAlias,
-  isOpaqueRemintedPaneKey
-} from '../../../shared/workspace-layout/pane-key-alias'
+import type { LegacyPaneKeyAliasEntry } from '../../../shared/persisted-state-types'
+import type { MigrationUnsupportedPtyEntry } from '../../../shared/agent-status-types'
+import { canRegisterPaneKeyAlias, isOpaqueRemintedPaneKey } from '../../../shared/pane-key-alias'
 import {
   isTerminalLeafId,
   parseLegacyNumericPaneKey,
   parsePaneKey
-} from '../../../shared/workspace-layout/stable-pane-id'
-import { agentHookServer } from '../../agent-hooks/server/agent-hook-server'
+} from '../../../shared/stable-pane-id'
+import { agentHookServer } from '../../agent-hooks/server'
 
 export function legacyMigrationUnsupportedRowsToAliasEntries(
   entries: MigrationUnsupportedPtyEntry[]

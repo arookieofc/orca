@@ -1,10 +1,9 @@
-import type { TaskPageJiraListStateModel } from './jira/use-task-page-jira-list-state'
+import type { TaskPageJiraListStateModel } from '../use-task-page-jira-list-state'
 import { useEffect } from 'react'
-import { resolveVisibleTaskProvider } from '../../../../shared/work-items/task-providers'
-import { normalizeGitHubTaskPreset } from '../../../../shared/work-items/task-github-search'
-import { getTaskPresetQuery } from '../../../../shared/work-items/task-preset-query'
+import { resolveVisibleTaskProvider } from '../../../../shared/task-providers'
+import { normalizeGitHubTaskPreset } from '../../../../shared/task-github-search'
+import { getTaskPresetQuery } from '../../../../shared/task-preset-query'
 import { loadLinearIssueView } from '../linear-issue-view-storage'
-import { translate } from '@/i18n/i18n'
 export function useTaskPageResumeRestoration(model: TaskPageJiraListStateModel) {
   const {
     settings,
@@ -150,12 +149,7 @@ export function useTaskPageResumeRestoration(model: TaskPageJiraListStateModel) 
             setSelectedLinearProject(null)
             setSelectedLinearProjectDetail(null)
             setLinearProjectParentView(null)
-            setLinearProjectsError(
-              translate(
-                'auto.components.TaskPage.resumeRestoration.linearProjectNotFound',
-                'Saved Linear project was not found.'
-              )
-            )
+            setLinearProjectsError('Saved Linear project was not found.')
             setTaskResumeState({
               linearContext: undefined
             })
@@ -170,12 +164,7 @@ export function useTaskPageResumeRestoration(model: TaskPageJiraListStateModel) 
             setSelectedLinearProject(null)
             setSelectedLinearProjectDetail(null)
             setLinearProjectParentView(null)
-            setLinearProjectsError(
-              translate(
-                'auto.components.TaskPage.resumeRestoration.linearProjectRestoreFailed',
-                'Failed to restore saved Linear project.'
-              )
-            )
+            setLinearProjectsError('Failed to restore saved Linear project.')
             setTaskResumeState({
               linearContext: undefined
             })
@@ -200,12 +189,7 @@ export function useTaskPageResumeRestoration(model: TaskPageJiraListStateModel) 
           setLinearCustomViewsLoading(false)
           if (!restoredView) {
             setSelectedLinearCustomView(null)
-            setLinearCustomViewsError(
-              translate(
-                'auto.components.TaskPage.resumeRestoration.linearViewNotFound',
-                'Saved Linear view was not found.'
-              )
-            )
+            setLinearCustomViewsError('Saved Linear view was not found.')
             setTaskResumeState({
               linearContext: undefined
             })
@@ -217,12 +201,7 @@ export function useTaskPageResumeRestoration(model: TaskPageJiraListStateModel) 
           if (!cancelled) {
             setSelectedLinearCustomView(null)
             setLinearCustomViewsLoading(false)
-            setLinearCustomViewsError(
-              translate(
-                'auto.components.TaskPage.resumeRestoration.linearViewRestoreFailed',
-                'Failed to restore saved Linear view.'
-              )
-            )
+            setLinearCustomViewsError('Failed to restore saved Linear view.')
             setTaskResumeState({
               linearContext: undefined
             })

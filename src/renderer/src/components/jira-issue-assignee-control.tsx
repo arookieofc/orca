@@ -2,16 +2,16 @@ import { useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { JiraUserPicker } from '@/components/jira-user-picker'
 import { getJiraSelfUser } from '@/components/jira-self-user'
-import { useJiraSourceConnection } from '@/components/new-workspace/source-search/use-jira-source-connection'
+import { useJiraSourceConnection } from '@/components/new-workspace/use-jira-source-connection'
 import { useAppStore } from '@/store'
-import { compareBaseSensitivityLocaleText } from '../../../shared/i18n/locale-text-collators'
-import { jiraListAssignableUsersForTarget } from '@/runtime/jira/runtime-jira-user-fields-client'
-import { useTranslate } from '@/i18n/use-translate'
+import { compareBaseSensitivityLocaleText } from '../../../shared/locale-text-collators'
+import { jiraListAssignableUsersForTarget } from '@/runtime/runtime-jira-client'
+import { translate } from '@/i18n/i18n'
 import {
   getTaskSourceCacheScope,
   type TaskSourceContext
-} from '../../../shared/work-items/task-source-context'
-import type { RuntimeClientTarget } from '../../../shared/remote-runtime/host-catalog/runtime-client-target'
+} from '../../../shared/task-source-context'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import type { JiraIssue, JiraIssueUpdate, JiraUser } from '../../../shared/jira/jira-types'
 
 export function JiraIssueAssigneeControl({
@@ -33,7 +33,6 @@ export function JiraIssueAssigneeControl({
     optimistic?: Partial<JiraIssue>
   ) => Promise<unknown>
 }): React.JSX.Element {
-  const t = useTranslate()
   const defaultStatus = useAppStore((state) => state.jiraStatus)
   const defaultStatusKey = useAppStore((state) => state.jiraStatusContextKey)
   const connection = useJiraSourceConnection({
@@ -82,16 +81,16 @@ export function JiraIssueAssigneeControl({
           siteId={issue.siteId}
           value={
             issue.assignee?.accountId ??
-            t('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned')
+            translate('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned')
           }
           selectedUser={issue.assignee ?? null}
           onSelect={assign}
           disabled={disabled}
-          label={t('components.jiraIssueAssigneeField.label', 'Assignee')}
+          label={translate('components.jiraIssueAssigneeField.label', 'Assignee')}
           fixedOptions={[
             {
               key: 'unassigned',
-              label: t('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned'),
+              label: translate('auto.components.JiraIssueWorkspace.0b6b5646ed', 'Unassigned'),
               onSelect: () => assign(null)
             }
           ]}
@@ -100,7 +99,7 @@ export function JiraIssueAssigneeControl({
       </div>
       {self && issue.assignee?.accountId !== self.accountId ? (
         <Button variant="ghost" size="xs" disabled={disabled} onClick={() => assign(self)}>
-          {t('components.jiraIssueAssigneeField.assignToMe', 'Assign to me ({{name}})', {
+          {translate('components.jiraIssueAssigneeField.assignToMe', 'Assign to me ({{name}})', {
             name: self.displayName
           })}
         </Button>

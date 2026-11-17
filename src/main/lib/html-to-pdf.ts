@@ -27,18 +27,13 @@ new Promise((resolve) => {
 })
 `
 
-export async function htmlToPdf(html: string, signal?: AbortSignal): Promise<Buffer> {
-  signal?.throwIfAborted()
+export async function htmlToPdf(html: string): Promise<Buffer> {
   const tempDir = app.getPath('temp')
   const tempPath = path.join(tempDir, `orca-export-${randomUUID()}.html`)
 
   // Exclusive creation prevents writing through pre-seated symlinks; EEXIST paths belong to someone else.
   try {
-    await writeFile(tempPath, html, {
-      encoding: 'utf-8',
-      flag: 'wx',
-      ...(signal ? { signal } : {})
-    })
+    await writeFile(tempPath, html, { encoding: 'utf-8', flag: 'wx' })
   } catch (error) {
     if (isAlreadyExists(error)) {
       throw error
@@ -48,7 +43,6 @@ export async function htmlToPdf(html: string, signal?: AbortSignal): Promise<Buf
   }
 
   try {
-    signal?.throwIfAborted()
     const win = new BrowserWindow({
       show: false,
       webPreferences: {
@@ -61,49 +55,24 @@ export async function htmlToPdf(html: string, signal?: AbortSignal): Promise<Buf
     })
 
     let timer: NodeJS.Timeout | undefined
-    let removeAbortListener: (() => void) | undefined
-    let removeLoadListeners: (() => void) | undefined
 
     try {
-      const abortPromise = new Promise<never>((_resolve, reject) => {
-        if (!signal) {
-          return
-        }
-        const abort = (): void => reject(signal.reason)
-        signal.addEventListener('abort', abort, { once: true })
-        removeAbortListener = () => signal.removeEventListener('abort', abort)
-        if (signal.aborted) {
-          abort()
-        }
-      })
       // Bound loading too: a non-yielding document script never fires load completion or failure.
       const timeoutPromise = new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => reject(new ExportTimeoutError()), EXPORT_TIMEOUT_MS)
       })
 
       const loadAndPrint = (async (): Promise<Buffer> => {
-        signal?.throwIfAborted()
         const loadPromise = new Promise<void>((resolve, reject) => {
-          const finish = (): void => resolve()
-          const fail = (
-            _event: Electron.Event,
-            errorCode: number,
-            errorDescription: string
-          ): void => {
+          win.webContents.once('did-finish-load', () => resolve())
+          win.webContents.once('did-fail-load', (_event, errorCode, errorDescription) => {
             reject(new Error(`Failed to load export document: ${errorDescription} (${errorCode})`))
-          }
-          win.webContents.once('did-finish-load', finish)
-          win.webContents.once('did-fail-load', fail)
-          removeLoadListeners = () => {
-            win.webContents.removeListener('did-finish-load', finish)
-            win.webContents.removeListener('did-fail-load', fail)
-          }
+          })
         })
 
-        await Promise.all([win.loadFile(tempPath), loadPromise])
-        signal?.throwIfAborted()
-        await win.webContents.mainFrame.executeJavaScript(WAIT_FOR_IMAGES_SCRIPT, true)
-        signal?.throwIfAborted()
+        await win.loadFile(tempPath)
+        await loadPromise
+        await win.webContents.executeJavaScript(WAIT_FOR_IMAGES_SCRIPT, true)
         return win.webContents.printToPDF({
           printBackground: true,
           pageSize: 'A4',
@@ -116,10 +85,8 @@ export async function htmlToPdf(html: string, signal?: AbortSignal): Promise<Buf
         })
       })()
 
-      return await Promise.race([loadAndPrint, timeoutPromise, abortPromise])
+      return await Promise.race([loadAndPrint, timeoutPromise])
     } finally {
-      removeAbortListener?.()
-      removeLoadListeners?.()
       if (timer) {
         clearTimeout(timer)
       }

@@ -5,35 +5,42 @@ import {
   selectSidebarFilterState,
   sidebarHasActiveFilters,
   sidebarWorkspaceRowFilters
-} from '../controls/sidebar-filter-actions'
+} from '../../sidebar-filter-actions'
 import { useShallow } from 'zustand/react/shallow'
 import type { AppState } from '@/store/types'
-import type { Repo } from '../../../../../../shared/repository/repo-types'
+import type { Repo } from '../../../../../../shared/repo-types'
 import {
   activeWorkspaceRowFilterKeys,
+  isSleepingSweepExempt,
   type WorkspaceRowFilters
 } from '../../../../../../shared/workspace-view/workspace-row-filters'
 import { resolveVisibleWorkspaceHostIds } from '../../../../../../shared/workspace-view/workspace-host-visibility'
 import type { Worktree } from '../../../../../../shared/worktree/types'
-import { parseWorkspaceKey } from '../../../../../../shared/workspace/identity/workspace-scope'
+import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import {
   getWorktreeExecutionHostId,
   getSettingsFocusedExecutionHostId,
   type ExecutionHostId
-} from '../../../../../../shared/execution-host/execution-host'
+} from '../../../../../../shared/execution-host'
 import {
   isAutomationGeneratedWorkspace,
   isCliCreatedWorkspace,
   isDefaultBranchWorkspace,
   isDetachedHeadWorkspace
-} from '../../../../../../shared/worktree/visibility/workspace-kinds'
-import { getFolderWorkspaceExecutionHostIdForRows } from '../../../../../../shared/sidebar-list/hosts/host-filtering'
+} from '../../../../../../shared/worktree/workspace-kinds'
+import { getFolderWorkspaceExecutionHostIdForRows } from '../../../../../../shared/sidebar-list/host-filtering'
 import {
   getPairedDeviceIdsByEnvironment,
   isWorkspaceOwnedBySomeoneElse
-} from '../../../../../../shared/workspace-view/workspace-creator-visibility'
-import { createSleepingSweepHiddenCheck } from './sleeping-sweep-visibility'
-import { selectFolderWorkspaces } from '@/store/workspaces/catalog/workspace-record-fields'
+} from '../../../../../../shared/workspace-creator-visibility'
+import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
+import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
+import {
+  getVisibleWorktreeBrowserActivityTabs,
+  getVisibleWorktreeTerminalActivityTabs,
+  getWorktreeIdsWithStructuredChat
+} from '../../visible-worktree-activity-inputs'
+import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
 
 export type SidebarWorktreeFilters = ReturnType<typeof useSidebarWorktreeFilters>
 
@@ -90,7 +97,27 @@ const REVEAL_WORKSPACE: Record<keyof WorkspaceRowFilters, (context: RevealContex
     }
   },
   hideSleepingWorkspaces: ({ state, worktree }) => {
-    if (createSleepingSweepHiddenCheck(state)(worktree)) {
+    const tabsByWorktree = getVisibleWorktreeTerminalActivityTabs(state.tabsByWorktree)
+    const browserTabsByWorktree = getVisibleWorktreeBrowserActivityTabs(state.browserTabsByWorktree)
+    const liveAgentWorktrees = getWorktreeIdsWithLiveAgent(
+      state.agentStatusByPaneKey,
+      tabsByWorktree,
+      getAgentStatusEpochNow(state.agentStatusEpoch)
+    )
+    if (
+      !isSleepingSweepExempt(worktree.isMainWorktree, state.alwaysShowDefaultBranchWorkspace) &&
+      isInactiveWorkspace(
+        worktree.id,
+        tabsByWorktree,
+        state.ptyIdsByTabId,
+        browserTabsByWorktree,
+        liveAgentWorktrees,
+        getWorktreeIdsWithStructuredChat(
+          state.unifiedTabsByWorktree,
+          state.structuredChatSleptAtByPaneKey
+        )
+      )
+    ) {
       state.setShowSleepingWorkspaces(true)
     }
   },

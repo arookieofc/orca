@@ -1,10 +1,10 @@
-import type { WorktreeSlice } from '../worktree-slice-contract'
+import type { WorktreeSlice } from '../../worktree-helpers'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import {
   getHostedReviewPushTargetLookup,
   hostedReviewPushTargetLookupsInFlight
 } from './hosted-review-push-target'
-import { runtimeTargetForWorkspaceOwner } from '@/lib/workspace/ownership/resolve-owner'
+import { runtimeTargetForWorkspaceOwner } from '@/lib/resolve-owner'
 
 export function createEnsureHostedReviewPushTarget(
   _set: WorktreeSliceSet,

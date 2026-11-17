@@ -1,14 +1,9 @@
 import type WebSocket from 'ws'
-import type { PairedE2EEClientHandshake } from '../e2ee/paired-e2ee-client-handshake'
+import type { PairedE2EEClientHandshake } from '../../paired-e2ee-client-handshake'
 import type { RemoteRuntimeHandshakeState } from '../remote-runtime-client-handshake'
 import { RemoteRuntimeClientError } from '../remote-runtime-client-error'
-import { RuntimeRpcEnvelopeSchema, type RuntimeRpcResponse } from '../rpc/runtime-rpc-envelope'
+import { RuntimeRpcEnvelopeSchema, type RuntimeRpcResponse } from '../../runtime-rpc-envelope'
 import { parseRemoteRuntimeJsonText } from './remote-runtime-request-frames'
-import {
-  openSealedFrame,
-  readSealedFrame,
-  SEALED_FRAME_FAILURE_MESSAGES
-} from '../remote-runtime-sealed-frame'
 
 type SubscriptionFrameRouterOptions<TResult> = {
   handshake: PairedE2EEClientHandshake
@@ -33,11 +28,11 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
   constructor(private readonly options: SubscriptionFrameRouterOptions<TResult>) {}
 
   handleFrame(data: WebSocket.RawData, isBinary: boolean): void {
-    const frame = readSealedFrame(data, isBinary)
-    if (typeof frame !== 'string') {
-      this.handleBinaryFrame(frame)
+    if (isBinary) {
+      this.handleBinaryFrame(new Uint8Array(data as Buffer))
       return
     }
+    const frame = data.toString()
     if (this.state === 'awaiting_ready') {
       this.handleReadyFrame(frame)
       return
@@ -160,23 +155,17 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
       )
       return
     }
-    const opened = openSealedFrame(this.options.handshake, frame)
-    if (opened.kind === 'failed') {
+    const plaintext = this.options.handshake.channel.openBinary(frame)
+    if (plaintext === null) {
       this.options.fail(
         new RemoteRuntimeClientError(
           'invalid_runtime_response',
-          opened.failure === 'undecryptable'
-            ? 'Remote Orca runtime returned an undecryptable binary frame.'
-            : SEALED_FRAME_FAILURE_MESSAGES[opened.failure]
+          'Remote Orca runtime returned an undecryptable binary frame.'
         )
       )
       return
     }
-    if (opened.kind === 'text') {
-      this.handleRpcFrame(opened.text)
-      return
-    }
-    this.deliver(() => this.options.callbacks.onBinary?.(opened.bytes))
+    this.deliver(() => this.options.callbacks.onBinary?.(plaintext))
   }
 
   // ws invokes this directly; route consumer throws to finishError instead of crashing the process.

@@ -1,20 +1,14 @@
-import { isPathInsideOrEqual } from '../../../src/shared/file-access/cross-platform-path'
-import { latestSessionConversationTurn } from '../../../src/shared/ai-vault/session-display/ai-vault-session-display'
-import {
-  aiVaultAgentLabel,
-  type AiVaultSession
-} from '../../../src/shared/ai-vault/contracts/ai-vault-types'
-
-import { formatTimeAgo } from '../worktree/agent-lineage/agent-row-display'
-import { translate } from '../i18n/mobile-i18n'
+import { isPathInsideOrEqual } from '../../../src/shared/cross-platform-path'
+import { latestSessionConversationTurn } from '../../../src/shared/ai-vault-session-display'
+import { aiVaultAgentLabel } from '../../../src/shared/ai-vault-types'
+import type { AiVaultSession } from '../../../src/shared/ai-vault-types'
+import { formatTimeAgo } from '../worktree/agent-row-display'
 
 export type MobileAgentHistoryCard = {
   id: string
   agent: AiVaultSession['agent']
   agentLabel: string
   title: string
-  /** The session is a forked chat, so its title follows the fork mark. */
-  forked: boolean
   lastMessage: string
   messageCount: number
   timeAgo: string
@@ -38,7 +32,7 @@ export function isSessionInActiveWorktree(
 }
 
 export function buildMobileAgentHistoryCard(
-  session: AiVaultSession & { forked?: true },
+  session: AiVaultSession,
   activeWorktreePath: string | null,
   now: number
 ): MobileAgentHistoryCard {
@@ -48,9 +42,7 @@ export function buildMobileAgentHistoryCard(
     id: session.id,
     agent: session.agent,
     agentLabel: aiVaultAgentLabel(session.agent),
-    title:
-      session.title || translate('agentHistory.sessionCard.untitledSession', 'Untitled session'),
-    forked: session.forked === true,
+    title: session.title || 'Untitled session',
     lastMessage: latestTurn?.text.trim() ?? '',
     messageCount: session.messageCount,
     timeAgo: Number.isFinite(updatedAtMs) ? formatTimeAgo(updatedAtMs, now) : '',

@@ -15,11 +15,8 @@ import {
   waitForSessionReady
 } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
-import { RuntimeClient } from '../../src/cli/runtime/client'
-import type {
-  RuntimeTerminalListResult,
-  RuntimeTerminalRead
-} from '../../src/shared/terminal/runtime/runtime-terminal-contracts'
+import { RuntimeClient } from '../../src/cli/runtime-client'
+import type { RuntimeTerminalListResult, RuntimeTerminalRead } from '../../src/shared/runtime-types'
 import { FAKE_CODEX_LAUNCH_PROBES_SOURCE } from './helpers/fake-codex-launch-probes'
 
 const fakeCliDir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-orchestration-worker-'))

@@ -3,18 +3,17 @@ import {
   LOCAL_EXECUTION_HOST_ID,
   normalizeExecutionHostId,
   type ExecutionHostId
-} from '../../shared/execution-host/execution-host'
-import type { SleepingAgentSessionRecord } from '../../shared/agent-session/lifecycle/agent-session-resume'
-import { applyCommandToSession } from '../persistence/terminal-topology/pane-admission/terminal-pane-admission'
-import type { PersistedUIState } from '../../shared/orca-profiles/persisted-ui-state-types'
-import type { WorkspaceSessionState } from '../../shared/workspace-session/workspace-session-state-types'
-import type { Store } from '../persistence/loading-store/store'
-import { isFrozenOrcadSourceSessionPartition } from '../persistence/migrating-orcad-catalog/source/catalog/orcad-source-visibility'
-import { isWslMoveWindowWriteHeld } from '../persistence/moving-wsl-projects/quiescence/wsl-move-window-write-hold'
+} from '../../shared/execution-host'
+import type { SleepingAgentSessionRecord } from '../../shared/agent-session-resume'
+import { applyCommandToSession } from '../persistence/terminal-topology/terminal-pane-admission'
+import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
+import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
+import type { Store } from '../persistence'
+import { isFrozenOrcadSourceSessionPartition } from '../ssh/orcad-retained-source'
 import { windowViewSaveForMain, type ReconnectFactsFor } from '../persistence/window-save-view'
 import { reportWindowSaveDrift } from '../persistence/window-save-divergence'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../shared/workspace-layout/layout-owner-switch'
-import { formatShutdownCheckpointFailureReason } from '../../shared/app-lifecycle/shutdown/renderer-shutdown-events'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../shared/layout-owner-switch'
+import { formatShutdownCheckpointFailureReason } from '../../shared/renderer-shutdown-events'
 
 type StageBeforeUnloadSyncArgs = {
   sessions: { state: WorkspaceSessionState; hostId?: ExecutionHostId }[]
@@ -103,9 +102,7 @@ export function registerRendererShutdownCheckpointHandler(
   ipcMain.on('app:stage-before-unload-sync', (event, args: StageBeforeUnloadSyncArgs) => {
     let error: string | undefined
     try {
-      // A window a WSL move rewrote under is stale; main reloads it and keeps what is on disk.
-      const sessions = isWslMoveWindowWriteHeld() ? [] : args.sessions
-      for (const { state, hostId } of sessions) {
+      for (const { state, hostId } of args.sessions) {
         if (!isFrozenOrcadSourceSessionPartition(store, hostId)) {
           store.stageWorkspaceSessionBeforeUnload(
             ORCA_LAYOUT_OWNER_IS_MAIN
@@ -115,9 +112,7 @@ export function registerRendererShutdownCheckpointHandler(
           )
         }
       }
-      if (!isWslMoveWindowWriteHeld()) {
-        store.updateUI(args.ui)
-      }
+      store.updateUI(args.ui)
     } catch (stagingError) {
       console.error('[app] Failed to stage renderer state before unload:', stagingError)
       // Main's console is not persisted in packaged builds; the renderer toast is the only place users see the cause.

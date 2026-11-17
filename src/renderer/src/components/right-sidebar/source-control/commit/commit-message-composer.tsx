@@ -1,8 +1,8 @@
 import React from 'react'
 import { RefreshCw, Sparkles, Square } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
+import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 
 export function CommitMessageComposer({
   rows,
@@ -29,7 +29,6 @@ export function CommitMessageComposer({
   onGenerate: () => void
   generateTooltip?: string
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div className="relative">
       <textarea
@@ -37,11 +36,14 @@ export function CommitMessageComposer({
         value={commitMessage}
         disabled={disabled}
         onChange={(e) => onCommitMessageChange(e.target.value)}
-        placeholder={t('auto.components.right.sidebar.SourceControl.0d0a8359d3', 'Message')}
-        aria-label={t('auto.components.right.sidebar.SourceControl.b94112eb9e', 'Commit message')}
+        placeholder={translate('auto.components.right.sidebar.SourceControl.0d0a8359d3', 'Message')}
+        aria-label={translate(
+          'auto.components.right.sidebar.SourceControl.b94112eb9e',
+          'Commit message'
+        )}
         aria-describedby={describedBy || undefined}
         // Reserve Generate icon space and pin disabled borders so Chromium cannot wash out the field outline.
-        className={`mt-0.5 min-h-14 w-full resize-none appearance-none rounded-md border border-input bg-background shadow-xs px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:border-input disabled:bg-background disabled:text-foreground disabled:shadow-xs dark:bg-input/30 dark:disabled:bg-input/30 ${
+        className={`mt-0.5 min-h-14 w-full resize-none appearance-none rounded-md border border-input bg-background shadow-xs px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:border-input disabled:bg-background disabled:text-foreground disabled:shadow-xs dark:bg-input/30 dark:disabled:bg-input/30 ${
           showGenerate ? 'pr-8' : ''
         }`}
       />
@@ -53,7 +55,7 @@ export function CommitMessageComposer({
               <button
                 type="button"
                 onClick={() => onCancelGenerate()}
-                aria-label={t(
+                aria-label={translate(
                   'auto.components.right.sidebar.SourceControl.ddc1fbd690',
                   'Stop generating commit message'
                 )}
@@ -64,7 +66,7 @@ export function CommitMessageComposer({
               </button>
             </TooltipTrigger>
             <TooltipContent side="left" sideOffset={6}>
-              {t(
+              {translate(
                 'auto.components.right.sidebar.SourceControl.37a81f29ad',
                 'Generating commit message. Click to stop.'
               )}
@@ -83,7 +85,7 @@ export function CommitMessageComposer({
                   }
                   onGenerate()
                 }}
-                aria-label={t(
+                aria-label={translate(
                   'auto.components.right.sidebar.SourceControl.461575b9bc',
                   'Generate commit message with AI'
                 )}
@@ -98,7 +100,10 @@ export function CommitMessageComposer({
             </TooltipTrigger>
             <TooltipContent side="left" sideOffset={6}>
               {generateTooltip ??
-                t('auto.components.right.sidebar.SourceControl.b16b8f0e4b', 'ai commit msg')}
+                translate(
+                  'auto.components.right.sidebar.SourceControl.b16b8f0e4b',
+                  'ai commit msg'
+                )}
             </TooltipContent>
           </Tooltip>
         ))}

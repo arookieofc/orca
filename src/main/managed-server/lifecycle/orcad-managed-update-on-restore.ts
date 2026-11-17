@@ -1,12 +1,9 @@
 // Restored tunnels bypass SSH connect; perform its update check once per server/session in the background.
-import type {
-  SshManagedServerUpdateNote,
-  SshTarget
-} from '../../../shared/remote-runtime/ssh/ssh-types'
+import type { SshManagedServerUpdateNote, SshTarget } from '../../../shared/ssh-types'
 import {
   checkManagedServerUpdate,
   type ManagedServerUpdateDeps
-} from '../../ssh/host-server/managed-server-update-check'
+} from '../../ssh/managed-server-update-check'
 
 export type ManagedOrcadRestoreUpdateDeps = ManagedServerUpdateDeps & {
   target: (environmentId: string) => SshTarget | null

@@ -2,10 +2,9 @@ import type {
   WorkspaceStatus,
   WorkspaceStatusDefinition
 } from '../../../../../../shared/worktree/types'
-import '../../workspace-status/presentation/workspace-status'
-import { getWorkspaceStatusFromGroupKey } from '../../../../../../shared/workspace/status/workspace-statuses'
-import { getWorktreeLineageDropTargetIdentity } from './worktree-lineage-drag-drop'
-import type { WorktreeSidebarStatusDropTarget } from './worktree-sidebar-drop-preview'
+import { getWorkspaceStatusFromGroupKey } from '../../workspace-status'
+import { getWorktreeLineageDropTargetId } from '../../worktree-lineage-drag-drop'
+import type { WorktreeSidebarStatusDropTarget } from '../../worktree-sidebar-drop-preview'
 import { NO_WORKTREE_SIDEBAR_DROP_TARGET, type WorktreeSidebarLineageDropTarget } from './row-state'
 
 export function getPointerDropStatusTarget(args: {
@@ -19,9 +18,9 @@ export function getPointerDropStatusTarget(args: {
   }
   const pinTarget = target.closest<HTMLElement>('[data-workspace-pin-drop-target]')
   if (pinTarget && args.container.contains(pinTarget)) {
-    return { status: null, isPinDrop: true, lineageParentIdentity: null }
+    return { status: null, isPinDrop: true, lineageParentId: null }
   }
-  const lineageParentIdentity = getWorktreeLineageDropTargetIdentity({
+  const lineageParentId = getWorktreeLineageDropTargetId({
     container: args.container,
     target,
     pointerY: args.y
@@ -33,7 +32,7 @@ export function getPointerDropStatusTarget(args: {
         ? ((statusTarget.dataset.workspaceStatus as WorkspaceStatus | undefined) ?? null)
         : null,
     isPinDrop: false,
-    lineageParentIdentity
+    lineageParentId
   }
 }
 

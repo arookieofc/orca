@@ -1,16 +1,9 @@
-import type { RuntimeProjectGroupDependencies } from '../repositories/runtime-project-group-contract'
-import type {
-  WorkspaceSelectorCandidate,
-  WorkspaceSelectorOptions
-} from '../workspaces/catalog/workspace-selector-candidates'
-import type { ResolvedWorktree } from '../workspaces/catalog/runtime-worktree-path-identity'
-import type { LegacyWorkerTerminalSurface } from '../orchestration/terminal-authority/legacy-worker-terminal-surface'
 import type { OrcaRuntimeWithMarkPtyLivenessUnverifiable as MarkPtyLivenessUnverifiable } from '../terminal/layout/terminal-input-floor'
 import type { OrcaRuntimeWithStopTerminalsForWorktree as StopTerminalsForWorktree } from '../terminal/stop/worktree-terminal-stop'
 import type { OrcaRuntimeWithStopTerminalsForProject as StopTerminalsForProject } from '../terminal/stop/project-terminal-stop'
-import type { RuntimeFederationOperations } from '../orchestration/federation/runtime-federation-operations'
+import type { OrcaRuntimeWithGetRuntimeId as GetRuntimeId } from '../workspaces/session-hosts/get-runtime-id'
 import type { OrcaRuntimeWithHasExactPersistedTerminalSurfaceIdentity as HasExactPersistedTerminalSurfaceIdentity } from '../workspaces/persisted-surfaces/has-exact-persisted-terminal-surface-identity'
-import type { LegacyWorkerRuntimeRecovery } from '../orchestration/terminal-authority/legacy-worker-runtime-recovery'
+import type { OrcaRuntimeWithAutomationOperations as AutomationOperations } from '../workspaces/persisted-surfaces/automation-operations'
 import type { OrcaRuntimeWithOnPtyExit as OnPtyExit } from '../terminal/lifecycle/pty-exit-lifecycle'
 import type { OrcaRuntimeWithResolveWorktreeRemovalTarget as ResolveWorktreeRemovalTarget } from '../workspaces/workspace-removal-target'
 import type { OrcaRuntimeWithReconcileHeadlessMobileSessionBrowserTabs as ReconcileHeadlessMobileSessionBrowserTabs } from '../session-lifecycle/projection/reconcile-headless-mobile-session-browser-tabs'
@@ -35,28 +28,28 @@ export type StopTerminalsForProjectResult = ReturnType<
   StopTerminalsForProject['stopTerminalsForProject']
 >
 export type ResolveOrchestrationWorkerServerArgs = Parameters<
-  RuntimeFederationOperations['resolveOrchestrationWorkerServer']
+  GetRuntimeId['resolveOrchestrationWorkerServer']
 >
 export type ResolveOrchestrationWorkerServerResult = ReturnType<
-  RuntimeFederationOperations['resolveOrchestrationWorkerServer']
+  GetRuntimeId['resolveOrchestrationWorkerServer']
 >
 export type CallOrchestrationWorkerServerArgs = Parameters<
-  RuntimeFederationOperations['callOrchestrationWorkerServer']
+  GetRuntimeId['callOrchestrationWorkerServer']
 >
 export type CallOrchestrationWorkerServerResult = ReturnType<
-  RuntimeFederationOperations['callOrchestrationWorkerServer']
+  GetRuntimeId['callOrchestrationWorkerServer']
 >
 export type SyncOrchestrationFederatedDispatchArgs = Parameters<
-  RuntimeFederationOperations['syncOrchestrationFederatedDispatch']
+  GetRuntimeId['syncOrchestrationFederatedDispatch']
 >
 export type SyncOrchestrationFederatedDispatchResult = ReturnType<
-  RuntimeFederationOperations['syncOrchestrationFederatedDispatch']
+  GetRuntimeId['syncOrchestrationFederatedDispatch']
 >
 export type GetLegacyWorkerRecoveryActivationArgs = Parameters<
-  LegacyWorkerTerminalSurface['getLegacyWorkerRecoveryActivation']
+  HasExactPersistedTerminalSurfaceIdentity['getLegacyWorkerRecoveryActivation']
 >
 export type GetLegacyWorkerRecoveryActivationResult = ReturnType<
-  LegacyWorkerTerminalSurface['getLegacyWorkerRecoveryActivation']
+  HasExactPersistedTerminalSurfaceIdentity['getLegacyWorkerRecoveryActivation']
 >
 export type HasExactPersistedTerminalSurfaceIdentityArgs = Parameters<
   HasExactPersistedTerminalSurfaceIdentity['hasExactPersistedTerminalSurfaceIdentity']
@@ -65,30 +58,30 @@ export type HasExactPersistedTerminalSurfaceIdentityResult = ReturnType<
   HasExactPersistedTerminalSurfaceIdentity['hasExactPersistedTerminalSurfaceIdentity']
 >
 export type HasExactTerminalSurfaceIdentityArgs = Parameters<
-  HasExactPersistedTerminalSurfaceIdentity['hasExactTerminalSurfaceIdentity']
+  AutomationOperations['hasExactTerminalSurfaceIdentity']
 >
 export type HasExactTerminalSurfaceIdentityResult = ReturnType<
-  HasExactPersistedTerminalSurfaceIdentity['hasExactTerminalSurfaceIdentity']
+  AutomationOperations['hasExactTerminalSurfaceIdentity']
 >
 export type AdoptLegacyWorkerTerminalArgs = Parameters<
-  LegacyWorkerTerminalSurface['adoptLegacyWorkerTerminal']
+  HasExactPersistedTerminalSurfaceIdentity['adoptLegacyWorkerTerminal']
 >
 export type AdoptLegacyWorkerTerminalResult = ReturnType<
-  LegacyWorkerTerminalSurface['adoptLegacyWorkerTerminal']
+  HasExactPersistedTerminalSurfaceIdentity['adoptLegacyWorkerTerminal']
 >
 export type OnPtyExitArgs = Parameters<OnPtyExit['onPtyExit']>
 export type OnPtyExitResult = ReturnType<OnPtyExit['onPtyExit']>
 export type ReconcileLegacyWorkerTerminalsArgs = Parameters<
-  LegacyWorkerRuntimeRecovery['reconcileLegacyWorkerTerminals']
+  AutomationOperations['reconcileLegacyWorkerTerminals']
 >
 export type ReconcileLegacyWorkerTerminalsResult = ReturnType<
-  LegacyWorkerRuntimeRecovery['reconcileLegacyWorkerTerminals']
+  AutomationOperations['reconcileLegacyWorkerTerminals']
 >
 export type UpdateLegacyWorkerTerminalRecoveryRetryArgs = Parameters<
-  LegacyWorkerRuntimeRecovery['updateLegacyWorkerTerminalRecoveryRetry']
+  AutomationOperations['updateLegacyWorkerTerminalRecoveryRetry']
 >
 export type UpdateLegacyWorkerTerminalRecoveryRetryResult = ReturnType<
-  LegacyWorkerRuntimeRecovery['updateLegacyWorkerTerminalRecoveryRetry']
+  AutomationOperations['updateLegacyWorkerTerminalRecoveryRetry']
 >
 export type RemoveWorktreeMetadataAndHistoryArgs = Parameters<
   ResolveWorktreeRemovalTarget['removeWorktreeMetadataAndHistory']
@@ -108,12 +101,3 @@ export type ResolveTerminalWorkspaceLaunchScopeArgs = Parameters<
 export type ResolveTerminalWorkspaceLaunchScopeResult = ReturnType<
   ResolveBrowserNetworkExecutionHostForWorktree['resolveTerminalWorkspaceLaunchScope']
 >
-
-export type SelectorArgs = [selector: string, options?: WorkspaceSelectorOptions]
-export type SelectorResult = Promise<ResolvedWorktree>
-export type CandidateResult = Promise<WorkspaceSelectorCandidate>
-
-export type FinishGroupFolderCreation = NonNullable<
-  RuntimeProjectGroupDependencies['finishFolderCreation']
->
-export type AcquireFileWatcherRemoval = RuntimeProjectGroupDependencies['acquireFileWatcherRemoval']

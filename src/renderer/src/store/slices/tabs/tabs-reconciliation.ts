@@ -1,19 +1,17 @@
 import { structuredLaunchSlotIds } from '@/lib/agent-session/launch/structured-agent-session-launch-persistence'
 import type { AppState } from '../../types'
-import type { Tab } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
-import { dedupeTabOrder } from '../../../../../shared/workspace-layout/tab-groups/tab-order'
-import { ensureWorktreeGroup, updateGroup } from './tab-group-state'
-import { sanitizeRecentTabIds } from './tab-selection-history'
-import { pruneTabGroupLayoutForGroups } from './tabs-hydration'
+import type { Tab } from '../../../../../shared/tab-types'
+import { dedupeTabOrder } from '../../../../../shared/workspace-layout/tab-order'
+import { ensureGroup, sanitizeRecentTabIds, updateGroup } from '../tab-group-state'
+import { pruneTabGroupLayoutForGroups } from '../tabs-hydration'
 import {
   buildOrphanTerminalCleanupPatch,
   getOrphanTerminalIds,
   terminalTabHasReconnectablePty
-} from '../../terminals/retirement/terminal-orphan-cleanup'
+} from '../terminal-orphan-helpers'
 import {
-  createReconciliationDrafts,
-  finishReconciliationDrafts,
-  type ReconciliationDraftField,
+  EMPTY_LIVE_EDITOR_IDS,
+  writeBatchedWorkspaceRecordEntry,
   type WorktreeTabModelReconciliationBatch
 } from './tabs-reconciliation-batch'
 
@@ -29,13 +27,8 @@ export function projectWorktreeTabModelReconciliation(
   worktreeId: string,
   batch?: WorktreeTabModelReconciliationBatch
 ): WorktreeTabModelReconciliation {
-  // A batch's drafts hold earlier workspaces' writes; a single reconciliation drafts from `state`.
-  const drafts = batch?.drafts ?? createReconciliationDrafts(state)
-  const unifiedTabs = drafts.unifiedTabs.get(worktreeId) ?? []
-  const storedGroups = drafts.groups.get(worktreeId)
-  const groups = storedGroups ?? []
-  const storedActiveGroupId = drafts.activeGroups.get(worktreeId)
-  const storedLayout = drafts.layout.get(worktreeId)
+  const unifiedTabs = state.unifiedTabsByWorktree[worktreeId] ?? []
+  const groups = state.groupsByWorktree[worktreeId] ?? []
   const runtimeTerminalTabs = state.tabsByWorktree[worktreeId] ?? []
   const unifiedTerminalEntityIds = new Set(
     unifiedTabs.filter((tab) => tab.contentType === 'terminal').map((tab) => tab.entityId)
@@ -50,23 +43,17 @@ export function projectWorktreeTabModelReconciliation(
       state.unverifiedPtyLossTabIds[tab.id] === true
     )
   })
-  const orphanTerminalIds = getOrphanTerminalIds(
-    {
-      tabsByWorktree: state.tabsByWorktree,
-      unifiedTabsByWorktree: { [worktreeId]: unifiedTabs },
-      ptyIdsByTabId: state.ptyIdsByTabId,
-      lastKnownRelayPtyIdByTabId: state.lastKnownRelayPtyIdByTabId,
-      deferredSshSessionIdsByTabId: state.deferredSshSessionIdsByTabId,
-      pendingReconnectPtyIdByTabId: state.pendingReconnectPtyIdByTabId,
-      unverifiedPtyLossTabIds: state.unverifiedPtyLossTabIds
-    },
-    worktreeId
-  )
-  const ensuredGroup =
+  const orphanTerminalIds = getOrphanTerminalIds(state, worktreeId)
+  const ensuredGroupState =
     legacyRuntimeTerminalTabs.length > 0
-      ? ensureWorktreeGroup(storedGroups, worktreeId, storedActiveGroupId)
+      ? ensureGroup(
+          state.groupsByWorktree,
+          state.activeGroupIdByWorktree,
+          worktreeId,
+          state.activeGroupIdByWorktree[worktreeId]
+        )
       : null
-  const reconciliationGroup = ensuredGroup?.group ?? groups[0] ?? null
+  const reconciliationGroup = ensuredGroupState?.group ?? groups[0] ?? null
   const restoredLegacyTabs =
     reconciliationGroup == null
       ? []
@@ -99,7 +86,7 @@ export function projectWorktreeTabModelReconciliation(
       : (restoredLegacyTabs[0]?.id ?? null)
   const reconciledGroups =
     restoredLegacyTabs.length > 0 && reconciliationGroup
-      ? updateGroup(ensuredGroup?.created ? [ensuredGroup.group] : groups, {
+      ? updateGroup(ensuredGroupState!.groupsByWorktree[worktreeId] ?? [], {
           ...reconciliationGroup,
           // Why: restore runtime tabs into the active/root group so reattach cannot spawn a duplicate.
           activeTabId: reconciliationGroup.activeTabId ?? legacyFallbackActiveTabId,
@@ -113,7 +100,11 @@ export function projectWorktreeTabModelReconciliation(
     runtimeTerminalTabs.filter((tab) => !orphanTerminalIds.has(tab.id)).map((tab) => tab.id)
   )
   // Batch index avoids O(workspaces × openFiles) rescanning.
-  const liveEditorIds = batch?.liveEditorIds ?? new Set(state.openFiles.map((file) => file.id))
+  const liveEditorIds: ReadonlySet<string> = batch
+    ? (batch.liveEditorIdsByWorktree.get(worktreeId) ?? EMPTY_LIVE_EDITOR_IDS)
+    : new Set(
+        state.openFiles.filter((file) => file.worktreeId === worktreeId).map((file) => file.id)
+      )
   const liveBrowserIds = new Set(
     (state.browserTabsByWorktree[worktreeId] ?? []).map((browserTab) => browserTab.id)
   )
@@ -168,7 +159,8 @@ export function projectWorktreeTabModelReconciliation(
     prunedGroups.some((group, index) => group !== groups[index])
   const nextGroups = groupsChanged ? prunedGroups : groups
   const currentActiveGroupId =
-    storedActiveGroupId ?? (ensuredGroup?.created ? ensuredGroup.group.id : undefined)
+    state.activeGroupIdByWorktree[worktreeId] ??
+    ensuredGroupState?.activeGroupIdByWorktree[worktreeId]
   const activeGroupStillExists = nextGroups.some((group) => group.id === currentActiveGroupId)
   const nextActiveGroupId = activeGroupStillExists
     ? currentActiveGroupId
@@ -179,8 +171,8 @@ export function projectWorktreeTabModelReconciliation(
   const activeGroupChanged = nextActiveGroupId !== currentActiveGroupId
   const baseNextLayout =
     restoredLegacyTabs.length > 0 && reconciliationGroup
-      ? (storedLayout ?? { type: 'leaf', groupId: reconciliationGroup.id })
-      : storedLayout
+      ? (state.layoutByWorktree[worktreeId] ?? { type: 'leaf', groupId: reconciliationGroup.id })
+      : state.layoutByWorktree[worktreeId]
   const validGroupIds = new Set(nextGroups.map((group) => group.id))
   const prunedNextLayout =
     baseNextLayout && validGroupIds.size > 0
@@ -188,7 +180,8 @@ export function projectWorktreeTabModelReconciliation(
       : baseNextLayout
   const nextLayout =
     prunedNextLayout ?? (nextGroups[0] ? { type: 'leaf', groupId: nextGroups[0].id } : undefined)
-  const layoutChanged = nextLayout !== storedLayout
+  const currentLayout = state.layoutByWorktree[worktreeId]
+  const layoutChanged = nextLayout !== currentLayout
   let patch: Partial<AppState> = {}
 
   if (
@@ -219,22 +212,42 @@ export function projectWorktreeTabModelReconciliation(
         batch?.ownedStateKeys.add('unreadTerminalTabs')
       }
     }
-    const written = new Set<ReconciliationDraftField>(['unifiedTabs', 'groups', 'activeGroups'])
-    drafts.unifiedTabs.set(worktreeId, validTabs)
-    drafts.groups.set(worktreeId, nextGroups)
-    drafts.activeGroups.set(worktreeId, nextActiveGroupId)
-    if (nextLayout && layoutChanged) {
-      // Why: restored runtime terminals need a concrete leaf before activation.
-      drafts.layout.set(worktreeId, nextLayout)
-      written.add('layout')
-    }
-    if (batch) {
-      written.forEach((field) => batch.writtenDraftFields.add(field))
-    }
     patch = {
-      ...(batch ? {} : finishReconciliationDrafts(drafts, written)),
+      unifiedTabsByWorktree: writeBatchedWorkspaceRecordEntry(
+        state.unifiedTabsByWorktree,
+        'unifiedTabsByWorktree',
+        worktreeId,
+        validTabs,
+        batch
+      ),
+      groupsByWorktree: writeBatchedWorkspaceRecordEntry(
+        state.groupsByWorktree,
+        'groupsByWorktree',
+        worktreeId,
+        nextGroups,
+        batch
+      ),
+      activeGroupIdByWorktree: writeBatchedWorkspaceRecordEntry(
+        state.activeGroupIdByWorktree,
+        'activeGroupIdByWorktree',
+        worktreeId,
+        nextActiveGroupId,
+        batch
+      ),
       ...(nextUnreadTerminalTabs !== state.unreadTerminalTabs
         ? { unreadTerminalTabs: nextUnreadTerminalTabs }
+        : {}),
+      ...(nextLayout && layoutChanged
+        ? {
+            // Why: restored runtime terminals need a concrete leaf before activation.
+            layoutByWorktree: writeBatchedWorkspaceRecordEntry(
+              state.layoutByWorktree,
+              'layoutByWorktree',
+              worktreeId,
+              nextLayout,
+              batch
+            )
+          }
         : {}),
       ...(orphanTerminalIds.size > 0
         ? buildOrphanTerminalCleanupPatch(state, worktreeId, orphanTerminalIds)

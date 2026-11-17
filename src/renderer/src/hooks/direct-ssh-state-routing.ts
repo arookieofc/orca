@@ -1,7 +1,4 @@
-import type {
-  DirectSshAuthority,
-  SshConnectionState
-} from '../../../shared/remote-runtime/ssh/ssh-types'
+import type { DirectSshAuthority, SshConnectionState } from '../../../shared/ssh-types'
 
 export type DirectSshConnectedStateOrigin = 'push' | 'initial-hydration'
 

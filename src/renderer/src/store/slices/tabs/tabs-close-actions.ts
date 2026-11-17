@@ -1,42 +1,36 @@
-import { editorTabRetirement } from '../editor/tabs/editor-tab-retirement'
-import {
-  landsOnEmptiedWorktree,
-  emptiedWorktreeLandingPatch,
-  landOnEmptiedWorktree
-} from './tabs-empty-workspace'
-import { retireRemovedNativeChatTabs } from '@/components/native-chat/session/native-chat-removed-tab-retirement'
-import { retireStructuredAgentSessionReadOwner } from '@/components/native-chat/session/structured/read/structured-agent-session-read-owner-registry'
 import type { TabsSlice, TabsSliceGet, TabsSliceSet } from './tabs-slice-contract'
-import { collapseWorktreeGroupLayout } from '../../../../../shared/workspace-layout/tab-groups/tab-group-layout-tree'
-import { findGroupForTab, findTabAndWorktree } from './tab-group-state'
-import { pickNextActiveTab, sanitizeRecentTabIds } from './tab-selection-history'
-import { dedupeTabOrder } from '../../../../../shared/workspace-layout/tab-groups/tab-order'
+import { collapseGroupLayout } from '../../../../../shared/workspace-layout/tab-group-layout-tree'
+import {
+  findGroupForTab,
+  findTabAndWorktree,
+  pickNextActiveTab,
+  sanitizeRecentTabIds
+} from '../tab-group-state'
+import { dedupeTabOrder } from '../../../../../shared/workspace-layout/tab-order'
 import { buildActiveSurfacePatch } from './tabs-surface'
-import { beginStructuredAgentSessionTabClose } from '@/runtime/native-chat/tab-retirement/structured-agent-session-tab-retirement'
+import { beginStructuredAgentSessionTabClose } from '@/runtime/structured-agent-session-tab-retirement'
 import {
   hasStructuredAgentSessionLaunchCancellationTombstone,
   shouldRetainStructuredAgentSessionLaunchTab
 } from '@/lib/agent-session/launch/structured-agent-session-launch-registry'
-import { clearWebSessionFocusIntentIfMatches } from '@/runtime/web-session-tabs-sync/navigation/web-session-focus-intent'
-import { ownsGlobalSelection } from '../../workspaces/selection/global-selection-owner'
+import { structuredAgentSessionTabId } from '../../../../../shared/structured-agent-session-projection'
+import { clearWebSessionFocusIntentIfMatches } from '@/runtime/web-session-focus-intent'
+import { ownsGlobalSelection } from '../../global-selection-owner'
 import {
   structuredAgentSessionFocusOwner,
   structuredAgentSessionTargetForTab
-} from '@/runtime/native-chat/session-ownership/structured-agent-session-owner'
+} from '@/runtime/structured-agent-session-owner'
 import { omitRecordKeys } from '../worktrees/teardown/record-key-omission'
 import { removeTabsAttention } from '../workspace-attention/subject-attention-transitions'
 import { settleAttentionRemovedBy } from '../workspace-attention/attention-removal-follow-up'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../shared/workspace-layout/layout-owner-switch'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../shared/layout-owner-switch'
 import { closeContentTabThroughLayoutOwner } from './content-tab-close-through-layout-owner'
 import { isEditorTabContentType } from '../editor/tabs/editor-tab-content-type'
-import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
-import { isTuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent-config'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host/execution-host'
-import { forgetDesktopCreatedServerTab } from '@/store/workspace-layout/frames/desktop-created-server-tabs'
-import {
-  replaceRecordEntries,
-  replaceTabBuckets
-} from '../../record-transitions/keyed-record-transitions'
+import type { AppState } from '../../types'
+import type { TuiAgent } from '../../../../../shared/tui-agent'
+import { isTuiAgent } from '../../../../../shared/tui-agent-config'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
+import { forgetDesktopCreatedServerTab } from '@/lib/desktop-created-server-tabs'
 
 export function createTabsCloseActions(
   set: TabsSliceSet,
@@ -50,9 +44,6 @@ export function createTabsCloseActions(
         return null
       }
       const { tab, worktreeId } = found
-      const retireEditor = opts?.editorRetirementHandled
-        ? () => {}
-        : editorTabRetirement(set, get, state, tab)
       forgetDesktopCreatedServerTab(tab.id)
       forgetDesktopCreatedServerTab(tab.entityId)
       const group = findGroupForTab(state.groupsByWorktree, worktreeId, tab.groupId)
@@ -77,9 +68,6 @@ export function createTabsCloseActions(
           shouldRetainStructuredAgentSessionLaunchTab(worktreeId, tab.entityId) ||
           hasStructuredAgentSessionLaunchCancellationTombstone(worktreeId, tab.entityId)
         const target = structuredAgentSessionTargetForTab(state, tab)
-        if (!tab.executionHostId || !target) {
-          retireStructuredAgentSessionReadOwner(tab.entityId, null, tab.executionHostId ?? '')
-        }
         if (target) {
           if (provisional) {
             clearWebSessionFocusIntentIfMatches(
@@ -106,6 +94,7 @@ export function createTabsCloseActions(
           // Closing still removes the tab; no host can be named to stop its chat on.
           console.warn('[structured-agent-session] close found no owning host', tab.entityId)
         }
+        get().clearNativeChatLaunchDraft(structuredAgentSessionTabId(tab.entityId))
         // The unsent draft stays: it belongs to the conversation, which can be reopened from history.
       }
       const nextActiveTabId =
@@ -128,12 +117,9 @@ export function createTabsCloseActions(
       const closeHere = (): void =>
         settleAttentionRemovedBy(set, get, () =>
           set((current) => {
-            const nextTabs = (current.unifiedTabsByWorktree[worktreeId] ?? []).filter((item) => {
-              if (item.id === tabId) {
-                retireRemovedNativeChatTabs([item], [])
-              }
-              return item.id !== tabId
-            })
+            const nextTabs = (current.unifiedTabsByWorktree[worktreeId] ?? []).filter(
+              (item) => item.id !== tabId
+            )
             // Bulk closes bypass terminals.closeTab, so clear entity-keyed unread markers here too.
             const nextUnreadTerminalTabs = terminalEntityId
               ? omitRecordKeys(current.unreadTerminalTabs, [terminalEntityId])
@@ -153,35 +139,33 @@ export function createTabsCloseActions(
             )
             let nextLayoutByWorktree = current.layoutByWorktree
             let nextActiveGroupIdByWorktree = current.activeGroupIdByWorktree
-            const currentLayout = current.layoutByWorktree[worktreeId]
-            if (group && wasLastTab && currentLayout && nextGroups.length > 1) {
+            if (
+              group &&
+              wasLastTab &&
+              current.layoutByWorktree[worktreeId] &&
+              nextGroups.length > 1
+            ) {
               nextGroups = nextGroups.filter((candidate) => candidate.id !== group.id)
-              const collapsed = collapseWorktreeGroupLayout(
-                currentLayout,
-                current.activeGroupIdByWorktree[worktreeId],
+              const collapsedState = collapseGroupLayout(
+                current.layoutByWorktree,
+                current.activeGroupIdByWorktree,
+                worktreeId,
                 group.id,
                 nextGroups[0]?.id ?? null
               )
-              nextLayoutByWorktree = replaceRecordEntries(current.layoutByWorktree, [
-                [worktreeId, collapsed.layout]
-              ])
-              nextActiveGroupIdByWorktree = replaceRecordEntries(current.activeGroupIdByWorktree, [
-                [worktreeId, collapsed.activeGroupId]
-              ])
+              nextLayoutByWorktree = collapsedState.layoutByWorktree
+              nextActiveGroupIdByWorktree = collapsedState.activeGroupIdByWorktree
             }
-            const nextUnifiedTabsByWorktree = replaceTabBuckets(current.unifiedTabsByWorktree, [
-              [worktreeId, nextTabs]
-            ])
-            const nextGroupsByWorktree = replaceRecordEntries(current.groupsByWorktree, [
-              [worktreeId, nextGroups]
-            ])
             // Unwinding a failed create added no tab; preserve the original selection instead of landing on welcome.
             const shouldDeactivateWorktree =
               !opts?.preserveWorktreeSelection &&
               landsOnEmptiedWorktree(current, worktreeId, nextTabs.length)
             return {
-              unifiedTabsByWorktree: nextUnifiedTabsByWorktree,
-              groupsByWorktree: nextGroupsByWorktree,
+              unifiedTabsByWorktree: { ...current.unifiedTabsByWorktree, [worktreeId]: nextTabs },
+              groupsByWorktree: {
+                ...current.groupsByWorktree,
+                [worktreeId]: nextGroups
+              },
               layoutByWorktree: nextLayoutByWorktree,
               activeGroupIdByWorktree: nextActiveGroupIdByWorktree,
               // Avoid no-op unread allocations that wake full-state selectors.
@@ -195,8 +179,14 @@ export function createTabsCloseActions(
                 ? buildActiveSurfacePatch(
                     {
                       ...current,
-                      unifiedTabsByWorktree: nextUnifiedTabsByWorktree,
-                      groupsByWorktree: nextGroupsByWorktree,
+                      unifiedTabsByWorktree: {
+                        ...current.unifiedTabsByWorktree,
+                        [worktreeId]: nextTabs
+                      },
+                      groupsByWorktree: {
+                        ...current.groupsByWorktree,
+                        [worktreeId]: nextGroups
+                      },
                       layoutByWorktree: nextLayoutByWorktree,
                       activeGroupIdByWorktree: nextActiveGroupIdByWorktree
                     },
@@ -212,10 +202,7 @@ export function createTabsCloseActions(
         ORCA_LAYOUT_OWNER_IS_MAIN &&
         closeContentTabThroughLayoutOwner(get, tab, {
           nextActiveTabId,
-          closeHere: () => {
-            closeHere()
-            retireEditor()
-          },
+          closeHere,
           // An editor close lands through closeFile, which owns its content.
           ...(isEditorTabContentType(tab.contentType) || opts?.preserveWorktreeSelection
             ? {}
@@ -231,8 +218,7 @@ export function createTabsCloseActions(
                     { tabsBefore: state }
                   )
               }
-            : {}),
-          ...(isEditorTabContentType(tab.contentType) ? { closed: retireEditor } : {})
+            : {})
         })
       ) {
         if (opts?.recordInteraction !== false) {
@@ -241,7 +227,6 @@ export function createTabsCloseActions(
         return { closedTabId: tabId, wasLastTab, worktreeId }
       }
       closeHere()
-      retireEditor()
       if (opts?.recordInteraction !== false) {
         get().recordFeatureInteraction?.('terminal-tabs')
       }
@@ -250,10 +235,79 @@ export function createTabsCloseActions(
   }
 }
 
+// Last user-close lands on welcome; failed-create cleanup preserves selection.
+type LandingState = Pick<
+  AppState,
+  | 'activeWorktreeId'
+  | 'unifiedTabsByWorktree'
+  | 'tabsByWorktree'
+  | 'browserTabsByWorktree'
+  | 'openFiles'
+  | 'activeTabIdByWorktree'
+  | 'activeBrowserTabIdByWorktree'
+  | 'activeFileIdByWorktree'
+  | 'activeTabTypeByWorktree'
+>
+
+function landsOnEmptiedWorktree(
+  current: LandingState,
+  worktreeId: string,
+  remainingTabs: number
+): boolean {
+  return (
+    current.activeWorktreeId === worktreeId &&
+    remainingTabs === 0 &&
+    (current.tabsByWorktree[worktreeId] ?? []).length === 0 &&
+    (current.browserTabsByWorktree[worktreeId] ?? []).length === 0 &&
+    !current.openFiles.some((file) => file.worktreeId === worktreeId)
+  )
+}
+
+function emptiedWorktreeLandingPatch(current: LandingState, worktreeId: string) {
+  return {
+    activeWorktreeId: null,
+    activeWorkspaceKey: null,
+    activeWorkspaceExecutionHostId: null,
+    activeTabId: null,
+    activeBrowserTabId: null,
+    activeFileId: null,
+    activeTabType: 'terminal' as const,
+    activeTabIdByWorktree: { ...current.activeTabIdByWorktree, [worktreeId]: null },
+    activeBrowserTabIdByWorktree: { ...current.activeBrowserTabIdByWorktree, [worktreeId]: null },
+    activeFileIdByWorktree: { ...current.activeFileIdByWorktree, [worktreeId]: null },
+    activeTabTypeByWorktree: {
+      ...current.activeTabTypeByWorktree,
+      [worktreeId]: 'terminal' as const
+    }
+  }
+}
+
+type LandingSet = (update: (state: AppState) => Partial<AppState>) => void
+
+/** After main's frame dropped a closed tab: lands when that emptied the active worktree. */
+export function landOnEmptiedWorktree(
+  set: LandingSet,
+  get: () => AppState,
+  worktreeId: string
+): boolean {
+  const state = get()
+  if (
+    !landsOnEmptiedWorktree(
+      state,
+      worktreeId,
+      (state.unifiedTabsByWorktree[worktreeId] ?? []).length
+    )
+  ) {
+    return false
+  }
+  set((current) => emptiedWorktreeLandingPatch(current, worktreeId))
+  return true
+}
+
 /** Main opens the chat where it opens any chat this host lists: a host-kept chat comes back. */
 function reopenChatTab(worktreeId: string, sessionId: string, agent: TuiAgent): () => void {
   return () =>
-    void import('@/lib/agent-session/launch/structured-agent-session-launch-surface').then(
+    void import('@/lib/structured-agent-session-launch-surface').then(
       ({ openStructuredAgentSessionProvisionalTab }) =>
         openStructuredAgentSessionProvisionalTab({
           worktreeId,

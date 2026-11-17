@@ -1,7 +1,7 @@
 import {
   isWindowsAbsolutePathLike,
   relativePathInsideRoot
-} from '../../../shared/file-access/cross-platform-path'
+} from '../../../shared/cross-platform-path'
 
 function stripTrailingSeparators(path: string): string {
   return path.replace(/[\\/]+$/, '')
@@ -13,6 +13,13 @@ function stripLeadingSeparators(path: string): string {
 
 function getSeparator(path: string): '/' | '\\' {
   return path.includes('\\') ? '\\' : '/'
+}
+
+export function normalizeRelativePath(path: string, rootPath?: string | null): string {
+  if (rootPath && !isWindowsAbsolutePathLike(rootPath)) {
+    return path.replace(/^\/+/, '').replace(/\/+/g, '/')
+  }
+  return stripLeadingSeparators(path).replace(/[\\/]+/g, '/')
 }
 
 export function getRelativePathInsideRoot(

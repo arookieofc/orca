@@ -13,7 +13,7 @@ import {
   readTerminals,
   sessionTabsBaseline
 } from './helpers/layout-compat-baseline'
-import type { RuntimeTerminalCreate } from '../../src/shared/terminal/runtime/runtime-terminal-create-contract'
+import type { RuntimeTerminalCreate } from '../../src/shared/runtime-terminal-contracts'
 
 const PANE = '.pane[data-leaf-id]:visible'
 const TAB = '[data-testid="sortable-tab"]'

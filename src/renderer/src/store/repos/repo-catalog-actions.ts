@@ -1,26 +1,26 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
-import type { Repo } from '../../../../shared/repository/repo-types'
-import { applyManualRepoOrder } from '../../../../shared/repository/manual-repo-order'
-import { reconcileCatalogRows } from '../../../../shared/collections/catalog-row-reconcile'
-import { retainValidFilterRepoIds } from './repo-filter-selection'
-import { mergeSshRepoReadoptions, reconcileReadoptedSshRepoRows } from './superseded-ssh-repo-rows'
-import { getRepoHostIdentity } from '../../../../shared/repository/repo-host-identity'
-import { runtimeTargetForOwnerEnvironment } from '../../runtime/rpc/targets/runtime-client-target'
-import { filterSetupScriptPromptDismissalsToValidRepos } from '@/runtime/repo-hooks/setup-script-prompt'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host/execution-host'
-import { isRemovedRuntimeHostId } from '../host-catalog/removed-runtime-host-rows'
+import type { Repo } from '../../../../shared/repo-types'
+import { applyManualRepoOrder } from '../../../../shared/manual-repo-order'
+import { reconcileCatalogRows } from '../../../../shared/catalog-row-reconcile'
+import { retainValidFilterRepoIds } from '../slices/repo-filter-selection'
+import {
+  mergeSshRepoReadoptions,
+  reconcileReadoptedSshRepoRows
+} from '../slices/superseded-ssh-repo-rows'
+import { getRepoHostIdentity } from '../slices/repo-host-identity'
+import { runtimeTargetForOwnerEnvironment } from '../../runtime/runtime-client-target'
+import { filterSetupScriptPromptDismissalsToValidRepos } from '@/lib/setup-script-prompt'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host'
+import { isRemovedRuntimeHostId } from '../slices/stale-runtime-host-rows'
 import type { LocalRepoCatalogFetchOutcome } from './repo-catalog-fencing'
 import type { RepoSlice } from './repo-state'
-import { arrayElementsUnchanged } from '../../lib/catalog-reconciliation/catalog-identity'
+import { arrayElementsUnchanged } from '../catalog-identity'
 import {
   awaitLatestLocalRepoCatalogFetch,
   startLocalRepoCatalogFetch
 } from './repo-catalog-fencing'
-import {
-  claimHostCatalogFence,
-  isHostCatalogFenceCurrent
-} from '../host-catalog/host-catalog-fence'
+import { claimHostCatalogFence, isHostCatalogFenceCurrent } from '../host-catalog-fencing'
 import {
   fetchRepoCatalogForTarget,
   filterSetupsForPrunedRepoRows,
@@ -33,13 +33,9 @@ import {
   getProjectHostSetupOwnerKey,
   mergeProjectHostSetupCompatibility,
   projectCompatibilityFromRepos
-} from '../../../../shared/project/catalog/project-compatibility-merge'
-import { mergeFetchedHostProjectCatalog } from '../../../../shared/project/catalog/project-compatibility-host-merge'
+} from '../../../../shared/project-compatibility-merge'
+import { mergeFetchedHostProjectCatalog } from '../../../../shared/project-compatibility-host-merge'
 import { scheduleSafeAutoForkSync } from './safe-auto-fork-sync'
-import {
-  withWslMovedRepoIds,
-  withWslMovedSetupScriptDismissals
-} from './wsl-moved-repo-ui-retention'
 
 export function createRepoCatalogActions(
   set: Parameters<StateCreator<AppState>>[0],
@@ -58,27 +54,27 @@ export function createRepoCatalogActions(
         )
         const reconciliation = reconcileReadoptedSshRepoRows(s.repos, pendingSshRepoReadoptions)
         const repos = reconciliation.repos
-        const worktreeState = reconcileReadoptedSshWorktreeState(
-          s,
-          pendingSshRepoReadoptions,
-          reconciliation.pendingReadoptions
+        const worktreeState = reconcileReadoptedSshWorktreeState(s, pendingSshRepoReadoptions)
+        const remainingSetups = filterSetupsForPrunedRepoRows(
+          s.endpointProjectHostSetups,
+          s.repos,
+          repos
         )
-        const remainingSetups = filterSetupsForPrunedRepoRows(s.projectHostSetups, s.repos, repos)
         const compatibility = mergeProjectHostSetupCompatibility(
           projectCompatibilityFromRepos(repos),
           {
-            projects: s.projects,
+            projects: s.endpointProjects,
             setups: remainingSetups
           }
         )
         // All-repos readoption cannot use host-scoped merge. Reconcile always-allocating compat results to preserve unchanged catalog arrays and avoid selector churn.
         const projects = reconcileCatalogRows(
-          s.projects,
+          s.endpointProjects,
           compatibility.projects,
           (project) => project.id
         )
         const projectHostSetups = reconcileCatalogRows(
-          s.projectHostSetups,
+          s.endpointProjectHostSetups,
           compatibility.projectHostSetups,
           getProjectHostSetupOwnerKey
         )
@@ -86,8 +82,8 @@ export function createRepoCatalogActions(
           repos,
           pendingSshRepoReadoptions: reconciliation.pendingReadoptions,
           ...worktreeState,
-          projects,
-          projectHostSetups
+          endpointProjects: projects,
+          endpointProjectHostSetups: projectHostSetups
         }
       }),
 
@@ -100,11 +96,7 @@ export function createRepoCatalogActions(
       set((s) => ({ reposFetchGeneration: s.reposFetchGeneration + 1 }))
       const fence = claimHostCatalogFence(get, 'repos', target)
       try {
-        const catalog = await fetchRepoCatalogForTarget(
-          target,
-          get().repos,
-          get().githubSourceCollections
-        )
+        const catalog = await fetchRepoCatalogForTarget(target, get().repos)
         // A newer same-host fetch or a replaced connection superseded us — drop this stale result.
         if (!isHostCatalogFenceCurrent(get, fence)) {
           return
@@ -123,9 +115,9 @@ export function createRepoCatalogActions(
           const validRepoHostIdentities = new Set(prunedRepos.map(getRepoHostIdentity))
           const mergedProjectCompatibility = mergeFetchedHostProjectCatalog({
             previous: {
-              projects: s.projects,
+              projects: s.endpointProjects,
               projectHostSetups: filterSetupsForPrunedRepoRows(
-                s.projectHostSetups,
+                s.endpointProjectHostSetups,
                 result.repos,
                 prunedRepos
               )
@@ -140,29 +132,18 @@ export function createRepoCatalogActions(
           return {
             repos: prunedRepos,
             pendingSshRepoReadoptions: reconciliation.pendingReadoptions,
-            ...reconcileFetchedCatalogWorktreeState(
-              s,
-              catalog,
-              prunedRepos,
-              reconciliation.pendingReadoptions
-            ),
-            ...mergedProjectCompatibility,
+            ...reconcileFetchedCatalogWorktreeState(s, catalog, prunedRepos),
+            endpointProjects: mergedProjectCompatibility.projects,
+            endpointProjectHostSetups: mergedProjectCompatibility.projectHostSetups,
             ...(arrayElementsUnchanged(prunedRepos, s.repos)
               ? {}
               : { folderWorkspacePathStatuses: {} }),
             activeRepoId:
               s.activeRepoId && validRepoIds.has(s.activeRepoId) ? s.activeRepoId : null,
-            filterRepoIds: retainValidFilterRepoIds(
-              s.filterRepoIds,
-              withWslMovedRepoIds(validRepoIds, s.wslMovedProjects)
-            ),
-            setupScriptPromptDismissedRepoIds: withWslMovedSetupScriptDismissals(
+            filterRepoIds: retainValidFilterRepoIds(s.filterRepoIds, validRepoIds),
+            setupScriptPromptDismissedRepoIds: filterSetupScriptPromptDismissalsToValidRepos(
               s.setupScriptPromptDismissedRepoIds,
-              filterSetupScriptPromptDismissalsToValidRepos(
-                s.setupScriptPromptDismissedRepoIds,
-                validRepoHostIdentities
-              ),
-              s.wslMovedProjects
+              validRepoHostIdentities
             )
           }
         })

@@ -1,25 +1,19 @@
 // A capped row remains checked when any id survives; report the actual per-team coverage.
 import React from 'react'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
 import { linearMetadataGroupCoverage } from './linear-issue-attribute-filter-team-ids'
 
 type LinearCoverageFacet = 'status' | 'labels'
 
-function shortfallMessage(
-  facet: LinearCoverageFacet,
-  applied: number,
-  intended: number,
-  t: Translate = translate
-): string {
+function shortfallMessage(facet: LinearCoverageFacet, applied: number, intended: number): string {
   const counts = { value0: applied, value1: intended }
   return facet === 'status'
-    ? t(
+    ? translate(
         'auto.components.linear-issue-attribute-filter-coverage-notice.statusPartialTeamCoverage',
         'Filtering {{value0}} of {{value1}} team statuses — issues from the remaining teams are not included.',
         counts
       )
-    : t(
+    : translate(
         'auto.components.linear-issue-attribute-filter-coverage-notice.labelsPartialTeamCoverage',
         'Filtering {{value0}} of {{value1}} team labels — issues from the remaining teams are not included.',
         counts
@@ -27,14 +21,14 @@ function shortfallMessage(
 }
 
 /** Why: a row the cap could not fit leaves no trace, so the spent budget is what we can state. */
-function idLimitMessage(facet: LinearCoverageFacet, max: number, t: Translate = translate): string {
+function idLimitMessage(facet: LinearCoverageFacet, max: number): string {
   return facet === 'status'
-    ? t(
+    ? translate(
         'auto.components.linear-issue-attribute-filter-coverage-notice.statusAtIdLimit',
         'Filtering the most this can carry: {{value0}} team statuses. Rows picked past that are left out.',
         { value0: max }
       )
-    : t(
+    : translate(
         'auto.components.linear-issue-attribute-filter-coverage-notice.labelsAtIdLimit',
         'Filtering the most this can carry: {{value0}} team labels. Rows picked past that are left out.',
         { value0: max }
@@ -55,16 +49,13 @@ export function LinearFacetCoverageNotice({
   /** Recorded where the cap ran, not inferred from the ids it left behind (STA-5996). */
   truncated: boolean
 }): React.JSX.Element | null {
-  const t = useTranslate()
   const { applied, intended } = linearMetadataGroupCoverage(options, selectedIds)
   if (intended <= applied && !truncated) {
     return null
   }
   return (
     <p className="border-t border-border/50 px-3 py-2 text-xs text-muted-foreground">
-      {intended > applied
-        ? shortfallMessage(facet, applied, intended, t)
-        : idLimitMessage(facet, max, t)}
+      {intended > applied ? shortfallMessage(facet, applied, intended) : idLimitMessage(facet, max)}
     </p>
   )
 }

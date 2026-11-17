@@ -1,13 +1,9 @@
 import { useState } from 'react'
 import { DndContext } from '@dnd-kit/core'
 import { defineFixture } from '../../component-fixtures/component-fixture'
-import type { TerminalTab } from '../../../../shared/workspace-layout/terminal-tab-types'
+import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import TabBar from './TabBar'
 import type { TabBarProps } from './tab-bar-props'
-import {
-  buildBrowserPage,
-  buildWorkspaceFromPage
-} from '../../store/slices/browser/pages/browser-page-records'
 
 const WORKSPACE_ID = 'tab-width-fixture'
 const TITLES = [
@@ -17,22 +13,17 @@ const TITLES = [
   "You're the president agent coordinating this review"
 ]
 const noop = (): void => {}
+
 function TabWidthFixture({
   count,
   titles = TITLES,
-  agentTabs = true,
   browserTabs,
-  clientHostedBrowserRows,
   editorFiles,
   tabBarOrder
 }: {
   count: number
   titles?: string[]
-  agentTabs?: boolean
-} & Pick<
-  TabBarProps,
-  'browserTabs' | 'clientHostedBrowserRows' | 'editorFiles' | 'tabBarOrder'
->): React.JSX.Element {
+} & Pick<TabBarProps, 'browserTabs' | 'editorFiles' | 'tabBarOrder'>): React.JSX.Element {
   const [activeTabId, setActiveTabId] = useState('tab-0')
   const tabs: TerminalTab[] = Array.from({ length: count }, (_, index) => ({
     id: `tab-${index}`,
@@ -43,7 +34,7 @@ function TabWidthFixture({
     color: null,
     sortOrder: index,
     createdAt: 0,
-    launchAgent: agentTabs ? 'codex' : undefined
+    launchAgent: 'codex'
   }))
 
   return (
@@ -56,7 +47,6 @@ function TabWidthFixture({
           worktreeId={WORKSPACE_ID}
           groupId="tab-width-group"
           browserTabs={browserTabs}
-          clientHostedBrowserRows={clientHostedBrowserRows}
           editorFiles={editorFiles}
           tabBarOrder={tabBarOrder}
           expandedPaneByTabId={{}}
@@ -77,16 +67,9 @@ function TabWidthFixture({
   )
 }
 
-export const availableWidth = defineFixture({
+export const spacious = defineFixture({
   width: 1280,
   render: () => <TabWidthFixture count={4} />
-})
-
-export const twoTabs = defineFixture({
-  width: 1280,
-  render: () => (
-    <TabWidthFixture count={2} titles={['Council Branch Review: Zero Regressions', 'Terminal 1']} />
-  )
 })
 
 export const single = defineFixture({
@@ -99,9 +82,33 @@ export const long = defineFixture({
   render: () => <TabWidthFixture count={1} titles={['A very long conversation title '.repeat(8)]} />
 })
 
+export const contentFit = defineFixture({
+  width: 1280,
+  render: () => (
+    <TabWidthFixture
+      count={3}
+      titles={[
+        'Measure the effect of the new tab layout on conversation navigation',
+        'PR implementation approach',
+        'Review the implementation for layout and interaction regressions'
+      ]}
+    />
+  )
+})
+
 export const narrow = defineFixture({
   width: 420,
   render: () => <TabWidthFixture count={4} />
+})
+
+export const mixed = defineFixture({
+  width: 620,
+  render: () => (
+    <TabWidthFixture
+      count={3}
+      titles={['A very long conversation title '.repeat(8), 'Go', 'Notes']}
+    />
+  )
 })
 
 export const overflowing = defineFixture({
@@ -145,189 +152,16 @@ export const mixedTypes = defineFixture({
   )
 })
 
-export const singleBrowser = defineFixture({
-  width: 1000,
+export const competingTitles = defineFixture({
+  width: 620,
   render: () => (
     <TabWidthFixture
-      count={0}
-      browserTabs={[
-        {
-          id: 'browser-0',
-          worktreeId: WORKSPACE_ID,
-          url: 'https://example.com',
-          title: 'A browser page with a long descriptive title',
-          loading: false,
-          faviconUrl: null,
-          canGoBack: false,
-          canGoForward: false,
-          loadError: null,
-          createdAt: 0
-        }
+      count={3}
+      titles={[
+        'A very long conversation title '.repeat(12),
+        'Go',
+        'Another long conversation title '.repeat(3)
       ]}
     />
   )
-})
-
-const audioPreview = buildBrowserPage(
-  'audio-preview',
-  WORKSPACE_ID,
-  '',
-  'HTML preview',
-  undefined,
-  'preview-page',
-  { kind: 'workspace-doc', worktreeId: WORKSPACE_ID, filePath: '/docs/audio.html' }
-)
-const audioBrowser = buildBrowserPage(
-  'audio-browser',
-  WORKSPACE_ID,
-  'https://example.com',
-  'Browser page',
-  undefined,
-  'browser-page'
-)
-
-export const documentAudioProtection = defineFixture({
-  width: 760,
-  store: {
-    browserPagesByWorkspace: { 'audio-preview': [audioPreview], 'audio-browser': [audioBrowser] },
-    browserAudiblePageIds: { 'browser-page': true },
-    browserAudioMutedTabIds: {}
-  },
-  render: () => (
-    <TabWidthFixture
-      count={0}
-      browserTabs={[
-        buildWorkspaceFromPage('audio-preview', WORKSPACE_ID, audioPreview, [audioPreview.id]),
-        buildWorkspaceFromPage('audio-browser', WORKSPACE_ID, audioBrowser, [audioBrowser.id])
-      ]}
-    />
-  )
-})
-
-export const singleFile = defineFixture({
-  width: 1000,
-  render: () => (
-    <TabWidthFixture
-      count={0}
-      editorFiles={[
-        {
-          id: 'file-0',
-          worktreeId: WORKSPACE_ID,
-          filePath: '/tmp/notes.md',
-          relativePath: 'notes.md',
-          language: 'markdown',
-          isDirty: true,
-          mode: 'edit'
-        }
-      ]}
-    />
-  )
-})
-
-export const singleHostedPage = defineFixture({
-  width: 1000,
-  render: () => (
-    <TabWidthFixture
-      count={0}
-      clientHostedBrowserRows={[
-        {
-          browserPageId: 'hosted-0',
-          worktreeId: WORKSPACE_ID,
-          url: 'https://example.com',
-          title: 'A page hosted on a paired device',
-          loading: false,
-          browserHostClientId: 'client-0',
-          hostDeviceName: 'Phone',
-          hostAbsent: false
-        }
-      ]}
-    />
-  )
-})
-
-function NonAgentTabsFixture(): React.JSX.Element {
-  return (
-    <TabWidthFixture
-      count={2}
-      titles={['sh', 'A very long terminal title '.repeat(8)]}
-      agentTabs={false}
-      tabBarOrder={['tab-0', 'browser-0', 'file-0', 'tab-1', 'browser-1', 'file-1']}
-      browserTabs={['Example', 'A very long browser page title '.repeat(8)].map((title, index) => ({
-        id: `browser-${index}`,
-        worktreeId: WORKSPACE_ID,
-        url: 'https://example.com',
-        title,
-        loading: false,
-        faviconUrl: null,
-        canGoBack: false,
-        canGoForward: false,
-        loadError: null,
-        createdAt: 0
-      }))}
-      editorFiles={['notes.md', `${'a-long-file-name-'.repeat(8)}.md`].map((name, index) => ({
-        id: `file-${index}`,
-        worktreeId: WORKSPACE_ID,
-        filePath: `/tmp/${name}`,
-        relativePath: name,
-        language: 'markdown',
-        isDirty: false,
-        mode: 'edit'
-      }))}
-      clientHostedBrowserRows={[
-        {
-          browserPageId: 'hosted-0',
-          worktreeId: WORKSPACE_ID,
-          url: 'https://example.com',
-          title: 'Hosted page',
-          loading: false,
-          browserHostClientId: 'client-0',
-          hostDeviceName: 'Phone',
-          hostAbsent: false
-        }
-      ]}
-    />
-  )
-}
-
-export const nonAgentTabs = defineFixture({
-  width: 1800,
-  render: () => <NonAgentTabsFixture />
-})
-
-export const nonAgentTabsOverflowing = defineFixture({
-  width: 420,
-  render: () => <NonAgentTabsFixture />
-})
-
-export const constrainedFiles = defineFixture({
-  width: 590,
-  render: () => (
-    <TabWidthFixture
-      count={0}
-      editorFiles={['first', 'second'].map((name, index) => ({
-        id: `file-${index}`,
-        worktreeId: WORKSPACE_ID,
-        filePath: `/tmp/${name}-${'long-name-'.repeat(12)}.md`,
-        relativePath: `${name}-${'long-name-'.repeat(12)}.md`,
-        language: 'markdown',
-        isDirty: false,
-        mode: 'edit'
-      }))}
-    />
-  )
-})
-
-function AgentIdentityFixture(): React.JSX.Element {
-  const [agentTabs, setAgentTabs] = useState(false)
-  return (
-    <>
-      <button onClick={() => setAgentTabs(!agentTabs)}>Toggle agent identity</button>
-      <TabWidthFixture count={2} titles={['sh', 'sh']} agentTabs={agentTabs} />
-    </>
-  )
-}
-
-export const agentIdentityChanges = defineFixture({
-  width: 900,
-  render: () => <AgentIdentityFixture />
 })

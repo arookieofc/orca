@@ -1,26 +1,24 @@
 import { OrcaRuntimeWithRunCreateMobileSessionTerminal } from './mobile-terminal-renderer-create'
-import type { TerminalWorkspaceLaunchScope } from '../../orchestration/terminal-authority/structured-sessions/runtime-legacy-worker-terminal-recovery-types'
-import type { WorktreeStartupLaunch } from '../../../../shared/worktree/creation/launch-types'
-import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
+import type { TerminalWorkspaceLaunchScope } from '../../runtime-legacy-worker-terminal-recovery-types'
+import type { WorktreeStartupLaunch } from '../../../../shared/worktree/launch-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
   isResumableTuiAgent,
   normalizeAgentProviderSession,
   type AgentProviderSessionMetadata,
   type SleepingAgentLaunchConfig
-} from '../../../../shared/agent-session/lifecycle/agent-session-resume'
-import { isTuiAgentEnabled } from '../../../../shared/agent-launch/catalog/tui-agent-selection'
-import { buildAgentResumeStartupPlan } from '../../../../shared/agent-launch/startup/tui-agent-resume-startup'
-import { buildAgentStartupPlan } from '../../../../shared/agent-launch/startup/tui-agent-startup'
-import { resolveResumeLaunchRecipe } from '../../../../shared/agent-launch/choices/resume-launch-recipe'
-import { resolveAgentStartupPlanInputs } from '../../../../shared/agent-launch/startup/agent-startup-plan-inputs'
+} from '../../../../shared/agent-session-resume'
+import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
 import {
-  resolveWslHostAgentLaunchInputs,
-  resolveWslHostAgentResumeInputs
-} from './wsl-host-agent-terminal-launch'
+  buildAgentResumeStartupPlan,
+  buildAgentStartupPlan
+} from '../../../../shared/tui-agent-startup'
+import { resolveResumeLaunchRecipe } from '../../../../shared/tui-agent-launch-defaults'
+import { resolveAgentStartupPlanInputs } from '../../../../shared/agent-startup-plan-inputs'
 import {
   agentLaunchQuotingShell,
   type AgentLaunchRuntime
-} from '../../../../shared/agent-launch/startup/agent-launch-runtime'
+} from '../../../../shared/agent-launch-runtime'
 
 export type MobileTerminalCommandOptions = {
   command?: string
@@ -86,18 +84,16 @@ export abstract class OrcaRuntimeWithResolveMobileSessionTerminalCommand extends
     }
     const launchRuntime = this.resolveAgentLaunchRuntime(workspace, record.agent)
     const { launchConfig } = record
-    // Throws WslHostWindowsOnlyAgentError; callers choose refusal or a plain-shell restore.
-    const resumeInputs = resolveWslHostAgentResumeInputs({
+    const startupPlan = buildAgentResumeStartupPlan({
       agent: record.agent,
       providerSession,
       cmdOverrides: settings.agentCmdOverrides ?? {},
-      ...resolveResumeLaunchRecipe(launchConfig, record.agent, providerSession),
+      ...resolveResumeLaunchRecipe(launchConfig),
       platform: launchRuntime.platform,
       shell: agentLaunchQuotingShell(launchRuntime),
       isRemote: Boolean(workspace.connectionId),
       launchCwd: workspace.path
     })
-    const startupPlan = buildAgentResumeStartupPlan(resumeInputs)
     if (!startupPlan) {
       return null
     }
@@ -135,17 +131,15 @@ export abstract class OrcaRuntimeWithResolveMobileSessionTerminalCommand extends
     }
     const launchRuntime = this.resolveAgentLaunchRuntime(workspace, opts.agent)
     const startupPlan = buildAgentStartupPlan({
-      ...resolveWslHostAgentLaunchInputs(
-        resolveAgentStartupPlanInputs({
-          agent: opts.agent,
-          settings,
-          // Quote for the execution host, even when the mobile client runs another OS.
-          platform: launchRuntime.platform,
-          shell: agentLaunchQuotingShell(launchRuntime),
-          // SSH uses relay-shim orca, never the local Linux orca-ide rename.
-          isRemote: Boolean(workspace.connectionId)
-        })
-      ),
+      ...resolveAgentStartupPlanInputs({
+        agent: opts.agent,
+        settings,
+        // Quote for the execution host, even when the mobile client runs another OS.
+        platform: launchRuntime.platform,
+        shell: agentLaunchQuotingShell(launchRuntime),
+        // SSH uses relay-shim orca, never the local Linux orca-ide rename.
+        isRemote: Boolean(workspace.connectionId)
+      }),
       prompt: opts.agentPrompt ?? '',
       allowEmptyPromptLaunch: true
     })

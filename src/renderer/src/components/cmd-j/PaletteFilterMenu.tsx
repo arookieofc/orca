@@ -3,8 +3,7 @@ import { ChevronRight, ListFilter, X } from 'lucide-react'
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useTranslate } from '@/i18n/use-translate'
-import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
+import { translate } from '@/i18n/i18n'
 import type { PaletteFilterModel } from './palette-filter-options'
 import {
   addPaletteFilterValues,
@@ -72,8 +71,6 @@ export default function PaletteFilterMenu({
   onRequestInputFocus: () => void
   portalContainer: HTMLElement | null
 }): React.JSX.Element | null {
-  const t = useTranslate()
-  const languageRevision = useUiLanguageRevision()
   const [open, setOpen] = useState(false)
   const [activeField, setActiveField] = useState<PaletteFilterField | null>(null)
   const [optionQuery, setOptionQuery] = useState('')
@@ -84,7 +81,7 @@ export default function PaletteFilterMenu({
     if (model.hosts.length > 1) {
       entries.push({
         field: 'host',
-        heading: t('worktreeJumpPalette.filter.hosts', 'Hosts'),
+        heading: translate('worktreeJumpPalette.filter.hosts', 'Hosts'),
         options: model.hosts,
         selected: filter.hostIds
       })
@@ -93,14 +90,13 @@ export default function PaletteFilterMenu({
       entries.push({
         field: 'repository',
         // "Projects" is the user-facing term for repository-granular choices; see filter.emptySubtitle.
-        heading: t('worktreeJumpPalette.filter.projects', 'Projects'),
+        heading: translate('worktreeJumpPalette.filter.projects', 'Projects'),
         options: model.repositories,
         selected: filter.repoIds
       })
     }
     return entries
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- translate() reads the UI language implicitly.
-  }, [filter.hostIds, filter.repoIds, model.hosts, model.repositories, languageRevision, t])
+  }, [filter.hostIds, filter.repoIds, model.hosts, model.repositories])
 
   const activeGroup =
     activeField == null ? null : (groups.find((group) => group.field === activeField) ?? null)
@@ -164,12 +160,12 @@ export default function PaletteFilterMenu({
           type="button"
           variant={active ? 'secondary' : 'outline'}
           size="xs"
-          aria-label={t('worktreeJumpPalette.filter.trigger', 'Filter results')}
+          aria-label={translate('worktreeJumpPalette.filter.trigger', 'Filter results')}
           data-active={active ? 'true' : undefined}
           className="ml-2"
         >
           <ListFilter className="size-3.5" aria-hidden="true" />
-          <span>{t('worktreeJumpPalette.filter.label', 'Filter')}</span>
+          <span>{translate('worktreeJumpPalette.filter.label', 'Filter')}</span>
           {active ? (
             <span className="rounded-full bg-primary/85 px-1.5 text-[10px] font-semibold tabular-nums text-primary-foreground">
               {selectionCount}
@@ -211,7 +207,7 @@ export default function PaletteFilterMenu({
         {active ? (
           <div className="flex items-center justify-between border-t border-border/55 px-3 py-2">
             <span className="text-[11px] text-muted-foreground">
-              {t('worktreeJumpPalette.filter.activeCount', '{{value0}} active', {
+              {translate('worktreeJumpPalette.filter.activeCount', '{{value0}} active', {
                 value0: selectionCount
               })}
             </span>
@@ -221,7 +217,7 @@ export default function PaletteFilterMenu({
               className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <X className="size-3" aria-hidden="true" />
-              {t('worktreeJumpPalette.filter.clearAll', 'Clear all')}
+              {translate('worktreeJumpPalette.filter.clearAll', 'Clear all')}
             </button>
           </div>
         ) : null}

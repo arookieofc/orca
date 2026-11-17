@@ -1,37 +1,27 @@
-import type { Repo } from '../../../../shared/repository/repo-types'
-import { applyInheritedProjectGroups } from '../../../../shared/project/groups/project-group-inheritance'
-import { reconcileCatalogRows } from '../../../../shared/collections/catalog-row-reconcile'
-import { getRepoRowIdentity } from './repo-host-identity'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host/execution-host'
+import type { Repo } from '../../../../shared/repo-types'
+import { applyInheritedProjectGroups } from '../../../../shared/project-group-inheritance'
+import { reconcileFetchedRepos } from '../slices/repo-identity-reconcile'
+import { getRepoHostIdentity } from '../slices/repo-host-identity'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import type { RepoSlice } from './repo-state'
-import { mergeFetchedProjectCompatibilityForHost } from '../../../../shared/project/catalog/project-compatibility-host-merge'
-import { projectCompatibilityFromRepos } from '../../../../shared/project/catalog/project-compatibility-merge'
-import { mergeByIdentity } from '../../lib/catalog-reconciliation/catalog-identity'
-import { isSavedHostCatalogRow } from './saved-host-catalog-rows'
+import { mergeFetchedProjectCompatibilityForHost } from '../../../../shared/project-compatibility-host-merge'
+import { projectCompatibilityFromRepos } from '../../../../shared/project-compatibility-merge'
+import { mergeByIdentity } from '../catalog-identity'
 
 export function mergeFetchedReposForHost(
   previous: readonly Repo[],
   fetched: readonly Repo[],
-  hostId: string,
-  /** The rows when the request went out; omitted, every row of the host is the answer's to drop. */
-  reposAtRequest?: readonly Repo[]
+  hostId: string
 ): readonly Repo[] {
   const fetchedWithProjectGroups = applyInheritedProjectGroups(previous, fetched)
-  const fetchedIdentities = new Set(fetchedWithProjectGroups.map(getRepoRowIdentity))
-  const requested = reposAtRequest ? new Set(reposAtRequest.map(getRepoRowIdentity)) : null
+  const fetchedIdentities = new Set(fetchedWithProjectGroups.map(getRepoHostIdentity))
   const preserved = previous.filter((repo) => {
-    const identity = getRepoRowIdentity(repo)
-    return (
-      getRepoExecutionHostId(repo) !== hostId ||
-      fetchedIdentities.has(identity) ||
-      // Added after the request: an answer that predates it cannot drop it.
-      (requested !== null && !requested.has(identity) && !isSavedHostCatalogRow(repo))
-    )
+    const existingHostId = getRepoExecutionHostId(repo)
+    return existingHostId !== hostId || fetchedIdentities.has(getRepoHostIdentity(repo))
   })
-  return reconcileCatalogRows(
+  return reconcileFetchedRepos(
     previous,
-    mergeByIdentity(preserved, fetchedWithProjectGroups, getRepoRowIdentity),
-    getRepoRowIdentity
+    mergeByIdentity(preserved, fetchedWithProjectGroups, getRepoHostIdentity)
   )
 }
 
@@ -40,14 +30,18 @@ export function mergeProjectCompatibilityForHostRepoChange({
   nextRepos,
   hostId
 }: {
-  previous: Pick<RepoSlice, 'projects' | 'projectHostSetups'>
+  previous: Pick<RepoSlice, 'endpointProjects' | 'endpointProjectHostSetups'>
   nextRepos: readonly Repo[]
   hostId: string
-}): Pick<RepoSlice, 'projects' | 'projectHostSetups'> {
-  return mergeFetchedProjectCompatibilityForHost({
-    previous,
+}): Pick<RepoSlice, 'endpointProjects' | 'endpointProjectHostSetups'> {
+  const merged = mergeFetchedProjectCompatibilityForHost({
+    previous: {
+      projects: previous.endpointProjects,
+      projectHostSetups: previous.endpointProjectHostSetups
+    },
     fetched: projectCompatibilityFromRepos(nextRepos),
     repos: nextRepos,
     hostId
   })
+  return { endpointProjects: merged.projects, endpointProjectHostSetups: merged.projectHostSetups }
 }

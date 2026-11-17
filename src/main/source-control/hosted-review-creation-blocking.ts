@@ -3,7 +3,7 @@ import type {
   HostedReviewCreationBlockedReason,
   HostedReviewCreationEligibility,
   HostedReviewProvider
-} from '../../shared/source-control/hosted-review/hosted-review-contracts'
+} from '../../shared/hosted-review'
 import { reviewCopy } from './hosted-review-creation-provider'
 
 function blockedCreateResultForReason(
@@ -17,63 +17,52 @@ function blockedCreateResultForReason(
     auth_required: {
       ok: false,
       code: 'auth_required',
-      error: `Create ${copy.shortLabel} failed: ${copy.providerName} is not authenticated. Next step: ${copy.authInstruction} in this environment.`,
-      reason: 'auth_required'
+      error: `Create ${copy.shortLabel} failed: ${copy.providerName} is not authenticated. Next step: ${copy.authInstruction} in this environment.`
     },
     unsupported_provider: {
       ok: false,
       code: 'unsupported_provider',
-      error: `Creating ${copy.reviewLabel}s requires a ${copy.providerName} remote.`,
-      reason: 'unsupported_provider'
+      error: `Creating ${copy.reviewLabel}s requires a ${copy.providerName} remote.`
     },
     dirty: {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: commit or discard local changes before creating a ${copy.reviewLabel}.`,
-      reason: 'dirty'
+      error: `Create ${copy.shortLabel} failed: commit or discard local changes before creating a ${copy.reviewLabel}.`
     },
     detached_head: {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: switch to a branch before creating a ${copy.reviewLabel}.`,
-      reason: 'detached_head'
+      error: `Create ${copy.shortLabel} failed: switch to a branch before creating a ${copy.reviewLabel}.`
     },
     default_branch: {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: choose a feature branch before creating a ${copy.reviewLabel}.`,
-      reason: 'default_branch'
+      error: `Create ${copy.shortLabel} failed: choose a feature branch before creating a ${copy.reviewLabel}.`
     },
     no_upstream: {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: publish this branch before creating a ${copy.reviewLabel}.`,
-      reason: 'no_upstream'
+      error: `Create ${copy.shortLabel} failed: publish this branch before creating a ${copy.reviewLabel}.`
     },
     needs_push: {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: push this branch before creating a ${copy.reviewLabel}.`,
-      reason: 'needs_push'
+      error: `Create ${copy.shortLabel} failed: push this branch before creating a ${copy.reviewLabel}.`
     },
     needs_sync: {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: sync this branch before creating a ${copy.reviewLabel}.`,
-      reason: 'needs_sync'
+      error: `Create ${copy.shortLabel} failed: sync this branch before creating a ${copy.reviewLabel}.`
     },
     fork_head_unsupported: {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: refresh source control status and try again.`,
-      reason: 'fork_head_unsupported'
+      error: `Create ${copy.shortLabel} failed: refresh source control status and try again.`
     },
     base_not_on_remote: {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: the base branch ${baseLabel}hasn't been pushed to the remote. Choose a pushed base or push it first.`,
-      reason: 'base_not_on_remote',
-      ...(submittedBase?.trim() ? { base: submittedBase.trim() } : {})
+      error: `Create ${copy.shortLabel} failed: the base branch ${baseLabel}hasn't been pushed to the remote. Choose a pushed base or push it first.`
     }
   } satisfies Partial<
     Record<NonNullable<HostedReviewCreationBlockedReason>, CreateHostedReviewResult>
@@ -94,7 +83,6 @@ export function blockedEligibilityToCreateResult(
       ok: false,
       code: 'already_exists',
       error: `A ${copy.reviewLabel} already exists for this branch.`,
-      reason: 'existing_review',
       existingReview: eligibility.review
     }
   }
@@ -109,7 +97,6 @@ export function blockedEligibilityToCreateResult(
   return {
     ok: false,
     code: 'validation',
-    error: `Create ${copy.shortLabel} failed: refresh source control status and try again.`,
-    reason: 'branch_status_unverified'
+    error: `Create ${copy.shortLabel} failed: refresh source control status and try again.`
   }
 }

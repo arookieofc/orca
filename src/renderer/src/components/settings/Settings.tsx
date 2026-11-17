@@ -1,19 +1,14 @@
-import { useSettingsStoreModel } from './page/use-settings-store-model'
-import { useSettingsInteractionController } from './page/use-settings-interaction-controller'
-import { useSettingsPageEffects } from './page/use-settings-page-effects'
-import { useSettingsNavigationModel } from './navigation/use-settings-navigation-model'
-import { useSettingsTerminalModel } from './page/use-settings-terminal-model'
-import { useSettingsRepoScrollEffects } from './navigation/use-settings-repo-scroll-effects'
-import { buildSettingsViewModel, useSettingsNavigationActions } from './page/settings-view-model'
-import { renderSettingsLoading, renderSettingsPage } from './page/settings-page-renderer'
-import type {
-  LoadedSettingsStoreModel,
-  SettingsRenderContext
-} from './page/settings-render-context'
-import { useTranslate } from '../../i18n/use-translate'
+import { useSettingsStoreModel } from './use-settings-store-model'
+import { useSettingsInteractionController } from './use-settings-interaction-controller'
+import { useSettingsPageEffects } from './use-settings-page-effects'
+import { useSettingsNavigationModel } from './use-settings-navigation-model'
+import { useSettingsTerminalModel } from './use-settings-terminal-model'
+import { useSettingsRepoScrollEffects } from './use-settings-repo-scroll-effects'
+import { buildSettingsViewModel, useSettingsNavigationActions } from './settings-view-model'
+import { renderSettingsLoading, renderSettingsPage } from './settings-page-renderer'
+import type { LoadedSettingsStoreModel, SettingsRenderContext } from './settings-render-context'
 
 function Settings(): React.JSX.Element {
-  const t = useTranslate()
   const model = useSettingsStoreModel()
   const interactions = useSettingsInteractionController(model)
   useSettingsPageEffects(model, interactions)
@@ -23,10 +18,10 @@ function Settings(): React.JSX.Element {
   const actions = useSettingsNavigationActions(model, interactions)
 
   if (!model.settings) {
-    return renderSettingsLoading(interactions, t)
+    return renderSettingsLoading(interactions)
   }
 
-  const view = buildSettingsViewModel(model, navigation, t)
+  const view = buildSettingsViewModel(model, navigation)
   const context: SettingsRenderContext = {
     model: model as LoadedSettingsStoreModel,
     interactions,
@@ -35,7 +30,7 @@ function Settings(): React.JSX.Element {
     actions,
     view
   }
-  return renderSettingsPage(context, t)
+  return renderSettingsPage(context)
 }
 
 export default Settings

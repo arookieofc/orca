@@ -1,13 +1,10 @@
-import { resolveSourceControlAiEnabled } from '../../../../../../shared/source-control/ai/source-control-ai-operation-policy'
-import { useAppStore } from '@/store'
 import { useCallback, useEffect } from 'react'
-import { shouldHydratePullRequestGenerationResult } from '@/store/slices/hosted-review/generation/pull-request-generation'
+import { shouldHydratePullRequestGenerationResult } from '@/store/slices/pull-request-generation'
 import { hasConfiguredSourceControlTextGenerationDefaults } from '../ai/text-generation-defaults'
 import type { SourceControlAi } from '../ai/use-ai'
-import { useCreatePullRequestDialogFields } from '../../hosted-review/creation/useCreatePullRequestDialogFields'
-import { useHostedReviewStackParent } from '../../hosted-review/provider-actions/useHostedReviewStackParent'
+import { useCreatePullRequestDialogFields } from '../../useCreatePullRequestDialogFields'
+import { useHostedReviewStackParent } from '../../useHostedReviewStackParent'
 import type { SourceControlStoreActions } from '../listing/use-store-actions'
-import { useSourceControlSectionActive } from '../panel/worktree-scope'
 import type { SourceControlWorktreeContext } from '../listing/use-worktree-context'
 import type { SourceControlHostedReviewState } from './use-hosted-review-state'
 import type { SourceControlPullRequestGeneration } from './use-pull-request-generation'
@@ -61,16 +58,12 @@ export function useSourceControlCreateReviewComposer({
   updatePullRequestGenerationRecord: SourceControlStoreActions['updatePullRequestGenerationRecord']
   worktreePath: string | null
 }) {
-  const sectionActive = useSourceControlSectionActive()
   const {
     aiGenerationEnabled: prAiGenerationEnabled,
     base: prBase,
     setBase: setPrBase,
     title: prTitle,
     setTitle: setPrTitle,
-    imageUploadPending: prImageUploadPending,
-    imageUploadPendingRef: prImageUploadPendingRef,
-    onImageUploadPending: onPrImageUploadPending,
     body: prBody,
     setBody: setPrBody,
     draft: prDraft,
@@ -127,7 +120,7 @@ export function useSourceControlCreateReviewComposer({
     }
   })
   const stackParentReview = useHostedReviewStackParent({
-    enabled: sectionActive && hostedReviewCreateProvider === 'github' && prStackedCreationSupported,
+    enabled: hostedReviewCreateProvider === 'github' && prStackedCreationSupported,
     repoPath: activeRepo?.path ?? '',
     repoId: activeRepo?.id ?? null,
     base: prBase,
@@ -138,17 +131,13 @@ export function useSourceControlCreateReviewComposer({
   })
 
   const handleGeneratePullRequestFieldsClick = useCallback((): void => {
-    const currentSettings = useAppStore.getState().settings
-    if (
-      !currentSettings ||
-      !resolveSourceControlAiEnabled({ settings: currentSettings, repo: activeRepo })
-    ) {
+    if (!sourceControlAiActionsVisible) {
       return
     }
     if (
       hasConfiguredSourceControlTextGenerationDefaults({
         actionId: 'pullRequest',
-        settings: useAppStore.getState().settings,
+        settings,
         repo: activeRepo ?? null
       })
     ) {
@@ -156,7 +145,13 @@ export function useSourceControlCreateReviewComposer({
       return
     }
     openPullRequestGenerationDialog()
-  }, [activeRepo, handleGeneratePullRequestFields, openPullRequestGenerationDialog])
+  }, [
+    activeRepo,
+    handleGeneratePullRequestFields,
+    openPullRequestGenerationDialog,
+    settings,
+    sourceControlAiActionsVisible
+  ])
 
   useEffect(() => {
     // Hydrate after the fields hook seeds defaults on remount, or those defaults overwrite generation.
@@ -210,9 +205,6 @@ export function useSourceControlCreateReviewComposer({
     prBaseResults,
     prBaseSearchError,
     prBaseSearchPending,
-    prImageUploadPending,
-    prImageUploadPendingRef,
-    onPrImageUploadPending,
     prBody,
     prDraft,
     prFieldRevisions,

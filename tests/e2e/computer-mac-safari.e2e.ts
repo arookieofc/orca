@@ -3,7 +3,7 @@ import type {
   ComputerActionResult,
   ComputerListWindowsResult,
   ComputerSnapshotResult
-} from '../../src/shared/computer/computer-use-runtime-types'
+} from '../../src/shared/runtime-types'
 import {
   closeSafariDraftFixture,
   ensureOrcaRuntimeLaunched,
@@ -46,6 +46,7 @@ describe.skipIf(!isMac || !e2eOptIn)('computer-use macOS e2e (Safari web app)', 
       ).stdout
     )
     expect(state.result.snapshot.window.title).toContain(fixture.title)
+    expect(state.result.snapshot.treeText).toContain('Draft empty')
 
     const recipientIndex = findRoleIndex(
       state.result.snapshot.treeText,
@@ -83,9 +84,10 @@ describe.skipIf(!isMac || !e2eOptIn)('computer-use macOS e2e (Safari web app)', 
         ])
       ).stdout
     )
-    expect(recipientPaste.result.action?.verification).toEqual({
+    expect(recipientPaste.result.action?.verification).toMatchObject({
       state: 'verified',
-      property: 'focusedText'
+      property: 'focusedText',
+      expected: recipient
     })
 
     state = parseJsonOutput<{ result: ComputerSnapshotResult }>(
@@ -104,6 +106,8 @@ describe.skipIf(!isMac || !e2eOptIn)('computer-use macOS e2e (Safari web app)', 
         ])
       ).stdout
     )
+    expect(state.result.snapshot.treeText).toContain('focused UI element is')
+    expect(state.result.snapshot.treeText).toContain('Body')
 
     const body = `hello browser draft ${Date.now()}`
     const bodyPaste = parseJsonOutput<{ result: ComputerActionResult }>(
@@ -122,9 +126,10 @@ describe.skipIf(!isMac || !e2eOptIn)('computer-use macOS e2e (Safari web app)', 
         ])
       ).stdout
     )
-    expect(bodyPaste.result.action?.verification).toEqual({
+    expect(bodyPaste.result.action?.verification).toMatchObject({
       state: 'verified',
-      property: 'focusedText'
+      property: 'focusedText',
+      expected: body
     })
 
     state = parseJsonOutput<{ result: ComputerSnapshotResult }>(
@@ -180,6 +185,7 @@ describe.skipIf(!isMac || !e2eOptIn)('computer-use macOS e2e (Safari web app)', 
         ])
       ).stdout
     )
+    expect(before.result.snapshot.treeText).toContain('Middle click waiting')
 
     const receiverIndex = findRoleIndex(
       before.result.snapshot.treeText,

@@ -12,11 +12,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatRelativeTime } from '@/components/github/work-item-state-presentation'
-import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
-import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
+import { translate } from '@/i18n/i18n'
+import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
 import { WorkItemIssueSourceIndicator } from './work-item-issue-source-indicator'
 import { WorkItemStateBadge } from '../load-item-details/work-item-state-badge'
-import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 
 export function GitHubItemDialogPRHeader({
   workItem,
@@ -43,8 +42,6 @@ export function GitHubItemDialogPRHeader({
   setLinkCopyButtonRef: (node: HTMLButtonElement | null) => void
   handleCopyWorkItemLink: () => Promise<void>
 }): React.JSX.Element {
-  const t = useTranslate()
-  const intlLocale = useIntlLocale()
   const Icon = workItem.type === 'pr' ? GitPullRequest : CircleDot
 
   return (
@@ -70,8 +67,8 @@ export function GitHubItemDialogPRHeader({
             <span className="font-mono">#{workItem.number}</span>
             <span>
               {workItem.type === 'pr'
-                ? t('auto.components.GitHubItemDialog.a2495e4784', 'Pull request')
-                : t('auto.components.GitHubItemDialog.3e544d966d', 'Issue')}
+                ? translate('auto.components.GitHubItemDialog.a2495e4784', 'Pull request')
+                : translate('auto.components.GitHubItemDialog.3e544d966d', 'Issue')}
             </span>
           </div>
           <h2 className="text-[15px] font-semibold leading-snug text-foreground">
@@ -79,12 +76,12 @@ export function GitHubItemDialogPRHeader({
           </h2>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
             <span>
-              {workItem.author ?? t('auto.components.GitHubItemDialog.773ff70035', 'unknown')}
+              {workItem.author ??
+                translate('auto.components.GitHubItemDialog.773ff70035', 'unknown')}
             </span>
             <span>
-              {t('auto.components.GitHubItemDialog.updatedRelativeTime', 'updated {{time}}', {
-                time: formatRelativeTime(workItem.updatedAt, intlLocale)
-              })}
+              {translate('auto.components.GitHubItemDialog.8223320f8d', 'updated')}{' '}
+              {formatRelativeTime(workItem.updatedAt)}
             </span>
             {workItem.branchName && (
               <span className="max-w-full truncate rounded-md border border-border/50 bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
@@ -113,12 +110,12 @@ export function GitHubItemDialogPRHeader({
               size="sm"
               onClick={() => onUse(workItem)}
               className="gap-1.5 whitespace-nowrap"
-              aria-label={t(
+              aria-label={translate(
                 'auto.components.GitHubItemDialog.0caac1a18f',
                 'Start workspace from PR'
               )}
             >
-              {t('auto.components.GitHubItemDialog.0caac1a18f', 'Start workspace from PR')}
+              {translate('auto.components.GitHubItemDialog.0caac1a18f', 'Start workspace from PR')}
               <ArrowRight className="size-3.5" />
             </Button>
           )}
@@ -130,7 +127,10 @@ export function GitHubItemDialogPRHeader({
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => void handleCopyWorkItemLink()}
-                aria-label={t('auto.components.GitHubItemDialog.c43fe79ee0', 'Copy GitHub link')}
+                aria-label={translate(
+                  'auto.components.GitHubItemDialog.c43fe79ee0',
+                  'Copy GitHub link'
+                )}
               >
                 {linkCopied ? (
                   <Check className="size-4 text-emerald-500" />
@@ -141,8 +141,8 @@ export function GitHubItemDialogPRHeader({
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
               {linkCopied
-                ? t('auto.components.GitHubItemDialog.038b3d39b1', 'Copied')
-                : t('auto.components.GitHubItemDialog.c43fe79ee0', 'Copy GitHub link')}
+                ? translate('auto.components.GitHubItemDialog.038b3d39b1', 'Copied')
+                : translate('auto.components.GitHubItemDialog.c43fe79ee0', 'Copy GitHub link')}
             </TooltipContent>
           </Tooltip>
           <Tooltip>
@@ -150,14 +150,17 @@ export function GitHubItemDialogPRHeader({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                onClick={(event) => openAppHttpLink(workItem.url, { event })}
-                aria-label={t('auto.components.GitHubItemDialog.3fdf777817', 'Open on GitHub')}
+                onClick={() => window.api.shell.openUrl(workItem.url)}
+                aria-label={translate(
+                  'auto.components.GitHubItemDialog.3fdf777817',
+                  'Open on GitHub'
+                )}
               >
                 <ExternalLink className="size-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              {t('auto.components.GitHubItemDialog.3fdf777817', 'Open on GitHub')}
+              {translate('auto.components.GitHubItemDialog.3fdf777817', 'Open on GitHub')}
             </TooltipContent>
           </Tooltip>
         </div>

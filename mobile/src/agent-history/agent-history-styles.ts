@@ -1,13 +1,7 @@
 import { StyleSheet } from 'react-native'
-import {
-  LIST_LEADING_INSET,
-  LIST_LEADING_SLOT,
-  LIST_ROW_PADDING
-} from '../components/list/ListGroup'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
-import { themedStyleSheet } from '../theme/themed-styles'
 
-export const styles = themedStyleSheet(() => ({
+export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgBase
@@ -15,105 +9,169 @@ export const styles = themedStyleSheet(() => ({
   header: {
     backgroundColor: colors.bgBase
   },
-  scopeTabs: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    backgroundColor: colors.bgPanel
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: LIST_LEADING_INSET,
-    backgroundColor: colors.borderSubtle
-  },
-  row: {
+  topBar: {
     flexDirection: 'row',
-    gap: spacing.md,
-    paddingHorizontal: LIST_ROW_PADDING,
-    paddingVertical: spacing.md
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle
   },
-  rowPressed: {
+  backButton: {
+    padding: spacing.xs,
+    borderRadius: radii.button
+  },
+  backButtonPressed: {
     backgroundColor: colors.bgRaised
   },
-  leading: {
-    width: LIST_LEADING_SLOT,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  main: {
+  titleBlock: {
     flex: 1,
-    minWidth: 0,
-    gap: 3
+    marginHorizontal: spacing.sm
   },
-  titleRow: {
+  title: {
+    color: colors.textPrimary,
+    fontSize: typography.titleSize,
+    fontWeight: '600'
+  },
+  meta: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize
+  },
+  refreshButton: {
+    padding: spacing.xs,
+    borderRadius: radii.button
+  },
+  refreshButtonPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  scopeTabs: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    gap: spacing.xs
+  },
+  scopeTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: radii.button,
+    backgroundColor: colors.bgPanel
+  },
+  scopeTabActive: {
+    backgroundColor: colors.bgRaised
+  },
+  scopeTabText: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySize
+  },
+  scopeTabTextActive: {
+    color: colors.textPrimary,
+    fontWeight: '600'
+  },
+  searchRow: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm
+  },
+  searchInput: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: radii.input,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    color: colors.textPrimary,
+    fontSize: typography.bodySize
+  },
+  list: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    gap: spacing.sm
+  },
+  groupHeaderText: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize,
+    fontWeight: '600',
+    textTransform: 'uppercase'
+  },
+  groupHeaderCount: {
+    color: colors.textMuted,
+    fontSize: typography.metaSize
+  },
+  card: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: radii.card,
+    padding: spacing.md,
+    marginBottom: spacing.sm
+  },
+  cardPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm
   },
-  title: {
+  cardTitle: {
     flex: 1,
-    minWidth: 0,
     color: colors.textPrimary,
-    fontSize: 15,
-    lineHeight: 18,
+    fontSize: typography.bodySize,
     fontWeight: '600'
   },
-  timeAgo: {
+  cardTimeAgo: {
     color: colors.textMuted,
-    fontSize: typography.metaSize,
-    fontVariant: ['tabular-nums']
+    fontSize: typography.metaSize
   },
-  lastMessage: {
+  cardLastMessage: {
     color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 16
+    fontSize: typography.metaSize,
+    marginTop: spacing.xs
   },
-  metaRow: {
+  cardMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing.sm,
-    marginTop: 1
+    marginTop: spacing.xs
   },
-  metaText: {
-    flexShrink: 1,
-    minWidth: 0,
+  cardMetaText: {
     color: colors.textMuted,
-    fontSize: typography.metaSize,
-    lineHeight: 16,
-    fontVariant: ['tabular-nums']
+    fontSize: typography.metaSize
   },
   currentBadge: {
-    flexShrink: 1,
     backgroundColor: colors.bgRaised,
-    borderRadius: radii.pill,
-    paddingHorizontal: 6,
-    paddingVertical: 1
+    borderRadius: radii.button,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2
   },
   currentBadgeText: {
     color: colors.accentBlue,
-    fontSize: 11,
+    fontSize: typography.metaSize,
     fontWeight: '600'
   },
-  // A round play button beside the text, so it never crowds the lines.
   resumeButton: {
-    alignSelf: 'center',
-    width: 34,
-    height: 34,
+    minHeight: 28,
+    minWidth: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radii.pill,
-    backgroundColor: colors.bgRaised
+    marginLeft: 'auto',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.button
   },
   resumeButtonPressed: {
-    opacity: 0.7
+    opacity: 0.78
   },
   resumeButtonDisabled: {
     opacity: 0.45
   },
   preview: {
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 1,
     borderTopColor: colors.borderSubtle,
     gap: spacing.sm
   },
@@ -123,11 +181,62 @@ export const styles = themedStyleSheet(() => ({
   previewRole: {
     color: colors.textMuted,
     fontSize: typography.metaSize,
-    fontWeight: '600'
+    fontWeight: '600',
+    textTransform: 'uppercase'
   },
   previewText: {
     color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 17
+    fontSize: typography.metaSize
+  },
+  noticeBanner: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radii.input,
+    backgroundColor: colors.bgPanel
+  },
+  noticeText: {
+    color: colors.statusAmber,
+    fontSize: typography.metaSize
+  },
+  resumeBanner: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radii.input,
+    backgroundColor: colors.bgPanel
+  },
+  resumeBannerText: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize
+  },
+  state: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: spacing.sm
+  },
+  stateTitle: {
+    color: colors.textPrimary,
+    fontSize: typography.bodySize,
+    fontWeight: '600'
+  },
+  stateText: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize,
+    textAlign: 'center'
+  },
+  retryButton: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.button,
+    backgroundColor: colors.bgRaised
+  },
+  retryText: {
+    color: colors.textPrimary,
+    fontSize: typography.bodySize,
+    fontWeight: '600'
   }
-}))
+})

@@ -1,14 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
-import './runtime-test-module-registration.spec'
-import { OrcaRuntimeService } from '../orca-runtime'
+import { OrcaRuntimeService } from '../orca-runtime-test-mocks.spec'
 import {
   HEADLESS_LEAF_ID,
   TEST_WORKTREE_ID,
   makeHeadlessTerminalLayout,
   makeRuntimeStoreWithWorkspaceSession,
   makeWorkspaceSessionWithHeadlessTerminal
-} from './orca-runtime-test-fixtures.spec'
-import { getRuntimeBrowserPageRegistry } from '../browser/client-pages/runtime-browser-page-registry'
+} from '../orca-runtime-test-fixtures.spec'
+import { getRuntimeBrowserPageRegistry } from '../runtime-browser-page-registry'
 
 // #25900: empty windowless snapshots hid persisted live agents and stranded clients on Reconnecting.
 

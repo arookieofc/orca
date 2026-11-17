@@ -1,13 +1,13 @@
 import { BrowserWindow, ipcMain } from 'electron'
-import type { MemorySnapshot } from '../../shared/diagnostics/process-stats-types'
-import type { Store } from '../persistence/loading-store/store'
+import type { MemorySnapshot } from '../../shared/process-stats-types'
+import type { Store } from '../persistence'
 import { collectMemorySnapshot } from '../memory/collector'
 
 import {
   assertResourceViewVisible,
   isResourceWindowVisible
-} from '../window/visibility/resource-view-admission'
-import type { ResourceViewAdmission } from '../../shared/diagnostics/resource-view-admission'
+} from '../window/resource-view-admission'
+import type { ResourceViewAdmission } from '../../shared/resource-view-admission'
 
 export function registerMemoryHandlers(store: Store): void {
   ipcMain.handle(

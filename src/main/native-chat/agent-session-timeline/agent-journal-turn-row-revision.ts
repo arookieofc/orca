@@ -1,4 +1,4 @@
-// The writer resolves revisions at its write position; each producer preserves fields it does not own.
+// Resolve revisions from journal state at execution; each writer preserves fields it does not own.
 
 import {
   MAX_CONTEXT_CATEGORIES,
@@ -6,24 +6,23 @@ import {
   MAX_CONTEXT_MODEL_ID_CHARS,
   type AgentSessionContextUsage,
   type AgentSessionContextWindow
-} from '../../../shared/agent-session/conversation-context/agent-session-context-usage'
+} from '../../../shared/agent-session-context-usage'
 import {
   agentJournalItemKey,
   parseAgentJournalItemKey
-} from '../../../shared/agent-session/journal/agent-session-journal-item-key'
+} from '../../../shared/agent-session-journal-item-key'
 import {
   AGENT_JOURNAL_THREAD_SCOPE,
+  type AgentJournalItemIdentity,
   type AgentJournalTurnItem
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentJournalItemIdentity } from '../../../shared/agent-session/journal/agent-session-journal-identity'
-import { estimateStructuredAgentSessionItemBytes } from '../agent-session-wire/journal-ingress/structured-agent-session-event-sink-estimate'
+} from '../../../shared/agent-session-journal-types'
+import { readAgentJournalTurn } from '../../../shared/agent-session-turn-record'
+import { estimateStructuredAgentSessionItemBytes } from '../agent-session-wire/structured-agent-session-event-sink-estimate'
 import type {
   StructuredAgentSessionEventSink,
+  StructuredAgentSessionRevisionJournal,
   StructuredAgentSessionRevisionOptions
-} from '../agent-session-wire/journal-ingress/structured-agent-session-event-sink'
-import type { JournalTimelineView } from '../agent-session-journal/writing/journal-timeline-view'
-
-type TurnRowView = Pick<JournalTimelineView, 'itemBody' | 'newestTurn' | 'contextWindowHeld'>
+} from '../agent-session-wire/structured-agent-session-event-sink'
 
 export type AgentJournalTurnRowTarget = { identity: AgentJournalItemIdentity } | { newest: true }
 
@@ -108,28 +107,37 @@ function withoutLifecycle(turn: AgentJournalTurnItem) {
 }
 
 function withFallbackWindow(
-  view: TurnRowView,
+  journal: StructuredAgentSessionRevisionJournal,
   { windowIfNoneHeld, ...write }: AgentJournalTurnRowWrite
 ): AgentJournalTurnRowWrite {
   if (!windowIfNoneHeld || write.contextUsage?.window) {
     return write
   }
-  return view.contextWindowHeld()
+  let held = false
+  journal.visitItems((_itemId, _sequence, body) => {
+    held ||= readAgentJournalTurn(body)?.contextUsage?.window !== undefined
+  })
+  return held
     ? write
     : { ...write, contextUsage: { ...write.contextUsage, window: windowIfNoneHeld } }
 }
 
 function findTurnRow(
-  view: TurnRowView,
+  journal: StructuredAgentSessionRevisionJournal,
   target: AgentJournalTurnRowTarget
 ): { itemId: string; body: AgentJournalTurnItem } | null {
   if ('identity' in target) {
     const itemId = agentJournalItemKey(target.identity)
-    const body = view.itemBody(itemId)
+    const body = journal.itemBody(itemId)
     return body?.kind === 'turn' ? { itemId, body } : null
   }
-  const newest = view.newestTurn()
-  return newest?.body.kind === 'turn' ? { itemId: newest.itemId, body: newest.body } : null
+  let found: { itemId: string; sequence: number; body: AgentJournalTurnItem } | null = null
+  journal.visitItems((itemId, sequence, body) => {
+    if (body.kind === 'turn' && (found === null || sequence >= found.sequence)) {
+      found = { itemId, sequence, body }
+    }
+  })
+  return found
 }
 
 export type AgentJournalTurnRowDelivery = {
@@ -150,20 +158,20 @@ export function agentJournalTurnRowReservedBytes(
   )
 }
 
-/** Resolve at the write position; null writes nothing. */
+/** Resolve against current journal state; null writes nothing. */
 export function resolveAgentJournalTurnRowWrite(
-  view: TurnRowView,
+  journal: StructuredAgentSessionRevisionJournal,
   target: AgentJournalTurnRowTarget,
   write: AgentJournalTurnRowWrite,
   reservedBytes: number
 ): { identity: AgentJournalItemIdentity; body: AgentJournalTurnItem } | null {
   const known = 'identity' in target ? target.identity : null
-  const row = findTurnRow(view, target)
+  const row = findTurnRow(journal, target)
   if (write.onlyWhileRunning && row && row.body.state !== 'running') {
     return null
   }
   const identity = known ?? (row ? parseAgentJournalItemKey(row.itemId) : null)
-  const body = reviseTurnBody(row?.body ?? null, withFallbackWindow(view, write))
+  const body = reviseTurnBody(row?.body ?? null, withFallbackWindow(journal, write))
   if (!identity || !body) {
     return null
   }
@@ -194,5 +202,10 @@ export function writeAgentJournalTurnRow(
     return
   }
   const reservedBytes = agentJournalTurnRowReservedBytes(target, write)
-  revise.call(sink, reservedBytes, { kind: 'turn-row', target, write }, options)
+  revise.call(
+    sink,
+    reservedBytes,
+    (journal) => resolveAgentJournalTurnRowWrite(journal, target, write, reservedBytes),
+    options
+  )
 }

@@ -1,7 +1,7 @@
+import { StyleSheet } from 'react-native'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
-import { themedStyleSheet } from '../theme/themed-styles'
 
-export const mobileOnboardingStyles = themedStyleSheet(() => ({
+export const mobileOnboardingStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgBase
@@ -29,7 +29,7 @@ export const mobileOnboardingStyles = themedStyleSheet(() => ({
   progressDot: {
     width: 7,
     height: 7,
-    borderRadius: radii.pill,
+    borderRadius: 999,
     backgroundColor: colors.borderSubtle
   },
   progressDotActive: {
@@ -66,7 +66,7 @@ export const mobileOnboardingStyles = themedStyleSheet(() => ({
   iconSurface: {
     width: 64,
     height: 64,
-    borderRadius: radii.tile,
+    borderRadius: radii.card,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bgRaised,
@@ -105,7 +105,7 @@ export const mobileOnboardingStyles = themedStyleSheet(() => ({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radii.control,
+    borderRadius: radii.button,
     backgroundColor: colors.surfaceBright,
     paddingVertical: spacing.sm
   },
@@ -118,7 +118,7 @@ export const mobileOnboardingStyles = themedStyleSheet(() => ({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radii.control,
+    borderRadius: radii.button,
     marginTop: spacing.xs,
     paddingVertical: spacing.sm
   },
@@ -140,4 +140,4 @@ export const mobileOnboardingStyles = themedStyleSheet(() => ({
     textAlign: 'center',
     marginBottom: spacing.sm
   }
-}))
+})

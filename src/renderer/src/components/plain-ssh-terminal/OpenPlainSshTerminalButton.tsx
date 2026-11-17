@@ -1,6 +1,6 @@
-import type { SshManagedServerStatus } from '../../../../shared/remote-runtime/ssh/ssh-types'
-import { isSshHostMoveBlocked } from '../../../../shared/remote-runtime/ssh/ssh-host-move-blocked'
-import { useTranslate } from '@/i18n/use-translate'
+import type { SshManagedServerStatus } from '../../../../shared/ssh-types'
+import { isSshHostMoveBlocked } from '../../../../shared/ssh-host-move-blocked'
+import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
 import { showPlainSshPanel } from '@/ssh/plain-ssh-terminal-panels'
 
@@ -16,7 +16,6 @@ export function OpenPlainSshTerminalButton({
   status: SshManagedServerStatus | undefined
   ownerEnvironmentId?: string | null
 }): React.JSX.Element | null {
-  const t = useTranslate()
   if (ownerEnvironmentId || !isSshHostMoveBlocked(status) || !window.api.plainSsh) {
     return null
   }
@@ -28,10 +27,10 @@ export function OpenPlainSshTerminalButton({
         variant="outline"
         onClick={() => showPlainSshPanel(targetId, targetLabel)}
       >
-        {t('auto.components.plainSshTerminal.open', 'Open plain SSH terminal')}
+        {translate('auto.components.plainSshTerminal.open', 'Open plain SSH terminal')}
       </Button>
       <span className="text-xs text-muted-foreground">
-        {t(
+        {translate(
           'auto.components.plainSshTerminal.openHint',
           'Keeps you working on the host while Orca can’t set up there.'
         )}

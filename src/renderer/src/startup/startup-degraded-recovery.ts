@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
-import { useAppStore } from '../store/index'
-import { getStartupErrorFallbackUI } from '../app-shell/startup/startup-ui-hydration'
+import { useAppStore } from '../store'
+import { getStartupErrorFallbackUI } from '../lib/startup-ui-hydration'
 import {
   announceWebHostUnreachableAtStartup,
   isWebHostUnreachableAtStartup
@@ -13,8 +13,7 @@ import {
 import {
   collectTerminalProviderSnapshotPtyIds,
   refreshTerminalProviderSnapshotCapabilities
-} from '../components/terminal/provider-snapshots/terminal-provider-snapshot-capability'
-import { probeTerminalProviderGoneSessions } from '../components/terminal/provider-snapshots/terminal-provider-gone-sessions'
+} from '../components/terminal/terminal-provider-snapshot-capability'
 
 type DegradedStartupRecoveryArgs = {
   error: unknown
@@ -105,11 +104,11 @@ export async function recoverFromDegradedStartup(args: DegradedStartupRecoveryAr
   try {
     await window.api.app.awaitFirstWindowStartupServices()
     await window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
-    const restoredPtyIds = collectTerminalProviderSnapshotPtyIds(useAppStore.getState())
-    void probeTerminalProviderGoneSessions(restoredPtyIds)
-    await refreshTerminalProviderSnapshotCapabilities(restoredPtyIds)
+    await refreshTerminalProviderSnapshotCapabilities(
+      collectTerminalProviderSnapshotPtyIds(useAppStore.getState())
+    )
     await reconnectPersistedTerminals(abortSignal)
-    await window.api.app.recoverLegacyWorkerTerminalsForRendererStartup({ afterReconnect: true })
+    await window.api.app.recoverLegacyWorkerTerminalsForRendererStartup()
     // Reconnect does not set the success chain’s final flag; release restoration readers on degraded boot too.
     if (!isCancelled()) {
       useAppStore.setState({ terminalStartupRestorationReady: true })

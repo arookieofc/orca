@@ -3,12 +3,12 @@ import {
   normalizeVisibleExecutionHostIds,
   type ExecutionHostId,
   type ExecutionHostScope
-} from '../execution-host/execution-host'
+} from '../execution-host'
 import {
   expandEquivalentExecutionHostIds,
   pickerExecutionHosts,
   type MergedExecutionHost
-} from '../execution-host/managed-orcad-execution-host'
+} from '../managed-orcad-execution-host'
 
 /** The shown hosts; with no list saved, the legacy single-host scope still narrows (null is all). */
 export function resolveVisibleWorkspaceHostIds(

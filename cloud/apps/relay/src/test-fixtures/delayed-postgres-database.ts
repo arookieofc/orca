@@ -4,7 +4,7 @@ import {
   POSTGRES_LOCK_TIMEOUT_MS,
   POSTGRES_STATEMENT_TIMEOUT_MS,
   PostgresDatabase
-} from '../database/database.js'
+} from '../database.js'
 
 export type StatementDelay = {
   enabled: boolean

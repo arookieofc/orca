@@ -1,36 +1,29 @@
-import { sessionIdFromStructuredWorkerIncarnation } from '../../orchestration/terminal-authority/structured-sessions/structured-worker-identity'
-import '../../rpc/methods/orchestration/structured-workers/orchestration-structured-worker-lifecycle'
-import { observeStructuredWorker } from '../../orchestration/terminal-authority/structured-sessions/structured-worker-authority'
+import { sessionIdFromStructuredWorkerIncarnation } from '../../structured-worker-identity'
+import { observeStructuredWorker } from '../../rpc/methods/orchestration-structured-worker-lifecycle'
 import { OrcaRuntimeWithApplyMobileDisplayMode } from './terminal-display-mode'
-import { addListenerToMap } from './terminal-listener-map'
-import { notifyRuntimeListeners } from '../../events/runtime-listener-delivery'
-import { withTimeoutResult } from '../../../../shared/concurrency/promise-timeout-fallback'
-
+import { addListenerToMap } from '../../orca-runtime-core'
+import { notifyRuntimeListeners, withTimeoutResult } from '../../runtime-async-boundaries'
+import type { TerminalExitCause } from '../../../../shared/terminal-exit-cause'
 import {
-  type TerminalExitCause,
   describeTerminalExitCause,
   isDeliberateTerminalExit
-} from '../../../../shared/terminal/pty/lifecycle/terminal-exit-cause'
-import { terminalLastOutput } from '../output/tail/terminal-tail-read'
-import { DEFAULT_TERMINAL_LIST_LIMIT } from '../query/terminal-list-limit'
-import { PTY_CONTROLLER_LIST_TIMEOUT_MS } from '../lifecycle/pty-controller-inventory-budget'
+} from '../../../../shared/terminal-exit-cause'
+import {
+  DEFAULT_TERMINAL_LIST_LIMIT,
+  PTY_CONTROLLER_LIST_TIMEOUT_MS
+} from '../../orca-runtime-postlude'
 import type {
   RuntimeTerminalListResult,
   RuntimeTerminalOrphanAdoptionRequest,
   RuntimeTerminalOrphanAdoptionResult
-} from '../../../../shared/terminal/runtime/runtime-terminal-contracts'
-import { classifyWorkerTerminalProcessIncarnation } from '../../orchestration/terminal-authority/release/worker-terminal-process-liveness'
-import { parseWorkerTerminalHostScope } from '../../../../shared/orchestration/workers/worker-terminal-host-scope'
+} from '../../../../shared/runtime-terminal-contracts'
+import { classifyWorkerTerminalProcessIncarnation } from '../../orchestration/worker-terminal-process-liveness'
+import { parseWorkerTerminalHostScope } from '../../../../shared/worker-terminal-host-scope'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
-import {
-  reportWorkerTurnStop,
-  type WorkerTurnStop
-} from '../../orchestration/workers/turn-stops/worker-turn-stop-report'
-import {
-  LOCAL_EXECUTION_HOST_ID,
-  toSshExecutionHostId
-} from '../../../../shared/execution-host/execution-host'
-import type { OrchestrationDb } from '../../orchestration/db/orchestration-db'
+import { escalateWorkerFailure } from '../../orchestration/worker-failure-escalation'
+import { dispatchReportMailbox } from '../../orchestration/dispatch-report-mailbox'
+import { LOCAL_EXECUTION_HOST_ID, toSshExecutionHostId } from '../../../../shared/execution-host'
+import type { OrchestrationDb } from '../../orchestration/db'
 
 export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRuntimeWithApplyMobileDisplayMode {
   subscribeToTerminalResize(
@@ -61,58 +54,22 @@ export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRunti
   protected failActiveDispatchOnExit(
     handle: string,
     paneKey: string | null,
-    cause: TerminalExitCause,
-    lastOutput?: string
+    exitCode: number,
+    cause: TerminalExitCause
   ): void {
     const errorContext = describeTerminalExitCause(cause)
-    // A person closing the pane leaves the task unowned; any other end is the agent's exit.
-    const stop = isDeliberateTerminalExit(cause)
-      ? { reason: 'lost' as const, cause: 'it was closed in Orca' }
-      : { reason: 'exited' as const, cause: errorContext }
-    const settledLocally = this.failActiveDispatchAndReport(handle, paneKey ?? undefined, {
+    this.failActiveDispatchAndEscalate(handle, paneKey ?? undefined, {
       error: errorContext,
       options: { workerProcessExited: true, terminationReason: cause.kind },
       processExited: true,
-      stop: { ...stop, lastOutput }
+      // Escalate unexpected exits on the next coordinator check even before its circuit breaker trips.
+      escalate: !isDeliberateTerminalExit(cause),
+      describe: (task, outcome) => ({
+        subject: `Agent exited unexpectedly (${errorContext})`,
+        body: `Worker ${handle} stopped while running task ${task}. ${errorContext}.${outcome}`
+      }),
+      payload: { exitCode, exitCause: cause }
     })
-    if (!settledLocally && paneKey) {
-      this.reportRemoteWorkerExit(handle, paneKey, { ...stop, lastOutput })
-    }
-  }
-
-  /** The PTY's last lines, read while its record exists: an exit prunes it before any async read. */
-  protected readPtyLastOutput(ptyId: string | null | undefined): string | undefined {
-    return terminalLastOutput(ptyId ? this.ptysById.get(ptyId) : undefined)
-  }
-
-  /** A paired server's worker has no local Dispatch; any exit it did not report reaches the Run home through the stop relay. */
-  private reportRemoteWorkerExit(
-    handle: string,
-    paneKey: string,
-    stop: Pick<WorkerTurnStop, 'reason' | 'cause' | 'lastOutput'>
-  ): void {
-    const db = this._orchestrationDb
-    const attachment = db?.findActiveRemoteAttachmentForPane(paneKey)
-    // The coordinator's own worker-stop closes the terminal before it settles the attachment.
-    if (
-      !db ||
-      !attachment ||
-      attachment.state === 'stopping' ||
-      attachment.state === 'stop_unknown' ||
-      !db.isRemoteAttachmentProcessCurrent({
-        dispatchId: attachment.dispatch_id,
-        paneKey,
-        processIncarnation: this.getTerminalProcessIncarnation(handle)
-      })
-    ) {
-      return
-    }
-    reportWorkerTurnStop(
-      db,
-      { kind: 'remote', attachment },
-      { from: handle, ...stop },
-      this.workerTurnStopReportDeps
-    )
   }
 
   /** Codex outlives a failed reconnect, so no PTY exit will ever settle its dispatch (#24791). */
@@ -133,16 +90,17 @@ export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRunti
       surfaces.some(
         ({ handle, paneKey }) =>
           handle !== undefined &&
-          this.failActiveDispatchAndReport(handle, paneKey, {
+          this.failActiveDispatchAndEscalate(handle, paneKey, {
             error: reason,
             // The terminal and worktree stay up for inspection; workerProcessExited bypasses the active-worker guard for this dead session.
             options: { workerProcessExited: true, workerStage: 'agent_session_lost' },
             processExited: false,
-            stop: {
-              reason: 'lost',
-              cause: `${reason}; its terminal is still open for inspection`,
-              lastOutput: this.readPtyLastOutput(ptyId)
-            }
+            escalate: true,
+            describe: (task, outcome) => ({
+              subject: 'Agent session lost',
+              body: `Worker ${handle} can no longer run task ${task}: ${reason}. Its terminal is still open for inspection.${outcome}`
+            }),
+            payload: { reason }
           })
       )
     } catch (error) {
@@ -151,14 +109,16 @@ export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRunti
   }
 
   /** Returns whether the surface had an active dispatch. */
-  private failActiveDispatchAndReport(
+  private failActiveDispatchAndEscalate(
     handle: string,
     paneKey: string | undefined,
     failure: {
       error: string
       options: Parameters<OrchestrationDb['failDispatch']>[2]
       processExited: boolean
-      stop: Pick<WorkerTurnStop, 'reason' | 'cause' | 'lastOutput'>
+      escalate: boolean
+      describe: (task: string, outcome: string) => { subject: string; body: string }
+      payload: Record<string, unknown>
     }
   ): boolean {
     const db = this._orchestrationDb
@@ -175,20 +135,33 @@ export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRunti
       }
       return true
     }
-    const settled = db.failDispatch(dispatch.id, failure.error, failure.options)?.status
-    // A stop asked for earlier (unconfirmed, or by a runtime before a restart) settles the Dispatch as failed, but sends no mail: the coordinator asked for it.
-    if (stopping?.state === 'stopping' || stopping?.state === 'stop_unknown') {
+    const settled = db.failDispatch(dispatch.id, failure.error, failure.options)
+    if (!failure.escalate) {
       return true
     }
-    reportWorkerTurnStop(
+    escalateWorkerFailure(
       db,
-      { kind: 'local', dispatch },
+      dispatch,
       {
         from: handle,
-        ...failure.stop,
-        ...(settled === 'failed' || settled === 'circuit_broken' ? { settled } : {})
+        mailbox: () => dispatchReportMailbox(db, dispatch),
+        describe: (task) =>
+          failure.describe(
+            task,
+            settled?.status === 'circuit_broken'
+              ? ' This task has now failed too many times, so it will not be retried automatically.'
+              : settled?.status === 'failed'
+                ? ' The task is ready to be dispatched again.'
+                : ''
+          ),
+        payload: {
+          taskId: dispatch.task_id,
+          dispatchId: dispatch.id,
+          ...failure.payload,
+          handle
+        }
       },
-      this.workerTurnStopReportDeps
+      (to, type) => this.notifyMessageArrived(to, type)
     )
     return true
   }
@@ -251,7 +224,7 @@ export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRunti
     return this.runWorktreeTerminalMutation(workspace.id, async () => {
       const resolvedWorkspace = workspace.folderWorkspace
         ? this.folderWorkspaceToResolvedWorktree(workspace.folderWorkspace)
-        : await this.resolveGitWorktreeSelector(`id:${workspace.id}`)
+        : await this.resolveWorktreeSelector(`id:${workspace.id}`)
       const inventory = await this.refreshPtyWorktreeRecordsWithControllerInventory(
         [resolvedWorkspace],
         workspace.id,

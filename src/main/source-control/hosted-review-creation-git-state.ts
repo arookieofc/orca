@@ -2,22 +2,18 @@ import {
   isRemoteHeadRef,
   normalizeHostedReviewBaseRef,
   normalizeHostedReviewHeadRef
-} from '../../shared/source-control/hosted-review/hosted-review-refs'
-import { isSafeGitRefName } from '../../shared/git/status/git-status-upstream-ref'
-import type { GitUpstreamStatus } from '../../shared/git/status/git-status-types'
-import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
-import { isShowRefNoMatchError } from '../../shared/git/refs/git-show-ref-no-match'
-import { probeExactRefsViaForEachRef } from '../git/refs/resolution/exact-ref-probe'
-import { gitOptionalLocksDisabledEnv } from '../git/command-runner/git-environment/git-process-env'
-import {
-  parsePorcelainV1Records,
-  type PorcelainV1Record
-} from '../git/source-control/status/porcelain-v1-records'
-import { resolveDefaultBaseRefViaExec } from '../../shared/git/refs/git-default-base-ref'
-import { getUpstreamStatus } from '../git/source-control/upstream/upstream'
-import { findExistingWorktreeSymlinkPaths } from '../git/worktrees/content-paths/worktree-symlink-detection'
+} from '../../shared/hosted-review-refs'
+import { isSafeGitRefName } from '../../shared/git-status-upstream-ref'
+import type { GitUpstreamStatus } from '../../shared/git-status-types'
+import { gitExecFileAsync } from '../github/gh-utils'
+import { isShowRefNoMatchError, probeAnyExactRef } from '../git/exact-ref-probe'
+import { gitOptionalLocksDisabledEnv } from '../git/runner'
+import { parsePorcelainV1Records, type PorcelainV1Record } from '../git/porcelain-v1-records'
+import { resolveDefaultBaseRefViaExec } from '../git/repo'
+import { getUpstreamStatus } from '../git/upstream'
+import { findExistingWorktreeSymlinkPaths } from '../git/worktree-symlink-detection'
 import { requireReachableGitRoute } from '../providers/execution-host-provider-dispatch'
-import type { ExecutionHostId } from '../../shared/execution-host/execution-host'
+import type { ExecutionHostId } from '../../shared/execution-host'
 import {
   getHostedReviewLocalGitOptions,
   type HostedReviewExecutionOptions
@@ -180,10 +176,10 @@ export async function baseRefExistsOnRemote(
         candidateRefs.add(ref)
       }
     }
-    const exactResult = await probeExactRefsViaForEachRef(run, [...candidateRefs], {
+    const exactResult = await probeAnyExactRef(run, [...candidateRefs], {
       maxBuffer: MAX_REMOTE_REF_OUTPUT_BYTES
     })
-    if (exactResult.presentRefs.length > 0 || exactResult.unknownRefs.length > 0) {
+    if (exactResult.found || exactResult.unknown) {
       return true
     }
     // Preserve stale-remote suffix matching with a 10MiB bound after cheap exact probes.
@@ -194,20 +190,18 @@ export async function baseRefExistsOnRemote(
   }
 }
 
-export async function getCurrentBranchAndHead(
+export async function getCurrentBranch(
   repoPath: string,
   executionHostId: ExecutionHostId,
   options: HostedReviewExecutionOptions = {}
-): Promise<{ branch: string; headOid: string | null }> {
-  // One process: the first HEAD prints the commit, the --abbrev-ref HEAD after it the branch.
+): Promise<string> {
   const { stdout } = await runGitForHostedReview(
     repoPath,
-    ['rev-parse', 'HEAD', '--abbrev-ref', 'HEAD'],
+    ['rev-parse', '--abbrev-ref', 'HEAD'],
     executionHostId,
     options
   )
-  const [headOid = '', branch = ''] = stdout.trim().split(/\r?\n/)
-  return { branch: stripRefPrefix(branch.trim()), headOid: headOid.trim() || null }
+  return stripRefPrefix(stdout.trim())
 }
 
 export async function hasUncommittedChanges(

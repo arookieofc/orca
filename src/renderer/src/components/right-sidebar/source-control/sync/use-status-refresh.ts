@@ -1,27 +1,22 @@
-import { useSourceControlState, useSourceControlScope } from '../panel/worktree-scope'
 import { useCallback, useEffect } from 'react'
-import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { toast } from 'sonner'
 import {
   resolveWorktreeGitCopyNow,
-  worktreeGitCopyHostId,
+  useWorktreeGitCopyHostId,
   worktreeCopyPushTarget
-} from '@/lib/workspace/ownership/worktree-git-copy'
-import {
-  getLocalPathOpenOwnerForRoute,
-  isLocalPathOpenBlocked
-} from '@/lib/files/os-open/local-path-open-guard'
+} from '@/lib/worktree-git-copy'
+import { getLocalPathOpenOwnerForRoute, isLocalPathOpenBlocked } from '@/lib/local-path-open-guard'
 import {
   beginHugeRepoWarningProbe,
   hasDismissedHugeRepoWarning,
   markHugeRepoWarningDismissed
-} from '@/lib/source-control/warnings/source-control-huge-repo-warning-dismissals'
+} from '@/lib/source-control-huge-repo-warning-dismissals'
 import { translate } from '@/i18n/i18n'
-import { useAppStore } from '@/store/index'
+import { useAppStore } from '@/store'
 import type { GitPushTarget } from '../../../../../../shared/worktree/types'
-import { isWslDistroNotRunningRefusal } from '../../../../../../shared/remote-runtime/wsl-hosts/wsl-distro-not-running-refusal'
-import type { PullRequestGenerationContext } from '@/store/slices/hosted-review/generation/pull-request-generation-state'
-import { refreshGitStatusForWorktree } from './git-status-refresh'
+import type { PullRequestGenerationContext } from '@/store/slices/pull-request-generation'
+import { refreshGitStatusForWorktree } from '../../git-status-refresh'
 
 export type SourceControlStatusRefresh = {
   refreshActiveGitStatus: (signal?: AbortSignal) => Promise<void>
@@ -50,11 +45,11 @@ export function useSourceControlStatusRefresh({
   activeConnectionId: string | null
   activeWorktreeInstanceId?: string
 }): SourceControlStatusRefresh {
-  const scope = useSourceControlScope()
-  const selectedCopyHostId = useSourceControlState((s) =>
-    !scope && activeWorktreeId ? worktreeGitCopyHostId(s, activeWorktreeId) : null
-  )
-  const activeCopyHostId = scope?.executionHostId ?? selectedCopyHostId
+  const setGitStatus = useAppStore((s) => s.setGitStatus)
+  const updateWorktreeGitIdentity = useAppStore((s) => s.updateWorktreeGitIdentity)
+  const setUpstreamStatus = useAppStore((s) => s.setUpstreamStatus)
+  const fetchUpstreamStatus = useAppStore((s) => s.fetchUpstreamStatus)
+  const activeCopyHostId = useWorktreeGitCopyHostId(activeWorktreeId)
   const localIgnoreBlocked = isLocalPathOpenBlocked(
     getLocalPathOpenOwnerForRoute({
       runtimeEnvironmentId:
@@ -79,11 +74,27 @@ export function useSourceControlStatusRefresh({
         worktreePath,
         connectionId: copy.connectionId,
         pushTarget: activePushTarget,
-        deps: useAppStore.getState(),
+        deps: {
+          setGitStatus,
+          updateWorktreeGitIdentity,
+          setUpstreamStatus,
+          fetchUpstreamStatus
+        },
         request: { admissionTier: 'interactive', ...(signal ? { signal } : {}) }
       })
     },
-    [activeCopyHostId, activeRepoTarget, activeWorktreeId, activePushTarget, isFolder, worktreePath]
+    [
+      activeCopyHostId,
+      activeRepoTarget,
+      activeWorktreeId,
+      activePushTarget,
+      fetchUpstreamStatus,
+      isFolder,
+      setGitStatus,
+      setUpstreamStatus,
+      updateWorktreeGitIdentity,
+      worktreePath
+    ]
   )
   const refreshActiveGitStatusAfterMutation = useCallback(async (): Promise<void> => {
     try {
@@ -142,11 +153,7 @@ export function useSourceControlStatusRefresh({
           }
         )
       })
-      .catch((error) => {
-        if (!isWslDistroNotRunningRefusal(error)) {
-          console.warn('[SourceControl] findHugeFoldersToIgnore failed', error)
-        }
-      })
+      .catch((error) => console.warn('[SourceControl] findHugeFoldersToIgnore failed', error))
     return () => {
       cancelled = true
     }
@@ -177,13 +184,18 @@ export function useSourceControlStatusRefresh({
             context.worktreeId,
             context.ownerHostId ?? null
           ),
-          deps: useAppStore.getState()
+          deps: {
+            setGitStatus,
+            updateWorktreeGitIdentity,
+            setUpstreamStatus,
+            fetchUpstreamStatus
+          }
         })
       } catch (error) {
         console.warn('[SourceControl] post-generation git status refresh failed', error)
       }
     },
-    [isFolder]
+    [fetchUpstreamStatus, isFolder, setGitStatus, setUpstreamStatus, updateWorktreeGitIdentity]
   )
 
   return {

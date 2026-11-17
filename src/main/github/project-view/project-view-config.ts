@@ -4,12 +4,11 @@ import type {
   GitHubProjectSort,
   GitHubProjectView,
   GitHubProjectViewLayout
-} from '../../../shared/github/projects/project-types'
-import type { GitHubProjectViewError } from '../../../shared/github/projects/project-result-types'
-import { githubProjectHost } from '../../../shared/github/projects/project-identity'
+} from '../../../shared/github/project-types'
+import type { GitHubProjectViewError } from '../../../shared/github/project-result-types'
+import { githubProjectHost } from '../../../shared/github/project-identity'
 import { driftError, extractGraphqlErrors } from './project-error-classification'
-import { projectGhExecOptions } from './project-host-execution'
-import { runGraphql, type GraphqlVars } from './project-graphql'
+import { projectGhExecOptions, runGraphql, type GraphqlVars } from './internals'
 import { normalizeField, type RawProjectV2Field } from './project-view-field-normalization'
 import { FIELD_CONFIG_FRAGMENT } from './project-view-query-fragments'
 
@@ -138,10 +137,7 @@ export async function fetchProjectViewsPage(args: {
   const top = res.data[root]
   const project = top?.projectV2 ?? null
   if (!project || typeof project.id !== 'string') {
-    return {
-      ok: false,
-      error: { type: 'not_found', message: 'Project not found.', reason: 'project_not_found' }
-    }
+    return { ok: false, error: { type: 'not_found', message: 'Project not found.' } }
   }
   const pageInfo = project.views?.pageInfo
   const views = (project.views?.nodes ?? []).filter((v): v is RawProjectView => v !== null)

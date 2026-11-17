@@ -2,7 +2,7 @@ import type {
   ClaudeUsageRange,
   ClaudeUsageScope,
   ClaudeUsageSessionRow
-} from '../../shared/agent-usage/analytics/claude-usage-types'
+} from '../../shared/claude-usage-types'
 import type { ClaudeUsagePersistedState } from './types'
 import { getSessionProjectLabel } from './usage-aggregation'
 import { getFilteredSessions } from './claude-usage-scope-filters'

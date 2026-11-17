@@ -90,13 +90,6 @@ export default function globalSetup(): void {
     prepareDockerSshHostImage(root)
   }
 
-  const testRepoDir = seedTestRepository()
-  writeFileSync(TEST_REPO_PATH_FILE, testRepoDir)
-  console.error(`[e2e] Test repo created at ${testRepoDir}`)
-}
-
-// Shared by global setup and worker fallbacks so both seed paths stay identical.
-export function seedTestRepository(): string {
   // Resolve macOS /var symlinks like git does when registering repo.path.
   const testRepoDir = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-repo-')))
 
@@ -119,18 +112,16 @@ export function seedTestRepository(): string {
   writeFileSync(path.join(testRepoDir, 'src', 'diff-note-layout.ts'), 'export const seed = true\n')
 
   execSync('git add -A', { cwd: testRepoDir, stdio: 'pipe' })
-  // Why: per-command -c so contributor global hooks/signing can't fail the seed without persisting into repo config.
-  const isolatedGit = 'git -c core.hooksPath=/dev/null -c commit.gpgsign=false'
-  execSync(`${isolatedGit} commit -m "Initial commit for E2E tests"`, {
-    cwd: testRepoDir,
-    stdio: 'pipe'
-  })
+  execSync('git commit -m "Initial commit for E2E tests"', { cwd: testRepoDir, stdio: 'pipe' })
 
-  // Seed a second worktree so retention/switching specs run; UUIDs keep concurrent workers apart.
+  // Seed a second worktree so retention/switching specs run instead of skipping.
   const worktreeDir = path.join(testRepoDir, '..', `orca-e2e-worktree-${randomUUID()}`)
-  execSync(`${isolatedGit} worktree add "${worktreeDir}" -b e2e-secondary`, {
+  execSync(`git worktree add "${worktreeDir}" -b e2e-secondary`, {
     cwd: testRepoDir,
     stdio: 'pipe'
   })
-  return testRepoDir
+  console.error(`[e2e] Secondary worktree created at ${worktreeDir}`)
+
+  writeFileSync(TEST_REPO_PATH_FILE, testRepoDir)
+  console.error(`[e2e] Test repo created at ${testRepoDir}`)
 }

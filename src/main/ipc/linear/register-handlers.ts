@@ -5,7 +5,7 @@ import {
   getStatus,
   selectWorkspace,
   testConnection
-} from '../../linear/accounts/linear-account-client'
+} from '../../linear/client'
 import { _resetPreflightCache } from '../../preflight/agent-detection'
 import { normalizeWorkspaceId, normalizeWorkspaceSelection } from './ipc-args'
 import { registerLinearIssueHandlers } from './issue-handlers'

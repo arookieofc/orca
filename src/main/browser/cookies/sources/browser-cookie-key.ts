@@ -1,28 +1,23 @@
 import { pbkdf2Sync } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { runProcess } from '@orca/process-host'
+import { runProcessSync } from '@orca/process-host'
 import { windowsPowerShellPath } from '@orca/process-host/windows-system-binary'
 import { diag } from '../browser-cookie-import-diagnostics'
 import {
   CHROMIUM_BROWSERS,
   browserRootPath,
   type DetectedBrowser
-} from './browser-cookie-source-profiles'
-import type { EncryptionKeyResult } from './chromium-encryption-key-contract'
-import type { LinuxCookieKeyFailure } from '../../../../shared/browser/workspaces/browser-workspace-types'
+} from './browser-cookie-detection-types'
+import type { EncryptionKeyResult } from './browser-cookie-sqlite'
+import type { LinuxCookieKeyFailure } from '../../../../shared/browser-workspace-types'
 
 const PBKDF2_ITERATIONS = 1003
 const PBKDF2_KEY_LENGTH = 16
 const PBKDF2_SALT = 'saltysalt'
 
-// Why async: macOS can hold `security` open on a keychain prompt; main must stay responsive meanwhile.
-async function runKeychainCommand(
-  program: string,
-  args: readonly string[],
-  timeoutMs: number
-): Promise<string> {
-  const result = await runProcess({ program, args, timeoutMs })
+function runKeychainCommand(program: string, args: readonly string[], timeoutMs: number): string {
+  const result = runProcessSync({ program, args, timeoutMs })
   if (result.code !== 0 || result.timedOut) {
     throw Object.assign(new Error(`${program} exited with code ${result.code ?? 'unknown'}`), {
       stderr: result.stderr
@@ -31,19 +26,16 @@ async function runKeychainCommand(
   return result.stdout.trim()
 }
 
-export async function getEncryptionKey(
+export function getEncryptionKey(
   keychainService: string,
   keychainAccount: string,
-  browser?: Pick<DetectedBrowser, 'family'>
-): Promise<EncryptionKeyResult | null> {
+  browser?: DetectedBrowser
+): EncryptionKeyResult | null {
   if (process.platform === 'darwin') {
     return getMacEncryptionKey(keychainService, keychainAccount)
   }
   if (process.platform === 'linux') {
-    const application = CHROMIUM_BROWSERS.find(
-      (b) => b.family === browser?.family
-    )?.linuxKeyringApplication
-    return getLinuxEncryptionKey(keychainService, keychainAccount, application)
+    return getLinuxEncryptionKey(keychainService, keychainAccount)
   }
   if (process.platform === 'win32' && browser) {
     return getWindowsEncryptionKey(browser)
@@ -51,12 +43,12 @@ export async function getEncryptionKey(
   return null
 }
 
-export async function getMacEncryptionKey(
+export function getMacEncryptionKey(
   keychainService: string,
   keychainAccount: string
-): Promise<EncryptionKeyResult | null> {
+): EncryptionKeyResult | null {
   try {
-    const raw = await runKeychainCommand(
+    const raw = runKeychainCommand(
       'security',
       ['find-generic-password', '-s', keychainService, '-a', keychainAccount, '-w'],
       30_000
@@ -72,22 +64,22 @@ export async function getMacEncryptionKey(
   }
 }
 
-export async function getLinuxEncryptionKey(
+export function getLinuxEncryptionKey(
   keychainService: string,
-  keychainAccount: string,
-  application = keychainAccount.toLowerCase().replaceAll(' ', '')
-): Promise<EncryptionKeyResult | null> {
+  keychainAccount: string
+): EncryptionKeyResult | null {
   // Linux v10 uses "peanuts"; v11 requires OS key storage, and CBC cannot authenticate a wrong key.
   const v10Key = pbkdf2Sync('peanuts', PBKDF2_SALT, 1, PBKDF2_KEY_LENGTH, 'sha1')
 
   let keyringPassword = ''
   let keyringFailure: LinuxCookieKeyFailure = 'key-unavailable'
+  const app = keychainAccount.toLowerCase().replaceAll(' ', '')
   for (const args of [
     ['lookup', 'service', keychainService, 'account', keychainAccount],
-    ['lookup', 'application', application]
+    ['lookup', 'application', app]
   ]) {
     try {
-      keyringPassword = await runKeychainCommand('secret-tool', args, 5_000)
+      keyringPassword = runKeychainCommand('secret-tool', args, 5_000)
       break
     } catch (error) {
       if (typeof error === 'object' && error !== null) {
@@ -119,9 +111,7 @@ export async function getLinuxEncryptionKey(
   return { mode: 'aes-128-cbc', keysByVersion: { v10: v10Key, v11: v11Key } }
 }
 
-export async function getWindowsEncryptionKey(
-  browser: Pick<DetectedBrowser, 'family'>
-): Promise<EncryptionKeyResult | null> {
+export function getWindowsEncryptionKey(browser: DetectedBrowser): EncryptionKeyResult | null {
   const browserDef = CHROMIUM_BROWSERS.find((b) => b.family === browser.family)
   if (!browserDef) {
     return null
@@ -162,7 +152,7 @@ export async function getWindowsEncryptionKey(
     ].join('')
 
     // Hide the console and use the system PowerShell path; Electron’s PATH may differ.
-    const result = await runProcess({
+    const result = runProcessSync({
       program: windowsPowerShellPath(),
       args: ['-NoProfile', '-NonInteractive', '-Command', script],
       timeoutMs: 10_000,

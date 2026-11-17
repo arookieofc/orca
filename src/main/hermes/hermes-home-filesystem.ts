@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { type ConfigParseResult, type HermesConfig, parseHermesConfig } from './hermes-config-yaml'
+import type { ConfigParseResult, HermesConfig } from './hermes-config-yaml'
+import { parseHermesConfig } from './hermes-config-yaml'
 import { getHermesHome } from './hermes-default-home'
-import { resolveHooksJsonWritePath } from '../agent-hooks/installation/configuration/hook-config-write-path'
-import { writeHooksJson } from '../agent-hooks/installation/configuration/hooks-json-write'
+import { resolveHooksJsonWritePath } from '../agent-hooks/hook-config-write-path'
+import { writeHooksJson } from '../agent-hooks/installer-utils'
 import {
   HERMES_PLUGIN_MARKER,
   HERMES_PLUGIN_NAME,

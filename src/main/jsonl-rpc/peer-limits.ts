@@ -1,4 +1,4 @@
-import { isSafeTimerDelayMs } from '../../shared/concurrency/timer-delay'
+import { isSafeTimerDelayMs } from '../../shared/timer-delay'
 
 export type JsonlRpcPeerOptions = {
   maxLineBytes?: number

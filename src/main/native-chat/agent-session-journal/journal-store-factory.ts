@@ -1,8 +1,10 @@
 import type { AgentSessionJournalOptions } from './journal-store-contracts'
 import { AgentSessionJournal } from './journal-store'
 
-export function openAgentSessionJournal(
+export async function openAgentSessionJournal(
   options: AgentSessionJournalOptions
 ): Promise<AgentSessionJournal> {
-  return AgentSessionJournal.open(options)
+  const journal = new AgentSessionJournal(options)
+  await journal.open()
+  return journal
 }

@@ -3,12 +3,11 @@ import type {
   SshConnectionState,
   SshManagedServerLinkedProject,
   SshTarget
-} from '../../../shared/remote-runtime/ssh/ssh-types'
+} from '../../../shared/ssh-types'
 import { translate } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
-import { useAppStore } from '@/store/index'
-import { compactIpcErrorMessage, extractIpcErrorMessage } from '@/runtime/errors/ipc-error'
-import { isWebClientLocation } from '@/app-shell/platform/web-client-location'
+import { useAppStore } from '@/store'
+import { compactIpcErrorMessage, extractIpcErrorMessage } from '@/lib/ipc-error'
+import { isWebClientLocation } from '@/lib/web-client-location'
 import { launchSessionEndedLine } from './ssh-host-launch-session-copy'
 import { automationsLeftDisabledLine } from './ssh-host-moved-automations-copy'
 import { bridgedTerminalsLine } from './ssh-host-bridged-terminals-copy'
@@ -17,8 +16,6 @@ import { blockedNodeDownload, nodeDownloadBlockedText } from './ssh-host-node-do
 import { settingUpLabel, sshHostServerReassurance } from './ssh-host-server-setup-copy'
 import { hostFixableUnavailableText } from './ssh-host-fixable-unavailable-copy'
 import { leaveBehindLine, REFUSAL_INLINE_CHARS, refusedLine } from './ssh-host-refused-move-copy'
-import { sshHostServerSetupRemedy } from '../../../shared/remote-runtime/ssh/ssh-host-server-setup-remedy'
-import { sshHostSetupRemedyText } from './ssh-host-setup-remedy-copy'
 
 export type SshHostServerStatusLine = {
   text: string
@@ -31,17 +28,16 @@ export type SshHostServerStatusLine = {
 
 export function sshHostServerStatusLine(
   target: Pick<SshTarget, 'label' | 'orcadFence' | 'managedServerUnavailable'>,
-  state: Pick<SshConnectionState, 'managedServer'> | undefined,
-  t: Translate = translate
+  state: Pick<SshConnectionState, 'managedServer'> | undefined
 ): SshHostServerStatusLine | null {
   const status = state?.managedServer
   if (target.orcadFence?.sourceChangedAt) {
-    return sourceChangedLine(t)
+    return sourceChangedLine()
   }
   if (status?.kind === 'managed' && status.serving) {
     return {
       tone: 'warning',
-      text: t(
+      text: translate(
         'auto.components.settings.sshHostServer.notServing',
         'Orca couldn’t confirm that its server on {{host}} is answering.',
         { host: target.label }
@@ -50,16 +46,16 @@ export function sshHostServerStatusLine(
     }
   }
   if (status?.kind === 'managed' && status.launchSessionEnded) {
-    return launchSessionEndedLine(t)
+    return launchSessionEndedLine()
   }
   if (status?.kind === 'managed' && status.update) {
-    return managedUpdateLine(status.update, t)
+    return managedUpdateLine(status.update)
   }
   if (status?.kind === 'managed' && status.linked?.length) {
-    return linkedProjectsLine(status.linked, t)
+    return linkedProjectsLine(status.linked)
   }
   if (status?.kind === 'managed' && status.automationsLeftDisabled) {
-    return automationsLeftDisabledLine(status.automationsLeftDisabled, t)
+    return automationsLeftDisabledLine(status.automationsLeftDisabled)
   }
   // A healthy managed server is the default; the card stays quiet unless something needs attention.
   if (status?.kind === 'managed' || (!status && target.orcadFence)) {
@@ -68,35 +64,32 @@ export function sshHostServerStatusLine(
   if (status?.kind === 'setting-up') {
     return {
       tone: 'muted',
-      text: settingUpLabel(status.phase, target.label, t),
+      text: settingUpLabel(status.phase, target.label),
       // Why only these phases: `starting` and `connecting` run on every reconnect, when nothing moves.
       ...(status.phase === 'deploying' || status.phase === 'converting'
-        ? { hint: sshHostServerReassurance(target.label, t) }
+        ? { hint: sshHostServerReassurance(target.label) }
         : {})
     }
   }
   if (status?.kind === 'relay') {
     // An unverifiable bridged terminal keeps the unverifiable line: nothing proves it still answers.
     return status.bridged && status.reason === 'relay_terminals_live'
-      ? bridgedTerminalsLine(status.detail, t)
-      : unservedLine(status, undefined, t)
+      ? bridgedTerminalsLine(status.detail)
+      : unservedLine(status)
   }
   if (target.managedServerUnavailable) {
-    return unavailableLine(target.managedServerUnavailable.reason, t)
+    return unavailableLine(target.managedServerUnavailable.reason)
   }
   return null
 }
 
 export function sshConnectFailureText(
   state: Pick<SshConnectionState, 'managedServer'> | undefined,
-  fallback: string,
-  t?: Translate
+  fallback: string
 ): string {
   const status = state?.managedServer
   // Uncapped because panes/toasts lack Details and refusal recovery guidance comes last.
-  return status?.kind === 'relay'
-    ? unservedLine(status, Number.POSITIVE_INFINITY, t).text
-    : fallback
+  return status?.kind === 'relay' ? unservedLine(status, Number.POSITIVE_INFINITY).text : fallback
 }
 
 export function sshTargetConnectFailureText(
@@ -116,10 +109,10 @@ export function sshTargetConnectFailureText(
 // Mirror main's ORCAD_TUNNEL_UNAVAILABLE_REASON.
 const TUNNEL_UNAVAILABLE = 'ssh_tunnel_unavailable'
 
-function sourceChangedLine(t: Translate = translate): SshHostServerStatusLine {
+function sourceChangedLine(): SshHostServerStatusLine {
   return {
     tone: 'warning',
-    text: t(
+    text: translate(
       'auto.components.settings.sshHostServer.sourceChanged',
       'This computer has projects or folders for this host that its Orca server doesn’t have yet, often added by an older version of Orca. Move them to this host’s Orca server, or keep the server’s version, to connect again.'
     )
@@ -127,22 +120,19 @@ function sourceChangedLine(t: Translate = translate): SshHostServerStatusLine {
 }
 
 /** `reason` is main's OrcadHostUnavailableReason; an unknown one is shown only as a detail. */
-function unavailableLine(
-  reason: string | undefined,
-  t: Translate = translate
-): SshHostServerStatusLine {
+function unavailableLine(reason: string | undefined): SshHostServerStatusLine {
   if (reason === TUNNEL_UNAVAILABLE) {
-    return tunnelUnavailableLine(t)
+    return tunnelUnavailableLine()
   }
-  const fixable = reason ? hostFixableUnavailableText(reason, t) : null
+  const fixable = reason ? hostFixableUnavailableText(reason) : null
   if (fixable) {
     return { tone: 'destructive', text: fixable }
   }
-  const cause = reason ? unavailableCause(reason, t) : null
+  const cause = reason ? unavailableCause(reason) : null
   if (cause) {
     return {
       tone: 'destructive',
-      text: t(
+      text: translate(
         'auto.components.settings.sshHostServer.unsupported',
         'This host isn’t supported by this version of Orca ({{reason}}). To keep using it, install an older version of Orca.',
         { reason: cause }
@@ -151,7 +141,7 @@ function unavailableLine(
   }
   return {
     tone: 'destructive',
-    text: t(
+    text: translate(
       'auto.components.settings.sshHostServer.unsupportedUnknown',
       'This host isn’t supported by this version of Orca. To keep using it, install an older version of Orca.'
     ),
@@ -159,35 +149,35 @@ function unavailableLine(
   }
 }
 
-function unavailableCause(reason: string, t: Translate = translate): string | null {
+function unavailableCause(reason: string): string | null {
   switch (reason) {
     case 'unsupported_host':
-      return t(
+      return translate(
         'auto.components.settings.sshHostServer.cause.unsupportedHost',
         'Orca has no server build for this system'
       )
     case 'artifacts_unavailable':
-      return t(
+      return translate(
         'auto.components.settings.sshHostServer.cause.artifactsUnavailable',
         'this Orca build doesn’t include the server'
       )
     case 'libc_unidentified':
-      return t(
+      return translate(
         'auto.components.settings.sshHostServer.cause.libcUnidentified',
         'Orca couldn’t identify the host’s system libraries'
       )
     case 'runtime_self_test':
-      return t(
+      return translate(
         'auto.components.settings.sshHostServer.cause.runtimeSelfTest',
         'the server’s runtime failed its self-test'
       )
     case 'security_software':
-      return t(
+      return translate(
         'auto.components.settings.sshHostServer.cause.securitySoftware',
         'security software changed the server’s runtime'
       )
     case 'native_preflight':
-      return t(
+      return translate(
         'auto.components.settings.sshHostServer.cause.nativePreflight',
         'the host is missing system libraries the server needs'
       )
@@ -196,39 +186,40 @@ function unavailableCause(reason: string, t: Translate = translate): string | nu
   }
 }
 
-function tunnelUnavailableLine(t: Translate = translate): SshHostServerStatusLine {
+function tunnelUnavailableLine(): SshHostServerStatusLine {
   return {
     tone: 'destructive',
-    text: t(
+    text: translate(
       'auto.components.settings.sshHostServer.tunnelUnsupported',
       'This host isn’t supported by this version of Orca: its SSH server doesn’t allow port forwarding, and Orca couldn’t reach its server through the SSH session either. To keep using it, install an older version of Orca.'
     )
   }
 }
 
-function setupStoppedLine(code: string | undefined, t?: Translate): SshHostServerStatusLine {
-  const remedy = sshHostServerSetupRemedy(code)
+function retryLine(): SshHostServerStatusLine {
   return {
-    // Only a host-side fix the user must make reads as an error.
-    tone: remedy === 'retry' || remedy === 'see-details' ? 'warning' : 'destructive',
-    text: sshHostSetupRemedyText(remedy, t)
+    tone: 'warning',
+    text: translate(
+      'auto.components.settings.sshHostServer.setupRetry',
+      'Orca couldn’t start its server on this host. Try connecting again.'
+    )
   }
 }
 
-function contactLostLine(t: Translate = translate): SshHostServerStatusLine {
+function contactLostLine(): SshHostServerStatusLine {
   return {
     tone: 'warning',
-    text: t(
+    text: translate(
       'auto.components.settings.sshHostServer.setupContactLost',
       'Orca lost contact with this host while setting up its server. Nothing on the host was stopped. Connect again to continue.'
     )
   }
 }
 
-function heldMoveLine(t: Translate = translate): SshHostServerStatusLine {
+function heldMoveLine(): SshHostServerStatusLine {
   return {
     tone: 'warning',
-    text: t(
+    text: translate(
       'auto.components.settings.sshHostServer.moveHeld',
       'Orca paused moving this host’s projects to its Orca server because it couldn’t confirm the server’s copy. Nothing is lost: the host keeps its projects and stays locked until the move finishes. Connect again to resume. If the server can’t come back, stop or forget it in Settings > Orca on your SSH hosts.'
     )
@@ -237,8 +228,7 @@ function heldMoveLine(t: Translate = translate): SshHostServerStatusLine {
 
 /** Projects the server already had: this desktop's own tabs and automations for them stayed behind. */
 function linkedProjectsLine(
-  linked: readonly SshManagedServerLinkedProject[],
-  t: Translate = translate
+  linked: readonly SshManagedServerLinkedProject[]
 ): SshHostServerStatusLine {
   const paths = linked.map((project) => project.path).join(', ')
   const count = linked.reduce((total, project) => total + project.automations, 0)
@@ -246,17 +236,12 @@ function linkedProjectsLine(
     tone: 'warning',
     text:
       count > 0
-        ? t(
+        ? translate(
             'auto.components.settings.sshHostServer.linkedProjects',
             'This host’s Orca server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automations there were not moved, and worktrees it created there show as external worktrees.',
-            {
-              paths,
-              count,
-              defaultValue_one:
-                'This host’s Orca server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automation there were not moved, and worktrees it created there show as external worktrees.'
-            }
+            { paths, count }
           )
-        : t(
+        : translate(
             'auto.components.settings.sshHostServer.linkedProjectsNoAutomations',
             'This host’s Orca server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs there were not moved, and worktrees it created there show as external worktrees.',
             { paths }
@@ -266,8 +251,7 @@ function linkedProjectsLine(
 
 function unservedLine(
   status: Extract<NonNullable<SshConnectionState['managedServer']>, { kind: 'relay' }>,
-  refusalChars = REFUSAL_INLINE_CHARS,
-  t: Translate = translate
+  refusalChars = REFUSAL_INLINE_CHARS
 ): SshHostServerStatusLine {
   switch (status.reason) {
     case 'relay_terminals_live':
@@ -275,16 +259,12 @@ function unservedLine(
         tone: 'warning',
         // Why: an absent count is unreported, never zero open terminals.
         text: status.terminals
-          ? t(
+          ? translate(
               'auto.components.settings.sshHostServer.olderTerminals',
               '{{count}} terminals started by an older version of Orca are still running on this host, and they don’t stop on their own. Close them in that version of Orca or end them on the host, then reconnect.',
-              {
-                count: status.terminals,
-                defaultValue_one:
-                  '{{count}} terminal started by an older version of Orca is still running on this host, and it doesn’t stop on its own. Close it in that version of Orca or end it on the host, then reconnect.'
-              }
+              { count: status.terminals }
             )
-          : t(
+          : translate(
               'auto.components.settings.sshHostServer.olderTerminalsUncounted',
               'Terminals started by an older version of Orca are still running on this host, and they don’t stop on their own. Close them in that version of Orca or end them on the host, then reconnect.'
             )
@@ -292,31 +272,31 @@ function unservedLine(
     case 'relay_terminals_unverifiable':
       return {
         tone: 'warning',
-        text: t(
+        text: translate(
           'auto.components.settings.sshHostServer.olderTerminalsUnverifiable',
           'Orca couldn’t confirm that terminals started by an older version of Orca have exited. Reconnect to try again.'
         )
       }
     case 'orcad_unavailable':
-      return unavailableLine(status.detail, t)
+      return unavailableLine(status.detail)
     case 'source_changed':
-      return sourceChangedLine(t)
+      return sourceChangedLine()
     case 'refused':
       // Web clients can't run this desktop's Move anyway, so they keep main's reason.
       return status.canLeaveBehind && !isWebClientLocation()
-        ? leaveBehindLine(status.detail, refusalChars, t)
-        : refusedLine(status.detail, refusalChars, t)
+        ? leaveBehindLine(status.detail, refusalChars)
+        : refusedLine(status.detail, refusalChars)
     case 'deferred':
     case 'failed': {
       const blocked = blockedNodeDownload(status)
       return {
         ...(blocked
-          ? { tone: 'destructive' as const, text: nodeDownloadBlockedText(blocked, t) }
+          ? { tone: 'destructive' as const, text: nodeDownloadBlockedText(blocked) }
           : status.held
-            ? heldMoveLine(t)
+            ? heldMoveLine()
             : status.contactLost
-              ? contactLostLine(t)
-              : setupStoppedLine(status.code, t)),
+              ? contactLostLine()
+              : retryLine()),
         ...withDetail(status.detail)
       }
     }

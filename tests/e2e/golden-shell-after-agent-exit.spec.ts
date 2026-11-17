@@ -38,8 +38,7 @@ test('opens a clean live shell after an agent exits', async ({ orcaPage }) => {
   const tabsBeforeShell = await orcaPage.locator('[data-testid="sortable-tab"]').count()
   await orcaPage.getByRole('button', { name: 'New tab' }).click({ force: true })
   await orcaPage
-    .getByRole('menu')
-    .getByRole('button', { name: /New Terminal/i })
+    .getByRole('menuitem', { name: /New Terminal/i })
     .first()
     .click({ force: true })
   await expect(orcaPage.locator('[data-testid="sortable-tab"]')).toHaveCount(tabsBeforeShell + 1)

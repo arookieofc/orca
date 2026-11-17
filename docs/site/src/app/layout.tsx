@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { RootProvider } from 'fumadocs-ui/provider/next'
 import './globals.css'
 
-const siteUrl = 'https://orca.dev'
+const siteUrl = 'https://www.onorca.dev'
 
 export const metadata: Metadata = {
   title: 'Orca Docs',

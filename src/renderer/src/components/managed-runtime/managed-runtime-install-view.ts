@@ -1,7 +1,6 @@
 import { translate } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
-import type { ManagedRuntimeInstallState } from '../../../../shared/agent-launch/installation/managed-runtime-install'
-import type { ManagedRuntimeInstallSnapshot } from '@/runtime/hosts/installation/managed-runtime-install-status'
+import type { ManagedRuntimeInstallState } from '../../../../shared/managed-runtime-install'
+import type { ManagedRuntimeInstallSnapshot } from '@/runtime/managed-runtime-install-status'
 
 export type ManagedRuntimeInstallAction =
   | { kind: 'install'; label: string }
@@ -14,7 +13,7 @@ export type ManagedRuntimeInstallView = {
   error: string | null
   action: ManagedRuntimeInstallAction | null
   menuAction: ManagedRuntimeInstallAction | null
-  /** Settings draws this action as a button instead of inline text. */
+  /** The action is the first step to using the agent, so Settings draws it as a button. */
   prominent: boolean
   /** Settings may offer to delete the copy Orca installed: one is there and nothing runs. */
   removable: boolean
@@ -39,33 +38,32 @@ const EMPTY: ManagedRuntimeInstallView = {
 function runningView(
   operation: NonNullable<ManagedRuntimeInstallState['operation']>,
   agent: string,
-  cancelling: boolean,
-  t: Translate = translate
+  cancelling: boolean
 ): ManagedRuntimeInstallView | null {
   const { phase, downloadedBytes: done, totalBytes: total } = operation
   if (phase === 'removing') {
-    const status = t('components.managed-runtime.removing', 'Removing…')
+    const status = translate('components.managed-runtime.removing', 'Removing…')
     return { ...EMPTY, status, removing: true }
   }
   if (phase !== 'downloading' && phase !== 'extracting' && phase !== 'verifying') {
     return null
   }
   const status = cancelling
-    ? t('components.managed-runtime.cancelling', 'Cancelling…')
+    ? translate('components.managed-runtime.cancelling', 'Cancelling…')
     : phase === 'extracting'
-      ? t('components.managed-runtime.extracting', 'Extracting {{agent}}.', { agent })
+      ? translate('components.managed-runtime.extracting', 'Extracting {{agent}}.', { agent })
       : phase === 'verifying'
-        ? t('components.managed-runtime.verifying', 'Checking the downloaded runtime.')
+        ? translate('components.managed-runtime.verifying', 'Checking the downloaded runtime.')
         : total === null
-          ? t('components.managed-runtime.downloading', 'Downloading {{done}} MB.', {
+          ? translate('components.managed-runtime.downloading', 'Downloading {{done}} MB.', {
               done: megabytes(done)
             })
-          : t(
+          : translate(
               'components.managed-runtime.downloadingOf',
               'Downloading {{done}} MB of {{total}} MB.',
               { done: megabytes(done), total: megabytes(total) }
             )
-  const label = t('components.managed-runtime.cancelShort', 'Cancel')
+  const label = translate('components.managed-runtime.cancelShort', 'Cancel')
   return {
     ...EMPTY,
     status,
@@ -74,20 +72,16 @@ function runningView(
   }
 }
 
-function settledView(
-  state: ManagedRuntimeInstallState,
-  agent: string,
-  t: Translate = translate
-): ManagedRuntimeInstallView {
+function settledView(state: ManagedRuntimeInstallState, agent: string): ManagedRuntimeInstallView {
   const { operation } = state
   const failed = operation?.phase === 'failed'
   const error = failed
     ? (operation.error ??
       (operation.kind === 'install'
-        ? t('components.managed-runtime.failedTitle', "Couldn't install {{agent}}", {
+        ? translate('components.managed-runtime.failedTitle', "Couldn't install {{agent}}", {
             agent
           })
-        : t('components.managed-runtime.failed', 'Installation failed. Try again.')))
+        : translate('components.managed-runtime.failed', 'Installation failed. Try again.')))
     : null
   const view = (
     status: string | null,
@@ -103,49 +97,54 @@ function settledView(
     removable: state.canRemove === true,
     note
   })
-  const install = t('components.managed-runtime.installShort', 'Install')
+  const install = translate('components.managed-runtime.installShort', 'Install')
   // A copy found outside Orca already runs; Orca's own, once installed, runs first.
   if (state.source === 'external') {
     return view(
-      t('components.managed-runtime.external', 'Uses the copy of {{agent}} found on this host.', {
-        agent
-      }),
-      state.available ? t('components.managed-runtime.installManaged', "Install Orca's copy") : null
+      translate(
+        'components.managed-runtime.external',
+        'Uses the copy of {{agent}} found on this host.',
+        { agent }
+      ),
+      state.available
+        ? translate('components.managed-runtime.installManaged', "Install Orca's copy")
+        : null
     )
   }
   if (state.installedVersion !== null) {
-    const reinstall = t('components.managed-runtime.reinstall', 'Reinstall {{agent}}', {
+    const reinstall = translate('components.managed-runtime.reinstall', 'Reinstall {{agent}}', {
       agent
     })
     // Reinstalling a current copy checks it and repairs what's missing, so it needs the pin.
     const label = !state.installedCurrent
-      ? t('components.managed-runtime.update', 'Update')
+      ? translate('components.managed-runtime.update', 'Update')
       : state.available
         ? reinstall
         : null
-    const status = t('components.managed-runtime.installed', 'Installed')
-    return state.installedCurrent
-      ? view(status, null, null, label)
-      : { ...view(status, label), prominent: true }
+    return view(translate('components.managed-runtime.installed', 'Installed'), null, null, label)
   }
   if (!state.available) {
     return view(
-      t('components.managed-runtime.unavailable', '{{agent}} is not available on this host.', {
-        agent
-      }),
+      translate(
+        'components.managed-runtime.unavailable',
+        '{{agent}} is not available on this host.',
+        { agent }
+      ),
       null
     )
   }
   if (state.damaged) {
-    const status = t('components.managed-runtime.damaged', 'This copy of {{agent}} is damaged.', {
-      agent
-    })
-    const label = t('components.managed-runtime.reinstallShort', 'Reinstall')
+    const status = translate(
+      'components.managed-runtime.damaged',
+      'This copy of {{agent}} is damaged.',
+      { agent }
+    )
+    const label = translate('components.managed-runtime.reinstallShort', 'Reinstall')
     return { ...view(status, label), prominent: true }
   }
-  const retry = t('components.managed-runtime.tryAgain', 'Try again')
+  const retry = translate('components.managed-runtime.tryAgain', 'Try again')
   if (operation?.kind === 'install' && operation.phase === 'cancelled') {
-    return view(t('components.managed-runtime.cancelled', 'Installation cancelled.'), retry)
+    return view(translate('components.managed-runtime.cancelled', 'Installation cancelled.'), retry)
   }
   if (operation?.kind === 'install' && failed) {
     return view(null, retry)
@@ -153,11 +152,11 @@ function settledView(
   const size = state.downloadBytes
   return {
     ...view(
-      t('components.managed-runtime.notInstalled', 'Not installed.'),
+      translate('components.managed-runtime.notInstalled', 'Not installed.'),
       install,
       size === undefined
         ? null
-        : t('components.managed-runtime.downloadSize', '{{size}} MB download.', {
+        : translate('components.managed-runtime.downloadSize', '{{size}} MB download.', {
             size: Math.ceil(size / 1_000_000)
           })
     ),
@@ -169,15 +168,14 @@ function settledView(
 export function managedRuntimeInstallView(
   snapshot: ManagedRuntimeInstallSnapshot,
   agent: string,
-  cancelling = false,
-  t: Translate = translate
+  cancelling = false
 ): ManagedRuntimeInstallView {
   if (snapshot.kind !== 'known') {
     return {
       ...EMPTY,
       error:
         snapshot.kind === 'readFailed'
-          ? t(
+          ? translate(
               'components.managed-runtime.readFailed',
               'Could not check {{agent}} on this host. Retrying.',
               { agent }
@@ -187,23 +185,7 @@ export function managedRuntimeInstallView(
   }
   const { operation } = snapshot.state
   return (
-    (operation ? runningView(operation, agent, cancelling, t) : null) ??
-    settledView(snapshot.state, agent, t)
+    (operation ? runningView(operation, agent, cancelling) : null) ??
+    settledView(snapshot.state, agent)
   )
-}
-
-/** Whether Orca's copy still needs the user: missing, outdated, damaged, failed, installing, or unreadable. */
-export function managedRuntimeInstallPending(snapshot: ManagedRuntimeInstallSnapshot): boolean {
-  if (snapshot.kind === 'readFailed') {
-    return true
-  }
-  if (snapshot.kind !== 'known') {
-    return false
-  }
-  const view = managedRuntimeInstallView(snapshot, '')
-  // A working external copy needs nothing unless Orca's own install is running or failed.
-  if (snapshot.state.source === 'external') {
-    return view.action?.kind === 'cancel' || view.removing || view.error !== null
-  }
-  return view.action !== null || view.error !== null || view.removing
 }

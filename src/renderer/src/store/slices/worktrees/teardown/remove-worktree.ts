@@ -1,52 +1,47 @@
-import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
-import { parseExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
-import { ensureHooksConfirmed } from '@/runtime/repo-hooks/ensure-hooks-confirmed'
-import { runtimeTargetForOwnerEnvironment } from '../../../../runtime/rpc/targets/runtime-client-target'
-import { forgetHugeRepoWarningDismissalsForWorktrees } from '@/lib/source-control/warnings/source-control-huge-repo-warning-dismissals'
-import { forgetWorktreeSleepIntent } from '@/lib/workspace/sleep/worktree-sleep-intent'
-import { readIpcErrorDetail } from '@/runtime/errors/ipc-error'
-import { isArchiveHookRemovalError } from '../../../../../../shared/worktree/removal/archive-hook-removal-gate'
+import type { WorktreeSlice } from '../../worktree-helpers'
+import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
+import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
+import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
+import { parseExecutionHostId } from '../../../../../../shared/execution-host'
+import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
+import { runtimeTargetForOwnerEnvironment } from '../../../../runtime/runtime-client-target'
+import { forgetHugeRepoWarningDismissalsForWorktrees } from '@/lib/source-control-huge-repo-warning-dismissals'
+import { forgetWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
+import { readIpcErrorDetail } from '@/lib/ipc-error'
+import { isArchiveHookRemovalError } from '../../../../../../shared/worktree/archive-hook-removal-gate'
 import {
   resolveWorktreeOperationRouteResult,
   resolveWorktreeOperationRouteResultForHost
-} from '@/lib/workspace/ownership/worktree-operation-route'
+} from '@/lib/worktree-operation-route'
 import {
   beginHostQualifiedRemoval,
   completeSameIdHostScopedRemoval,
   findWorktreeOnConfirmedHost,
+  prepareHostScopedRemovalCompletion,
   refuseUnprovableRemoteHostRouting
 } from './host-qualified-worktree-removal'
-import {
-  resolveSameIdSurvivingHostId,
-  prepareHostScopedRemovalCompletion
-} from './host-qualified-worktree-row-removal'
+import { resolveSameIdSurvivingHostId } from './host-qualified-worktree-row-removal'
 import {
   classifyWorktreeForceDeleteReason,
   getLockedWorktreeRemovalReason,
   isLockedWorktreeRemovalError
-} from '../../../../../../shared/worktree/removal/removal'
-import '../../../../../../shared/git/branches/preserved-branch-cleanup'
+} from '../../../../../../shared/worktree/removal'
+import { preservedBranchCleanupKey } from '../../../../../../shared/preserved-branch-cleanup'
 import { getWorktreeDeleteStateKey } from './worktree-delete-state'
 import { pruneHostedReviewLinkMutationGenerations } from '../metadata/hosted-review-link-mutation'
 import { rememberAuthoritativelyRemovedWorktrees } from '../listing/authoritative-worktree-removal-memory'
-import { rememberPreservedBranchCleanup } from './preserved-branch-cleanup-target'
+import { preservedBranchRuntimeTargetByCleanupKey } from './preserved-branch-cleanup-target'
 import {
   isRuntimeRepoNotFoundError,
   isRuntimeSelectorNotFoundError
 } from '../listing/runtime-worktree-rpc-errors'
 import { recordRemovedWorktreeSnapshotPrune } from './removed-worktree-snapshot-prune'
-import { retireRemovedWorktreeCommitDrafts } from '@/lib/source-control/drafts/source-control-commit-draft-session'
+import { clearSessionCommitDraftForWorktree } from '@/lib/source-control-commit-draft-session'
 import { dispatchWorktreeRemoval } from './dispatch-worktree-removal'
 import { tearDownRemovedWorktreeRendererState } from './removed-worktree-renderer-teardown'
-import {
-  captureWorktreeStateBeforeRemoval,
-  retireWorktreeDraftOwners
-} from './worktree-state-before-removal'
+import { captureWorktreeStateBeforeRemoval } from './worktree-state-before-removal'
 import { resolveWorktreeRemovalPreference } from './worktree-removal-preference'
 import { completePreservedBranchCleanup } from './complete-preserved-branch-cleanup'
-import type { WorktreeSlice } from '../worktree-slice-contract'
-import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
-import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
 
 export function createRemoveWorktree(
   set: WorktreeSliceSet,
@@ -71,9 +66,10 @@ export function createRemoveWorktree(
       removalRoute,
       hostId,
       removalGenerationGuard,
-      sameIdSurvivingHostId: catalogSurvivorHostId
+      sameIdSurvivingHostId: catalogSameIdSurvivingHostId
     } = start
-    const sameIdSurvivingHostId = catalogSurvivorHostId ?? options?.sameIdSurvivingHostId ?? null
+    const sameIdSurvivingHostId =
+      catalogSameIdSurvivingHostId ?? options?.sameIdSurvivingHostId ?? null
     const deleteStateKey = getWorktreeDeleteStateKey(get(), worktreeId, requiredExecutionHostId)
     set((s) => ({
       deleteStateByWorktreeId: {
@@ -106,7 +102,7 @@ export function createRemoveWorktree(
         worktreeId,
         requiredExecutionHostId
       )
-      let beforeRemoval = captureWorktreeStateBeforeRemoval(get(), worktreeId, hostId)
+      const beforeRemoval = captureWorktreeStateBeforeRemoval(get(), worktreeId, hostId)
       if (!policy.forgetLocalOnly) {
         removalGenerationGuard?.assertCurrent()
       }
@@ -168,9 +164,6 @@ export function createRemoveWorktree(
         }
       }
 
-      retireRemovedWorktreeCommitDrafts(worktreeId, requiredExecutionHostId ?? hostId)
-      beforeRemoval = retireWorktreeDraftOwners(beforeRemoval)
-
       if (!snapshotPruneHandledByLocalMain) {
         await recordRemovedWorktreeSnapshotPrune({
           worktreeId,
@@ -197,7 +190,7 @@ export function createRemoveWorktree(
             options?.ignoreWorkspaceCleanupScanSurvivors === true
           )
           if (sameIdStillSurvives) {
-            return await completeSameIdHostScopedRemoval({
+            return completeSameIdHostScopedRemoval({
               set,
               get,
               worktreeId,
@@ -245,14 +238,26 @@ export function createRemoveWorktree(
         catalogVersion: removalResult?.catalogVersion,
         confirmedDiscards: options?.confirmedDiscards
       })
+      // Why: Source Control may be unmounted during deletion, so it can't be the only stale-draft cleanup path.
+      clearSessionCommitDraftForWorktree(worktreeId)
       const preservedBranch = removalResult?.preservedBranch
-      const cleanup = rememberPreservedBranchCleanup(
-        worktreeId,
-        preservedBranch,
-        hostId,
-        removalRoute,
-        target
-      )
+      const cleanup = preservedBranch
+        ? {
+            worktreeId,
+            branchName: preservedBranch.branchName,
+            expectedHead: preservedBranch.head,
+            ...(hostId ? { hostId } : {}),
+            ...(removalRoute?.runtimeEnvironmentId
+              ? { runtimeEnvironmentId: removalRoute.runtimeEnvironmentId }
+              : {})
+          }
+        : null
+      if (preservedBranch) {
+        preservedBranchRuntimeTargetByCleanupKey.set(preservedBranchCleanupKey(cleanup!), {
+          cleanup: cleanup!,
+          target
+        })
+      }
       const branchCleanupOptions = {
         ...(hostId ? { hostId } : {}),
         ...(removalRoute?.runtimeEnvironmentId

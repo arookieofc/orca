@@ -1,17 +1,12 @@
-import { pickSourceControlLaunchAgent } from '../../../../../../shared/source-control/ai/source-control-launch-agent-selection'
-import type { GitConflictOperation } from '../../../../../../shared/git/status/git-status-types'
-import type { TuiAgent } from '../../../../../../shared/agent-launch/catalog/tui-agent'
+import { pickSourceControlLaunchAgent } from '../../../../../../shared/source-control-launch-agent-selection'
+import type { GitConflictOperation } from '../../../../../../shared/git-status-types'
+import type { TuiAgent } from '../../../../../../shared/tui-agent'
 
 export function shouldRenderCommitArea(
   unresolvedConflictCount: number,
-  conflictOperation: GitConflictOperation,
-  sequencerRecoverySupported = true
+  conflictOperation: GitConflictOperation
 ): boolean {
-  return (
-    unresolvedConflictCount === 0 &&
-    (conflictOperation === 'unknown' ||
-      (conflictOperation === 'revert' && !sequencerRecoverySupported))
-  )
+  return unresolvedConflictCount === 0 && conflictOperation === 'unknown'
 }
 
 export function pickDefaultSourceControlAgent(

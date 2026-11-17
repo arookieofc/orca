@@ -1,29 +1,25 @@
-import type { OrcaVmRecipe } from '../../shared/workspace-setup/orca-yaml-hook-types'
+import type { OrcaVmRecipe } from '../../shared/orca-yaml-hook-types'
 import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus
-} from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
-import type { EphemeralVmRuntimeRecord } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
-import type {
-  EphemeralVmRecipeContext,
-  EphemeralVmRecipeStartFailure,
-  EphemeralVmRecipeStartSuccess
-} from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner'
-import { ShellRecipeDriver } from '../environment-providers/shell-recipe-driver'
+} from '../../shared/ephemeral-vm-runtime-store'
+import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
 import {
-  beginEphemeralVmProvisioning,
-  endEphemeralVmProvisioning,
-  isEphemeralVmProvisionLive,
-  persistFailedEphemeralVmStart,
-  persistProvisionedEphemeralVmRuntime
+  runEphemeralVmRecipeCleanup,
+  runEphemeralVmRecipeResume,
+  runEphemeralVmRecipeSuspend,
+  runEphemeralVmRecipeStart,
+  type EphemeralVmRecipeContext,
+  type EphemeralVmRecipeStartFailure,
+  type EphemeralVmRecipeStartSuccess
+} from '../../shared/ephemeral-vm-recipe-runner'
+import { cleanupFailedEphemeralVmStart } from './failed-start-cleanup'
+import {
+  persistProvisionedEphemeralVmRuntime,
+  prepareEphemeralVmCompatibilityPersistence
 } from './runtime-provisioning-persistence'
 import { getProvisionedRootResumeIntegrityError } from './resume-integrity'
 import { runControlledEphemeralVmRuntimeCleanup } from './runtime-cleanup-control'
-import {
-  ephemeralVmFailure,
-  pickEphemeralVmFailureCode,
-  type EphemeralVmFailure
-} from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 
 export type ProvisionEphemeralVmRuntimeArgs = {
   userDataPath: string
@@ -84,50 +80,59 @@ export type SuspendEphemeralVmRuntimeResult =
       runtime: EphemeralVmRuntimeRecord
       skipped: boolean
     }
-  | ({
+  | {
       ok: false
       runtime: EphemeralVmRuntimeRecord
-    } & EphemeralVmFailure)
+      error: string
+    }
 
-/** Same shape as suspend: success may be a skipped no-op; failure carries the coded reason. */
-export type ResumeEphemeralVmRuntimeResult = SuspendEphemeralVmRuntimeResult
+export type ResumeEphemeralVmRuntimeResult =
+  | {
+      ok: true
+      runtime: EphemeralVmRuntimeRecord
+      skipped: boolean
+    }
+  | {
+      ok: false
+      runtime: EphemeralVmRuntimeRecord
+      error: string
+    }
 
 export async function provisionEphemeralVmRuntime(
   args: ProvisionEphemeralVmRuntimeArgs
 ): Promise<ProvisionEphemeralVmRuntimeResult> {
-  const writeAhead = beginEphemeralVmProvisioning(args)
-  try {
-    const start = await new ShellRecipeDriver(args.recipe, args.repoPath).runCreate({
-      context: {
-        projectId: args.projectId,
-        workspaceId: args.workspaceId,
-        workspaceName: args.workspaceName,
-        repoUrl: args.repoUrl,
-        branch: args.branch,
-        ref: args.ref,
-        expectedRefHead: args.expectedRefHead,
-        orcaVersion: args.orcaVersion,
-        instanceId: writeAhead.instanceId
-      },
-      signal: args.signal,
-      onSpawn: () => {
-        writeAhead.launched = true
-      },
-      onStdout: args.onStdout,
-      onStderr: args.onStderr
-    })
-    if (!start.ok) {
-      await persistFailedEphemeralVmStart(args, writeAhead, start)
-      endEphemeralVmProvisioning(args, writeAhead)
-      return { ok: false, start }
+  const compatibility = prepareEphemeralVmCompatibilityPersistence(args)
+  const start = await runEphemeralVmRecipeStart({
+    repoPath: args.repoPath,
+    recipe: args.recipe,
+    context: {
+      projectId: args.projectId,
+      workspaceId: args.workspaceId,
+      workspaceName: args.workspaceName,
+      repoUrl: args.repoUrl,
+      branch: args.branch,
+      ref: args.ref,
+      expectedRefHead: args.expectedRefHead,
+      orcaVersion: args.orcaVersion,
+      ...(compatibility ? { instanceId: compatibility.instanceId } : {})
+    },
+    signal: args.signal,
+    onStdout: args.onStdout,
+    onStderr: args.onStderr
+  })
+  if (!start.ok) {
+    if (start.recipeResult) {
+      await cleanupFailedEphemeralVmStart(args, {
+        context: start.context,
+        recipeResult: start.recipeResult
+      })
     }
-    const runtime = await persistProvisionedEphemeralVmRuntime(args, start, writeAhead)
-    endEphemeralVmProvisioning(args, writeAhead)
-    return { ok: true, start, runtime }
-  } catch (error) {
-    endEphemeralVmProvisioning(args, writeAhead, error)
-    throw error
+    return { ok: false, start }
   }
+
+  const runtime = await persistProvisionedEphemeralVmRuntime(args, start, compatibility)
+
+  return { ok: true, start, runtime }
 }
 
 export function cleanupEphemeralVmRuntime(
@@ -150,9 +155,6 @@ async function cleanupEphemeralVmRuntimeOnce(
   if (!existing) {
     throw new Error(`Unknown ephemeral VM runtime: ${args.runtimeId}`)
   }
-  if (existing.status === 'provisioning' && isEphemeralVmProvisionLive(existing.id)) {
-    throw new Error(`Ephemeral VM runtime is still provisioning: ${existing.id}`)
-  }
   if (existing.status === 'cleaned') {
     return {
       ok: true,
@@ -169,7 +171,9 @@ async function cleanupEphemeralVmRuntimeOnce(
     cleanupLastError: null,
     updatedAt: now
   })
-  const cleanup = await new ShellRecipeDriver(args.recipe, args.repoPath).runDestroy({
+  const cleanup = await runEphemeralVmRecipeCleanup({
+    repoPath: args.repoPath,
+    recipe: args.recipe,
     context: contextFromRuntime(args.repoPath, running),
     recipeResult: running.recipeResult,
     signal: args.signal,
@@ -178,16 +182,13 @@ async function cleanupEphemeralVmRuntimeOnce(
   })
 
   if (!cleanup.ok) {
-    const failure = cleanup.error
-      ? { error: cleanup.error, ...pickEphemeralVmFailureCode(cleanup) }
-      : ephemeralVmFailure('destroyFailed')
     const failed = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
       status: 'cleanup_failed',
       cleanupStatus: 'failed',
-      cleanupLastError: failure,
+      cleanupLastError: cleanup.error ?? 'Destroy failed.',
       updatedAt: Date.now()
     })
-    return { ok: false, runtime: failed, error: failure.error }
+    return { ok: false, runtime: failed, error: cleanup.error ?? 'Destroy failed.' }
   }
 
   const cleaned = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
@@ -208,10 +209,9 @@ export async function suspendEphemeralVmRuntime(
   if (!existing) {
     throw new Error(`Unknown ephemeral VM runtime: ${args.runtimeId}`)
   }
-  if (!existing.recipeResult) {
-    throw new Error(`Ephemeral VM runtime never finished provisioning: ${args.runtimeId}`)
-  }
-  const suspend = await new ShellRecipeDriver(args.recipe, args.repoPath).runSuspend({
+  const suspend = await runEphemeralVmRecipeSuspend({
+    repoPath: args.repoPath,
+    recipe: args.recipe,
     context: contextFromRuntime(args.repoPath, existing),
     recipeResult: existing.recipeResult,
     signal: args.signal,
@@ -220,16 +220,15 @@ export async function suspendEphemeralVmRuntime(
   })
 
   if (!suspend.ok) {
-    const failure = {
-      error: suspend.error ?? 'Suspend failed.',
-      ...pickEphemeralVmFailureCode(suspend)
-    }
-    return recordLifecycleFailure(args.userDataPath, existing.id, 'suspend_failed', failure)
+    const failed = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
+      status: 'suspend_failed',
+      updatedAt: Date.now()
+    })
+    return { ok: false, runtime: failed, error: suspend.error ?? 'Suspend failed.' }
   }
 
   const suspended = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
     status: suspend.skipped ? existing.status : 'suspended',
-    ...(suspend.skipped ? {} : { lifecycleLastError: null }),
     updatedAt: Date.now()
   })
   return { ok: true, runtime: suspended, skipped: suspend.skipped }
@@ -244,10 +243,9 @@ export async function resumeEphemeralVmRuntime(
   if (!existing) {
     throw new Error(`Unknown ephemeral VM runtime: ${args.runtimeId}`)
   }
-  if (!existing.recipeResult) {
-    throw new Error(`Ephemeral VM runtime never finished provisioning: ${args.runtimeId}`)
-  }
-  const resume = await new ShellRecipeDriver(args.recipe, args.repoPath).runResume({
+  const resume = await runEphemeralVmRecipeResume({
+    repoPath: args.repoPath,
+    recipe: args.recipe,
     context: contextFromRuntime(args.repoPath, existing),
     recipeResult: existing.recipeResult,
     signal: args.signal,
@@ -256,41 +254,30 @@ export async function resumeEphemeralVmRuntime(
   })
 
   if (!resume.ok) {
-    const failure = { error: resume.error, ...pickEphemeralVmFailureCode(resume) }
-    return recordLifecycleFailure(args.userDataPath, existing.id, 'resume_failed', failure)
+    const failed = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
+      status: 'resume_failed',
+      updatedAt: Date.now()
+    })
+    return { ok: false, runtime: failed, error: resume.error }
   }
 
   const resumeIntegrityError = resume.skipped
     ? null
     : getProvisionedRootResumeIntegrityError(existing.recipeResult, resume.result)
   if (resumeIntegrityError) {
-    return recordLifecycleFailure(args.userDataPath, existing.id, 'resume_failed', {
-      error: resumeIntegrityError
+    const failed = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
+      status: 'resume_failed',
+      updatedAt: Date.now()
     })
+    return { ok: false, runtime: failed, error: resumeIntegrityError }
   }
 
   const runtime = updateEphemeralVmRuntimeStatus(args.userDataPath, existing.id, {
     status: 'running',
-    lifecycleLastError: null,
     ...(!resume.skipped ? { recipeResult: resume.result } : {}),
     updatedAt: Date.now()
   })
   return { ok: true, runtime, skipped: resume.skipped }
-}
-
-/** Persist the failed status with its reason so the sidebar can explain it after a restart. */
-function recordLifecycleFailure(
-  userDataPath: string,
-  runtimeId: string,
-  status: 'suspend_failed' | 'resume_failed',
-  failure: EphemeralVmFailure
-): { ok: false; runtime: EphemeralVmRuntimeRecord } & EphemeralVmFailure {
-  const runtime = updateEphemeralVmRuntimeStatus(userDataPath, runtimeId, {
-    status,
-    lifecycleLastError: failure,
-    updatedAt: Date.now()
-  })
-  return { ok: false, runtime, ...failure }
 }
 
 function contextFromRuntime(

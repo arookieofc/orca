@@ -1,26 +1,21 @@
 import {
+  agentProviderSessionsEqual,
   isResumableTuiAgent,
   normalizeAgentProviderSession,
+  type SleepingAgentLaunchConfig,
   type SleepingAgentSessionRecord
-} from '../../../../shared/agent-session/lifecycle/agent-session-resume'
-import { agentProviderSessionsEqual } from '../../../../shared/agent-session/lifecycle/resume/agent-provider-session-equality'
-import type { AgentStatusIpcPayload } from '../../../../shared/agent-status/contracts/agent-status-ipc-payload'
-import type { AgentProcessVerdict } from '../../../../shared/agent-status/process/agent-process-presence'
-import { parsePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
-import { isLocalHookConnectionId } from '../../../../shared/agent-hook-listener/transport/wsl-hook-relay-contract'
-import type { WorkspaceSessionState } from '../../../../shared/workspace-session/workspace-session-state-types'
-import { isWorkspaceSleepRecord } from '../../../../shared/workspace/lifecycle/workspace-sleep'
-import { launchStatement, type PtyLaunchFacts } from '../launch/launch-evidence'
+} from '../../../../shared/agent-session-resume'
+import type { AgentStatusIpcPayload } from '../../../../shared/agent-status-ipc-payload'
+import type { AgentProcessVerdict } from '../../../../shared/agent-process-presence'
+import { parsePaneKey } from '../../../../shared/stable-pane-id'
+import { isLocalHookConnectionId } from '../../../../shared/wsl-hook-relay-contract'
+import type { WorkspaceSessionState } from '../../../../shared/workspace-session-state-types'
+import { isWorkspaceSleepRecord } from '../../../../shared/workspace-sleep'
 
 /** Per slept PTY: the resume records captured, and the panes the hook store proves moved on. */
 export type WorktreeSleepResumeCapture = Map<
   string,
-  {
-    retiredPaneKeys: string[]
-    records: SleepingAgentSessionRecord[]
-    /** Main can't tell this PTY's launch, so a record keeps an earlier capture's same-session note. */
-    launchUnknown?: boolean
-  }
+  { retiredPaneKeys: string[]; records: SleepingAgentSessionRecord[] }
 >
 
 /** Captures before a host-driven sleep stops its PTYs and persists for the ones proven stopped. */
@@ -37,10 +32,13 @@ export type WorktreeSleepResumeRecorder = {
 export async function captureWorktreeSleepResumeRecords(args: {
   worktreeId: string
   paneKeysByPtyId: ReadonlyMap<string, Iterable<string>>
-  /** Each PTY's launch facts; only a launch main still holds supplies its recipe. */
-  launchByPtyId: ReadonlyMap<string, PtyLaunchFacts | undefined>
+  /** The agent each PTY was launched as, with its recipe; resume must reuse a custom binary/args. */
+  launchByPtyId: ReadonlyMap<
+    string,
+    { agent: string | null; config: SleepingAgentLaunchConfig | null }
+  >
   /** Read after each presence probe, so a conversation started during it is the one captured. */
-  readRowsForPane: (paneKey: string) => readonly AgentStatusIpcPayload[]
+  readRows: () => readonly AgentStatusIpcPayload[]
   checkAgentPresence:
     | ((paneKey: string, exitedSince?: number) => Promise<AgentProcessVerdict | null>)
     | null
@@ -55,14 +53,13 @@ export async function captureWorktreeSleepResumeRecords(args: {
     const records: SleepingAgentSessionRecord[] = []
     const retiredPaneKeys: string[] = []
     const launch = args.launchByPtyId.get(ptyId)
-    let launchUnknown = false
     for (const { paneKey, tabId } of panes) {
       // Why: the one holder rule — an agent the hook store proved exited left a plain shell.
       if ((await args.checkAgentPresence?.(paneKey, 0).catch(() => null)) === 'exited') {
         retiredPaneKeys.push(paneKey)
         continue
       }
-      const row = args.readRowsForPane(paneKey).find((candidate) => candidate.paneKey === paneKey)
+      const row = args.readRows().find((candidate) => candidate.paneKey === paneKey)
       const agent = row?.agentType
       const providerSession = normalizeAgentProviderSession(row?.providerSession)
       if (!row) {
@@ -73,9 +70,6 @@ export async function captureWorktreeSleepResumeRecords(args: {
         retiredPaneKeys.push(paneKey)
         continue
       }
-      const statement = launchStatement(launch, agent)
-      launchUnknown ||= statement === undefined
-      const launchConfig = statement ?? undefined
       records.push({
         paneKey,
         tabId,
@@ -91,14 +85,10 @@ export async function captureWorktreeSleepResumeRecords(args: {
         restoreOnTabOpenOnly: true,
         // Why: the SSH host boundary keeps the id off another machine; a WSL relay tag is local transport.
         connectionId: isLocalHookConnectionId(row.connectionId) ? null : row.connectionId,
-        ...(launchConfig ? { launchConfig } : {})
+        ...(launch?.config && launch.agent === agent ? { launchConfig: launch.config } : {})
       })
     }
-    capture.set(ptyId, {
-      retiredPaneKeys,
-      records,
-      ...(launchUnknown ? { launchUnknown } : {})
-    })
+    capture.set(ptyId, { retiredPaneKeys, records })
   }
   return capture
 }
@@ -121,10 +111,9 @@ export function applyWorktreeSleepResumeRecords(
       }
     }
     for (const record of entry?.records ?? []) {
-      // Only a terminal main can't tell about keeps an earlier capture's recipe for the same session.
       const previous = next[record.paneKey]
+      // Reattach can lose launch recipes; retain an earlier capture's config for the same session.
       const keptLaunchConfig =
-        entry?.launchUnknown &&
         !record.launchConfig &&
         previous?.launchConfig &&
         previous.agent === record.agent &&

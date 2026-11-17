@@ -4,18 +4,14 @@ import type {
   MobilePushTestResult,
   MobilePushRegisterInput,
   MobilePushRegisterResult
-} from '../../../shared/notifications/mobile-push-contract'
-import { runKeyedSerializedOperation } from '../../../shared/concurrency/keyed-serialized-operations'
-import type { DeviceRegistry } from '../rpc/server/pairing/device-registry'
+} from '../../../shared/mobile-push-contract'
+import { runKeyedSerializedOperation } from '../../cli/keyed-promise-queue'
+import type { DeviceRegistry } from '../device-registry'
 import type { OrcaRuntimeService } from '../orca-runtime'
-import type { OrcaRuntimeRpcServer } from '../rpc/server/runtime-rpc'
+import type { OrcaRuntimeRpcServer } from '../runtime-rpc'
 import { PushDispatcher } from './push-dispatcher'
 import { PushGatewayClient } from './push-gateway-client'
 import { PushRegisterThrottle } from './push-register-throttle'
-import {
-  readMobilePushDeliveryMode,
-  type MobilePushDeliveryMode
-} from './mobile-push-delivery-policy'
 import type { PushUnregisterOutbox } from './push-unregister-outbox'
 
 const OUTBOX_RETRY_BASE_MS = 30_000
@@ -42,7 +38,6 @@ export class DesktopPushService {
   private readonly outbox: PushUnregisterOutbox
   private readonly client: PushGatewayClient
   private readonly dispatcher: PushDispatcher
-  private readonly deliveryMode: MobilePushDeliveryMode
   private readonly registerThrottle: PushRegisterThrottle
   private readonly scheduleRetry: (run: () => void, delayMs: number) => void
   private unsubscribe: (() => void) | null = null
@@ -63,8 +58,7 @@ export class DesktopPushService {
     this.registry = registry
     this.client = client
     this.outbox = options.runtimeRpc.getPushUnregisterOutbox()
-    this.deliveryMode = readMobilePushDeliveryMode()
-    this.dispatcher = new PushDispatcher({ client, registry, deliveryMode: this.deliveryMode })
+    this.dispatcher = new PushDispatcher({ client, registry })
     this.registerThrottle = options.registerThrottle ?? new PushRegisterThrottle()
     this.scheduleRetry =
       options.scheduleRetry ??
@@ -116,7 +110,7 @@ export class DesktopPushService {
     if (device?.scope !== 'mobile' || !registration || registration.expiresAt <= Date.now()) {
       return { accepted: false, reason: 'not_registered' }
     }
-    if (this.stopped || this.deliveryMode === 'disabled') {
+    if (this.stopped) {
       return { accepted: false, reason: 'unavailable' }
     }
     // Explicit tests target only the caller and bypass automatic activity filters.
@@ -158,9 +152,6 @@ export class DesktopPushService {
   }
 
   async register(input: MobilePushRegisterInput): Promise<MobilePushRegisterResult> {
-    if (this.deliveryMode === 'disabled') {
-      return { registered: false, reason: 'gateway_rejected' }
-    }
     if (this.registry.getDevice(input.deviceId)?.scope !== 'mobile') {
       return { registered: false, reason: 'not_mobile' }
     }

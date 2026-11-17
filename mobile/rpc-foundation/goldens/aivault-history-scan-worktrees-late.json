@@ -4,9 +4,71 @@
   "family": "aiVault.history",
   "namedDeltas": [],
   "values": {
-    "03fd6edde488": {
-      "name": "aiVault.listSessions#1",
+    "1e294d39caf5": {
+      "name": "status.get#2",
       "ordinal": 4,
+      "args": [
+        {
+          "name": "method",
+          "value": "status.get"
+        },
+        {
+          "name": "params",
+          "value": {
+            "$rpc": "absent"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-3",
+          "ok": true,
+          "result": {
+            "capabilities": ["aiVault.v1"]
+          }
+        }
+      }
+    },
+    "33d053404f10": {
+      "activeWorktreePath": {
+        "$rpc": "null"
+      },
+      "hostStatusResult": {
+        "capabilities": ["aiVault.v1"]
+      },
+      "refreshing": false,
+      "scope": "workspace",
+      "screenState": {
+        "kind": "loading"
+      }
+    },
+    "44a27dbf05e2": {
+      "name": "status.get#1",
+      "ordinal": 3,
+      "json": "{\"id\":\"frame-2\",\"deviceToken\":\"recording-device\",\"method\":\"status.get\"}"
+    },
+    "595e6c3bbfed": {
+      "name": "aiVault.listSessions#1",
+      "ordinal": 7,
+      "json": "{\"id\":\"frame-4\",\"deviceToken\":\"recording-device\",\"method\":\"aiVault.listSessions\",\"params\":{\"limit\":500,\"force\":false,\"scopePaths\":[\"/repo/feature\"]}}"
+    },
+    "6c80e490239f": {
+      "name": "status.get#2",
+      "ordinal": 5,
+      "json": "{\"id\":\"frame-3\",\"deviceToken\":\"recording-device\",\"method\":\"status.get\"}"
+    },
+    "79fccda27236": {
+      "name": "aiVault.listSessions#1",
+      "ordinal": 6,
       "args": [
         {
           "name": "method",
@@ -17,14 +79,13 @@
           "value": {
             "force": false,
             "limit": 500,
-            "scopeOnly": true,
             "scopePaths": ["/repo/feature"]
           }
         },
         {
           "name": "options",
           "value": {
-            "failWhenDisconnected": true
+            "$rpc": "absent"
           }
         }
       ],
@@ -33,7 +94,7 @@
         "startedAt": 0,
         "settledAt": 0,
         "value": {
-          "id": "frame-3",
+          "id": "frame-4",
           "ok": true,
           "result": {
             "issues": [],
@@ -48,19 +109,9 @@
         }
       }
     },
-    "2182656920b3": {
-      "name": "aiVault.listSessions#1",
-      "ordinal": 5,
-      "json": "{\"id\":\"frame-3\",\"deviceToken\":\"recording-device\",\"method\":\"aiVault.listSessions\",\"params\":{\"limit\":500,\"force\":false,\"scopePaths\":[\"/repo/feature\"],\"scopeOnly\":true}}"
-    },
-    "44a27dbf05e2": {
-      "name": "status.get#1",
-      "ordinal": 3,
-      "json": "{\"id\":\"frame-2\",\"deviceToken\":\"recording-device\",\"method\":\"status.get\"}"
-    },
-    "758b3fde1948": {
+    "7e8b2964ad63": {
       "name": "streams-registered-at-teardown",
-      "ordinal": 6,
+      "ordinal": 8,
       "value": [
         {
           "cancelled": false,
@@ -69,23 +120,7 @@
         }
       ]
     },
-    "9aa0df31dc4d": {
-      "activeWorktreePath": "/repo/feature",
-      "refreshing": false,
-      "scope": "workspace",
-      "screenState": {
-        "issues": [],
-        "kind": "ready",
-        "sessions": [
-          {
-            "agent": "claude",
-            "cwd": "/repo/feature",
-            "id": "s1"
-          }
-        ]
-      }
-    },
-    "daf52dc85a58": {
+    "acf501fa9958": {
       "name": "status.get#1",
       "ordinal": 2,
       "args": [
@@ -96,13 +131,13 @@
         {
           "name": "params",
           "value": {
-            "$rpc": "undefined"
+            "$rpc": "absent"
           }
         },
         {
           "name": "options",
           "value": {
-            "failWhenDisconnected": true
+            "$rpc": "absent"
           }
         }
       ],
@@ -119,14 +154,23 @@
         }
       }
     },
-    "dcc5f025cb63": {
-      "activeWorktreePath": {
-        "$rpc": "null"
+    "cd739a80b7a8": {
+      "activeWorktreePath": "/repo/feature",
+      "hostStatusResult": {
+        "capabilities": ["aiVault.v1"]
       },
       "refreshing": false,
       "scope": "workspace",
       "screenState": {
-        "kind": "loading"
+        "issues": [],
+        "kind": "ready",
+        "sessions": [
+          {
+            "agent": "claude",
+            "cwd": "/repo/feature",
+            "id": "s1"
+          }
+        ]
       }
     },
     "e28c488ce6b2": {
@@ -149,39 +193,39 @@
       {
         "id": "held",
         "observation": {
-          "sender": [],
-          "payloads": ["e28c488ce6b2"],
+          "sender": ["acf501fa9958"],
+          "payloads": ["e28c488ce6b2", "44a27dbf05e2"],
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "dcc5f025cb63",
+          "state": "33d053404f10",
           "effects": []
         }
       },
       {
         "id": "ready",
         "observation": {
-          "sender": ["daf52dc85a58", "03fd6edde488"],
-          "payloads": ["e28c488ce6b2", "44a27dbf05e2", "2182656920b3"],
+          "sender": ["acf501fa9958", "1e294d39caf5", "79fccda27236"],
+          "payloads": ["e28c488ce6b2", "44a27dbf05e2", "6c80e490239f", "595e6c3bbfed"],
           "settlements": {
             "mount": "eb79a9b3682a",
             "worktrees-loaded": "eb79a9b3682a"
           },
-          "state": "9aa0df31dc4d",
+          "state": "cd739a80b7a8",
           "effects": []
         }
       },
       {
         "id": "cleanup",
         "observation": {
-          "sender": ["daf52dc85a58", "03fd6edde488"],
-          "payloads": ["e28c488ce6b2", "44a27dbf05e2", "2182656920b3"],
+          "sender": ["acf501fa9958", "1e294d39caf5", "79fccda27236"],
+          "payloads": ["e28c488ce6b2", "44a27dbf05e2", "6c80e490239f", "595e6c3bbfed"],
           "settlements": {
             "mount": "eb79a9b3682a",
             "worktrees-loaded": "eb79a9b3682a"
           },
-          "state": "9aa0df31dc4d",
-          "effects": ["758b3fde1948"]
+          "state": "cd739a80b7a8",
+          "effects": ["7e8b2964ad63"]
         }
       }
     ]

@@ -1,5 +1,5 @@
-import type { PersistedState } from '../../../shared/orca-profiles/persisted-state-types'
-import type { SshRemotePtyLease } from '../../../shared/remote-runtime/ssh/ssh-types'
+import type { PersistedState } from '../../../shared/persisted-state-types'
+import type { SshRemotePtyLease } from '../../../shared/ssh-types'
 
 export type SshPtyLeaseTombstoneRetentionOperations = {
   state: PersistedState

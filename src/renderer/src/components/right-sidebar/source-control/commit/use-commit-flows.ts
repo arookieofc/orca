@@ -15,28 +15,43 @@ export function useSourceControlCommitFlows(foundation: SourceControlPanelFounda
     allocateCommitMessageGenerationRequestId,
     beginGitBranchCompareRequest,
     branchName,
+    commitInFlightRef,
     commitMessage,
+    commitMessageGenerationRecords,
     compareBaseRef,
     conflictOperation,
     effectiveBaseRef,
     fastForwardBranch,
     fetchBranch,
+    generateErrors,
+    generateInFlightByWorktree,
+    generateInFlightRef,
     getCreatePrIntentOperationTarget,
     grouped,
+    isAbortingOperation,
     openCommitGenerationDialog,
-    operationStore,
     pullBranch,
     pushBranch,
     rebaseFromBase,
     refreshActiveGitStatusAfterMutation,
     refreshBranchCompareRef,
     refreshGitHistoryRef,
+    remoteActionErrorSequenceByWorktreeRef,
     remoteStatus,
     remoteStatusForActions,
+    resolvedCommitMessageAi,
+    setAbortOperationInFlightByWorktree,
+    setCommitErrorForWorktree,
+    setCommitInFlightByWorktree,
     setCommitMessageGenerationRecord,
+    setGenerateErrors,
+    setGenerateInFlightByWorktree,
+    setRemoteActionErrors,
+    settings,
+    sourceControlAiActionsVisible,
     syncBranch,
     unresolvedConflicts,
-    updateCommitDraft,
+    updateCommitDrafts,
     updateCommitMessageGenerationRecord,
     worktreePath
   } = foundation
@@ -46,15 +61,17 @@ export function useSourceControlCommitFlows(foundation: SourceControlPanelFounda
     activeWorktree,
     activeWorktreeId,
     beginGitBranchCompareRequest,
+    commitInFlightRef,
     commitMessage,
     compareBaseRef,
-    operationStore,
     refreshActiveGitStatusAfterMutation,
     refreshBranchCompareRef,
     refreshGitHistoryRef,
+    setCommitErrorForWorktree,
+    setCommitInFlightByWorktree,
     stagedCount: grouped.staged.length,
     unresolvedConflictCount: unresolvedConflicts.length,
-    updateCommitDraft,
+    updateCommitDrafts,
     worktreePath
   })
   const commitMessageGeneration = useSourceControlCommitMessageGeneration({
@@ -62,14 +79,22 @@ export function useSourceControlCommitFlows(foundation: SourceControlPanelFounda
     activeRepoTarget,
     activeWorktreeId,
     allocateCommitMessageGenerationRequestId,
+    commitMessageGenerationRecords,
+    generateErrors,
+    generateInFlightByWorktree,
+    generateInFlightRef,
     openCommitGenerationDialog,
-    operationStore,
+    resolvedCommitMessageAi,
     setCommitMessageGenerationRecord,
-    updateCommitDraft,
+    setGenerateErrors,
+    setGenerateInFlightByWorktree,
+    settings,
+    sourceControlAiActionsVisible,
+    updateCommitDrafts,
     updateCommitMessageGenerationRecord,
     worktreePath
   })
-  const { handleCommit: commitStagedChanges, handleCompleteMerge } = commitAction
+  const { handleCommit: commitStagedChanges } = commitAction
   const { handleCancelGenerate } = commitMessageGeneration
   // Cancel box generation when committing its draft so a late reply cannot refill it; Create PR has its own target.
   const handleCommit = useCallback<typeof commitStagedChanges>(
@@ -83,8 +108,12 @@ export function useSourceControlCommitFlows(foundation: SourceControlPanelFounda
   )
   const createPrIntentCommitMessage = useSourceControlCreatePrIntentCommitMessage({
     activeRepo,
+    generateInFlightRef,
     getCreatePrIntentOperationTarget,
-    operationStore
+    resolvedCommitMessageAi,
+    setGenerateErrors,
+    setGenerateInFlightByWorktree,
+    settings
   })
   const remoteActionRunner = useSourceControlRemoteActionRunner({
     activeRepoTarget,
@@ -96,15 +125,16 @@ export function useSourceControlCommitFlows(foundation: SourceControlPanelFounda
     fetchBranch,
     grouped,
     handleCommit,
-    operationStore,
     pullBranch,
     pushBranch,
     rebaseFromBase,
     refreshActiveGitStatusAfterMutation,
     refreshBranchCompareRef,
     refreshGitHistoryRef,
+    remoteActionErrorSequenceByWorktreeRef,
     remoteStatus,
     remoteStatusForActions,
+    setRemoteActionErrors,
     syncBranch,
     worktreePath
   })
@@ -112,16 +142,17 @@ export function useSourceControlCommitFlows(foundation: SourceControlPanelFounda
     activeRepoTarget,
     activeWorktreeId,
     conflictOperation,
-    operationStore,
+    isAbortingOperation,
     refreshActiveGitStatusAfterMutation,
     refreshBranchCompareRef,
     refreshGitHistoryRef,
+    setAbortOperationInFlightByWorktree,
+    setRemoteActionErrors,
     worktreePath
   })
 
   return {
     handleCommit,
-    handleCompleteMerge,
     ...commitMessageGeneration,
     ...createPrIntentCommitMessage,
     ...remoteActionRunner,

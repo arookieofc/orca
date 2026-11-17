@@ -1,81 +1,66 @@
-import {
-  closeSync,
-  fchmodSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync
-} from 'node:fs'
+import { readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  asHangObservations,
-  latestHangMarker,
-  parseLegacyHangMarker,
-  type HangDetectionMarker,
-  type HangObservationCollection
-} from './hang-observations'
 
-export type { HangDetectionMarker } from './hang-observations'
-export type StoredHangMarker = HangDetectionMarker | HangObservationCollection
+// The next launch consumes detection/resolution markers; selfRecovered distinguishes cleared stalls from unresolved hangs.
+export type HangDetectionMarker = {
+  detectedAt: number
+  parentPid: number
+  unresponsiveMs: number
+  selfRecovered: boolean
+}
 
 export function hangDetectionMarkerPath(userDataPath: string): string {
   return join(userDataPath, 'main-thread-hang.json')
 }
 
-export function writeHangDetectionMarker(markerPath: string, marker: StoredHangMarker): void {
-  const collection = 'version' in marker ? asHangObservations(marker) : null
-  if (
-    'version' in marker &&
-    (!collection || collection.observations.length !== marker.observations.length)
-  ) {
-    throw new Error('Invalid hang observations')
-  }
-  const text = JSON.stringify(
-    collection ? { ...latestHangMarker(collection), ...collection } : marker
-  )
-  if (Buffer.byteLength(text) > 32 * 1024) {
-    throw new Error('Hang observations exceed byte bound')
-  }
-  const temporaryPath = `${markerPath}.tmp`
-  const fd = openSync(temporaryPath, 'w', 0o600)
-  try {
-    fchmodSync(fd, 0o600)
-    writeFileSync(fd, text)
-  } finally {
-    closeSync(fd)
-  }
-  renameSync(temporaryPath, markerPath)
+export function writeHangDetectionMarker(markerPath: string, marker: HangDetectionMarker): void {
+  writeFileSync(markerPath, JSON.stringify(marker), { mode: 0o600 })
 }
 
-export function readAvailableHangDetectionMarker(
+function readAvailableHangDetectionMarker(
   markerPath: string
-): StoredHangMarker | null | undefined {
+): HangDetectionMarker | null | undefined {
   let raw: string
   try {
     if (statSync(markerPath).size > 64 * 1024) {
       return null
     }
     raw = readFileSync(markerPath, 'utf8')
-  } catch (error) {
-    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
-      ? null
-      : undefined
+  } catch {
+    return undefined
   }
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed === 'object' && parsed && 'version' in parsed && parsed.version === 1) {
-      const collection = Buffer.byteLength(raw) <= 32 * 1024 ? asHangObservations(parsed) : null
-      return collection ? { ...latestHangMarker(collection), ...collection } : null
+    if (
+      typeof parsed !== 'object' ||
+      !parsed ||
+      !('detectedAt' in parsed) ||
+      typeof parsed.detectedAt !== 'number' ||
+      !Number.isFinite(parsed.detectedAt) ||
+      !('parentPid' in parsed) ||
+      typeof parsed.parentPid !== 'number' ||
+      !Number.isInteger(parsed.parentPid) ||
+      parsed.parentPid <= 0 ||
+      !('unresponsiveMs' in parsed) ||
+      typeof parsed.unresponsiveMs !== 'number' ||
+      !Number.isFinite(parsed.unresponsiveMs) ||
+      parsed.unresponsiveMs < 0
+    ) {
+      return null
     }
-    return parseLegacyHangMarker(parsed)
+    return {
+      detectedAt: parsed.detectedAt,
+      parentPid: parsed.parentPid,
+      unresponsiveMs: parsed.unresponsiveMs,
+      // Missing recovery evidence leaves the stall unresolved.
+      selfRecovered: 'selfRecovered' in parsed && parsed.selfRecovered === true
+    }
   } catch {
     return null
   }
 }
 
-export function consumeHangDetectionMarker(markerPath: string): StoredHangMarker | null {
+export function consumeHangDetectionMarker(markerPath: string): HangDetectionMarker | null {
   const marker = readAvailableHangDetectionMarker(markerPath)
   // Retry unavailable reads next startup; only successfully inspected files are consumable.
   if (marker === undefined) {

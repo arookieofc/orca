@@ -15,7 +15,6 @@ export const TERMINAL_DOCUMENT_SCRIPT_PATH = path.join(
   mobileRoot,
   'src',
   'terminal',
-  'document',
   'terminal-webview-document-script.generated.ts'
 )
 

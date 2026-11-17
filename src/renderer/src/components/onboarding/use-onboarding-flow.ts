@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { getAgentCatalog } from '@/lib/agent-catalog/agent-catalog'
-import { useAppStore } from '@/store/index'
-import { selectOnboardingWorkspaceId } from './onboarding-workspace-selection'
-import { applyDocumentTheme } from '@/app-shell/appearance/document-theme'
-import { resolvePaintedTheme } from '@/app-shell/appearance/terminal-app-theme'
-import { track } from '@/diagnostics/telemetry/telemetry'
+import { getAgentCatalog } from '@/lib/agent-catalog'
+import { useAppStore } from '@/store'
+import { applyDocumentTheme } from '@/lib/document-theme'
+import { track } from '@/lib/telemetry'
 import { buildAgentPickedPayload } from './agent-picked-payload'
-import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
-import type { OnboardingState } from '../../../../shared/onboarding/onboarding-state-types'
-import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
-import { STEPS, stepIndexAfterCompletedStep } from './use-onboarding-flow-types'
-import { useOnboardingAgentSurface } from './use-onboarding-agent-surface'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { OnboardingState } from '../../../../shared/onboarding-state-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import { STEPS } from './use-onboarding-flow-types'
 import { persistStep, useCloseWith, usePersistCurrentStep } from './use-onboarding-flow-persistence'
 import { resolveOnboardingSettingsHydration } from './onboarding-settings-hydration'
 import { translate } from '@/i18n/i18n'
 import { useOnboardingYoloPermissions } from './use-onboarding-yolo-permissions'
-import { isWindowsUserAgent } from '@/app-shell/platform/user-agent-platform'
+import { isWindowsUserAgent } from '@/components/terminal-pane/pane-helpers'
 import {
   isSkippedStepIndex,
   remapOpenOnboardingLastCompletedStep,
@@ -24,21 +21,24 @@ import {
   shouldSkipIntegrationsStep,
   shouldSkipWindowsTerminalStep
 } from './onboarding-flow-state'
+
 import { useOnboardingFlowActions } from './use-onboarding-flow-actions'
 import { useOnboardingFlowTelemetry } from './use-onboarding-flow-telemetry'
+export { STEPS } from './use-onboarding-flow-types'
+export type { StepId, StepNumber } from './use-onboarding-flow-types'
 
 export function useOnboardingFlow(
   onboarding: OnboardingState,
   onOnboardingChange: (state: OnboardingState) => void
 ) {
   const settings = useAppStore((s) => s.settings)
-  const updateSettingsOrThrow = useAppStore((s) => s.updateSettingsOrThrow)
+  const updateSettings = useAppStore((s) => s.updateSettings)
+  const refreshDetectedAgents = useAppStore((s) => s.refreshDetectedAgents)
   const detectedAgentIds = useAppStore((s) => s.detectedAgentIds)
   const isDetectingAgents = useAppStore((s) => s.isDetectingAgents || s.isRefreshingAgents)
   const pathSource = useAppStore((s) => s.pathSource)
   const pathFailureReason = useAppStore((s) => s.pathFailureReason)
   const openModal = useAppStore((s) => s.openModal)
-  const selectedWorkspaceId = useAppStore(selectOnboardingWorkspaceId)
   const preflightStatus = useAppStore((s) => s.preflightStatus)
   const preflightStatusChecked = useAppStore((s) => s.preflightStatusChecked)
   const preflightStatusLoading = useAppStore((s) => s.preflightStatusLoading)
@@ -56,7 +56,7 @@ export function useOnboardingFlow(
   )
   const remappedLastCompletedStep = remapOpenOnboardingLastCompletedStep(onboarding)
   const initialStep = resolveStepIndex(
-    stepIndexAfterCompletedStep(remappedLastCompletedStep),
+    Math.min(Math.max(remappedLastCompletedStep, 0), STEPS.length - 1),
     skipOptions,
     'forward'
   )
@@ -112,6 +112,7 @@ export function useOnboardingFlow(
   const setSelectedAgentInteractive = useCallback(
     (value: TuiAgent | null, fromCollapsedSection = false) => {
       agentInteractedRef.current = true
+      // Count changed picks, excluding repeated clicks on the current agent.
       const prev = selectedAgentRef.current
       setSelectedAgent(value)
       if (value === null || value === prev) {
@@ -133,14 +134,6 @@ export function useOnboardingFlow(
     []
   )
 
-  const { agentSurface, setAgentSurface, chatAgents, chatDetected, refreshDetectedAgents } =
-    useOnboardingAgentSurface({
-      settings,
-      selectedAgent,
-      agentInteractedRef,
-      setSelectedAgent
-    })
-
   const detectedSet = useMemo(() => new Set(detectedAgentIds ?? []), [detectedAgentIds])
   const currentStep = STEPS[stepIndex]
   // Omit skipped steps so the stepper shows only reachable pages.
@@ -160,26 +153,27 @@ export function useOnboardingFlow(
   const [initialStartTime] = useState(() => Date.now())
   const startTimeRef = useRef<number>(initialStartTime)
 
-  // Unmount-only restoration needs the latest painted theme without rerunning on settings changes;
-  // painted, because Match Terminal can paint the mode the setting doesn't ask for.
-  const paintedTheme = resolvePaintedTheme(settings, settings?.theme ?? 'dark')
-  const paintedThemeRef = useRef<GlobalSettings['theme']>(paintedTheme)
+  // Unmount-only restoration needs the latest persisted theme without rerunning on settings changes.
+  const persistedThemeRef = useRef<GlobalSettings['theme']>(settings?.theme ?? 'dark')
+  persistedThemeRef.current = settings?.theme ?? 'dark'
+  const themeStepEntryThemeRef = useRef<GlobalSettings['theme'] | null>(null)
+  const themeStepEntryCapturedRef = useRef(false)
   useEffect(() => {
-    paintedThemeRef.current = paintedTheme
-  }, [paintedTheme])
-  // Why per entry: "Set up later" keeps the look the user arrived with, and each pick
-  // replaces only its own mode's slot from here.
-  const [themeLookBaseline, setThemeLookBaseline] = useState<GlobalSettings | null>(null)
-  if (currentStep.id !== 'theme' && themeLookBaseline) {
-    setThemeLookBaseline(null)
-  } else if (currentStep.id === 'theme' && settings && !themeLookBaseline) {
-    setThemeLookBaseline(settings)
-  }
+    if (currentStep.id !== 'theme') {
+      themeStepEntryCapturedRef.current = false
+      return
+    }
+    if (!settings || themeStepEntryCapturedRef.current) {
+      return
+    }
+    // Why: capture entry theme so "Skip to project setup" keeps the preference the user arrived with.
+    themeStepEntryCapturedRef.current = true
+    themeStepEntryThemeRef.current = settings.theme
+  }, [currentStep.id, settings])
 
-  const previewTheme = resolvePaintedTheme(settings, theme)
   useEffect(() => {
-    applyDocumentTheme(previewTheme)
-  }, [previewTheme])
+    applyDocumentTheme(theme)
+  }, [theme])
 
   useEffect(() => {
     void refreshPreflightStatus()
@@ -226,7 +220,7 @@ export function useOnboardingFlow(
     useOnboardingFlowTelemetry({
       remappedLastCompletedStep,
       currentStep,
-      paintedThemeRef,
+      persistedThemeRef,
       preflightStatus,
       preflightStatusLoading,
       linearStatus,
@@ -241,8 +235,7 @@ export function useOnboardingFlow(
     }
     didAutoSelectRef.current = true
     // Refresh PATH on mount; pre-hydration session-cache entries can falsely report no agents.
-    // First-run setup is a user act: it may start the default WSL distro to find its agents.
-    void refreshDetectedAgents(undefined, { wakeWslDistro: true }).then((ids) => {
+    void refreshDetectedAgents().then((ids) => {
       if (selectedAgentRef.current !== null) {
         return
       }
@@ -259,20 +252,18 @@ export function useOnboardingFlow(
 
   const persistCurrentStep = usePersistCurrentStep({
     currentStepId: currentStep.id,
-    agentSurface,
     selectedAgent,
-    agentInteractedRef,
     yoloPermissions,
     yoloPermissionsChosen,
     theme,
     settings,
-    updateSettings: updateSettingsOrThrow,
+    updateSettings,
     onboardingChecklist: onboarding.checklist,
     onOnboardingChange,
     setError
   })
 
-  const { next, setUpLater, dismissOnboarding, back, jumpToStep } = useOnboardingFlowActions({
+  const { next, skipToRepo, dismissOnboarding, back, jumpToStep } = useOnboardingFlowActions({
     busyLabel,
     setBusyLabel,
     setError,
@@ -281,7 +272,6 @@ export function useOnboardingFlow(
     trackTaskSourcesSnapshot,
     settings,
     persistCurrentStep,
-    selectedWorkspaceId,
     closeWith,
     openModal,
     getNextStepIndex,
@@ -289,38 +279,30 @@ export function useOnboardingFlow(
     stepIndex,
     setStepIndex,
     selectedAgent,
-    agentSurface,
-    themeLookBaseline,
+    themeStepEntryThemeRef,
     setTheme,
-    updateSettings: updateSettingsOrThrow,
+    updateSettings,
     skipOptions
   })
 
   return {
     settings,
-    updateSettings: useAppStore((s) => s.updateSettings),
+    updateSettings,
     stepIndex,
     progressSteps,
     progressStepIndex,
     currentStep,
-    agentSurface,
-    setAgentSurface,
-    chatAgents,
-    chatDetected,
     selectedAgent,
     setSelectedAgent: setSelectedAgentInteractive,
     yoloPermissions,
     setYoloPermissions: setYoloPermissionsInteractive,
     theme,
     setTheme: setThemeInteractive,
-    themeLookBaseline,
-    setThemeLookBaseline,
     busyLabel,
-    hasSelectedWorkspace: selectedWorkspaceId !== null,
     detectedSet,
     isDetectingAgents,
     next,
-    setUpLater,
+    skipToRepo,
     dismissOnboarding,
     back,
     jumpToStep,

@@ -1,46 +1,29 @@
-import { useShellStorage } from '../platform/shell-storage/shell-storage'
-import { useDirectionPadAvailable } from '../layout/use-shell-side-rail'
 import { settleSessionPreferenceRead } from './session-preference-read'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { AppState, type AppStateStatus, Platform } from 'react-native'
 import { useFocusEffect } from 'expo-router'
-import { currentAppStateStatus } from '../platform/app-state-status'
-import { loadHosts } from '../host-catalog/host-store'
-import {
-  loadTerminalAccessoryLayout,
-  saveTerminalSmartRail
-} from '../terminal/key-input/terminal-accessory-layout'
+import { loadHosts } from '../transport/host-store'
+import { loadTerminalAccessoryLayout } from '../terminal/terminal-accessory-layout'
 import {
   recoverActiveTerminalAfterForeground,
   shouldRecoverTerminalOnAppStateChange
-} from '../terminal/webview/terminal-foreground-recovery'
-import {
-  loadCustomKeys,
-  subscribeStoredCustomKeys
-} from '../terminal/key-input/terminal-custom-keys'
-import type { MobileSessionTabReconciliationModel } from './tabs/use-mobile-session-tab-reconciliation'
+} from '../terminal/terminal-foreground-recovery'
+import { loadCustomKeys } from '../terminal/terminal-custom-keys'
+import type { MobileSessionTabReconciliationModel } from './use-mobile-session-tab-reconciliation'
 
 export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationModel) {
-  const shellStorage = useShellStorage()
-  const padAvailable = useDirectionPadAvailable()
   const [customKeysLoaded, setCustomKeysLoaded] = useState(false)
   const [accessoryLayoutLoaded, setAccessoryLayoutLoaded] = useState(false)
   const {
     hostId,
     connState,
-    customKeys,
     setCustomKeys,
     setVisibleBuiltInIds,
-    setDirectionPadEnabled,
-    setSmartRailEnabled,
     setHostEndpoint,
-    setHostName,
     connStateRef,
     terminalRefs,
     initializedHandlesRef,
-    terminalResume,
     activeHandleRef,
-    visibleTerminalHandlesRef,
     scheduleDelayedAction,
     unsubscribeTerminal,
     subscribeToTerminal
@@ -58,7 +41,6 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
       const host = hosts.find((h) => h.id === hostId)
       if (host) {
         setHostEndpoint(host.endpoint)
-        setHostName(host.name)
       }
     })
     return () => {
@@ -66,50 +48,28 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
     }
   }, [hostId])
 
-  const customKeysRef = useRef(customKeys)
   useEffect(() => {
-    customKeysRef.current = customKeys
-  }, [customKeys])
-  const customKeysReadRevisionRef = useRef(0)
-  const refreshCustomKeys = useCallback(() => {
-    const revision = ++customKeysReadRevisionRef.current
-    const keysAtStart = customKeysRef.current
-    void settleSessionPreferenceRead(loadCustomKeys(keysAtStart)).then((keys) => {
-      if (customKeysReadRevisionRef.current === revision) {
-        if (keys && customKeysRef.current === keysAtStart) {
+    let active = true
+    void settleSessionPreferenceRead(loadCustomKeys()).then((keys) => {
+      if (active) {
+        if (keys) {
           setCustomKeys(keys)
         }
         setCustomKeysLoaded(true)
       }
     })
     return () => {
-      if (customKeysReadRevisionRef.current === revision) {
-        customKeysReadRevisionRef.current += 1
-      }
+      active = false
     }
-  }, [shellStorage])
-
-  useEffect(
-    () =>
-      subscribeStoredCustomKeys((keys) => {
-        // An accepted write is at least as new as any read still in flight.
-        customKeysReadRevisionRef.current += 1
-        customKeysRef.current = keys
-        setCustomKeys(keys)
-        setCustomKeysLoaded(true)
-      }),
-    []
-  )
+  }, [])
 
   const layoutReadRevisionRef = useRef(0)
   const refreshAccessoryLayout = useCallback(() => {
     const revision = ++layoutReadRevisionRef.current
-    void settleSessionPreferenceRead(loadTerminalAccessoryLayout(padAvailable)).then((layout) => {
+    void settleSessionPreferenceRead(loadTerminalAccessoryLayout()).then((layout) => {
       if (layoutReadRevisionRef.current === revision) {
         if (layout) {
           setVisibleBuiltInIds(layout.visibleBuiltInIds)
-          setDirectionPadEnabled(layout.directionPadEnabled !== false)
-          setSmartRailEnabled(layout.smartRail === true)
         }
         setAccessoryLayoutLoaded(true)
       }
@@ -119,49 +79,25 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
         layoutReadRevisionRef.current += 1
       }
     }
-  }, [padAvailable, shellStorage])
+  }, [])
 
-  const handleSmartRailChange = useCallback(
-    (enabled: boolean) => {
-      // A read that started before the toggle must not flip it back.
-      layoutReadRevisionRef.current += 1
-      setSmartRailEnabled(enabled)
-      saveTerminalSmartRail(enabled, padAvailable).catch((error: unknown) => {
-        console.warn('[terminal-keys] the store would not take the Smart rail setting', error)
-        setSmartRailEnabled(!enabled)
-      })
-    },
-    [padAvailable]
-  )
-
-  useFocusEffect(
-    useCallback(() => {
-      const releaseKeys = refreshCustomKeys()
-      const releaseLayout = refreshAccessoryLayout()
-      return () => {
-        releaseKeys()
-        releaseLayout()
-      }
-    }, [refreshAccessoryLayout, refreshCustomKeys])
-  )
+  useFocusEffect(refreshAccessoryLayout)
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s: AppStateStatus) => {
       if (s === 'active') {
-        refreshCustomKeys()
         refreshAccessoryLayout()
       }
     })
     return () => {
-      customKeysReadRevisionRef.current += 1
       layoutReadRevisionRef.current += 1
       sub.remove()
     }
-  }, [refreshAccessoryLayout, refreshCustomKeys])
+  }, [refreshAccessoryLayout])
 
   const pendingForegroundRecoveryRef = useRef(false)
   useEffect(() => {
-    let previousAppState: AppStateStatus | null = currentAppStateStatus()
+    let previousAppState: AppStateStatus | null = AppState.currentState
     const sub = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       const shouldRecover = shouldRecoverTerminalOnAppStateChange(
         previousAppState,
@@ -178,10 +114,8 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
       // WKWebView can resume blank without ready; clear the latch so init waits for a fresh pong.
       const outcome = recoverActiveTerminalAfterForeground({
         activeHandleRef,
-        visibleTerminalHandlesRef,
         terminalRefs,
         initializedHandlesRef,
-        terminalResume,
         connStateRef,
         unsubscribeTerminal,
         subscribeToTerminal,
@@ -192,7 +126,7 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
     return () => {
       sub.remove()
     }
-  }, [scheduleDelayedAction, subscribeToTerminal, terminalResume, unsubscribeTerminal])
+  }, [scheduleDelayedAction, subscribeToTerminal, unsubscribeTerminal])
 
   // Repeat resume recovery after reconnect or an iOS-blanked WebView can remain stale.
   useEffect(() => {
@@ -205,19 +139,16 @@ export function useMobileSessionLifecycle(scope: MobileSessionTabReconciliationM
     }
     recoverActiveTerminalAfterForeground({
       activeHandleRef,
-      visibleTerminalHandlesRef,
       terminalRefs,
       initializedHandlesRef,
-      terminalResume,
       connStateRef,
       unsubscribeTerminal,
       subscribeToTerminal,
       schedule: scheduleDelayedAction
     })
-  }, [connState, scheduleDelayedAction, subscribeToTerminal, terminalResume, unsubscribeTerminal])
+  }, [connState, scheduleDelayedAction, subscribeToTerminal, unsubscribeTerminal])
   return {
     accessoryPreferencesReady: customKeysLoaded && accessoryLayoutLoaded,
-    handleSmartRailChange,
     pendingForegroundRecoveryRef
   }
 }

@@ -1,18 +1,13 @@
-import type { PairedE2EEClientHandshake } from '../e2ee/paired-e2ee-client-handshake'
+import type { PairedE2EEClientHandshake } from '../../paired-e2ee-client-handshake'
 import type { RemoteRuntimeHandshakeState } from '../remote-runtime-client-handshake'
 import { RemoteRuntimeClientError } from '../remote-runtime-client-error'
 import {
   isKeepaliveFrame,
   RuntimeRpcEnvelopeSchema,
   type RuntimeRpcResponse
-} from '../rpc/runtime-rpc-envelope'
+} from '../../runtime-rpc-envelope'
 import { parseRemoteRuntimeJsonText } from './remote-runtime-request-frames'
-import type { RuntimeStatus } from '../session-graph/runtime-session-contracts'
-import {
-  acceptSealedReady,
-  openSealedText,
-  type RemoteRuntimeSealedFrame
-} from '../remote-runtime-sealed-frame'
+import type { RuntimeStatus } from '../../runtime-types'
 
 type RequestResponseRouterOptions<TResult> = {
   handshake: PairedE2EEClientHandshake
@@ -23,7 +18,7 @@ type RequestResponseRouterOptions<TResult> = {
   statusRequestId: string | null
   validateStatus?: (response: RuntimeRpcResponse<RuntimeStatus>) => void
   send: (frame: string) => void
-  sendRequestedRpc: (status?: unknown) => void
+  sendRequestedRpc: () => void
   refreshTimeout: () => void
   finishError: (error: Error) => void
   finishResponse: (response: RuntimeRpcResponse<TResult>) => void
@@ -47,22 +42,25 @@ export class RemoteRuntimeRequestResponseRouter<TResult> {
         : 'runtime'
   }
 
-  handleFrame(frame: RemoteRuntimeSealedFrame): void {
+  handleTextFrame(frame: string): void {
     if (this.state === 'awaiting_ready') {
       this.handleReadyFrame(frame)
       return
     }
-    const opened = openSealedText(this.options.handshake, frame)
-    if (opened.kind === 'failed') {
+    const plaintext = this.options.handshake.channel.openText(frame)
+    if (plaintext === null) {
       this.options.finishError(
-        new RemoteRuntimeClientError('invalid_runtime_response', opened.message, {
-          pairingStage:
-            this.state === 'awaiting_authenticated' ? 'host-identity' : this.pairingStage
-        })
+        new RemoteRuntimeClientError(
+          'invalid_runtime_response',
+          'Remote Orca runtime returned an undecryptable frame.',
+          {
+            pairingStage:
+              this.state === 'awaiting_authenticated' ? 'host-identity' : this.pairingStage
+          }
+        )
       )
       return
     }
-    const plaintext = opened.text
     if (this.state === 'awaiting_authenticated') {
       this.handleAuthenticatedFrame(plaintext)
       return
@@ -70,8 +68,8 @@ export class RemoteRuntimeRequestResponseRouter<TResult> {
     this.handleRpcFrame(plaintext)
   }
 
-  private handleReadyFrame(frame: RemoteRuntimeSealedFrame): void {
-    const readyFrame = acceptSealedReady(this.options.handshake, frame)
+  private handleReadyFrame(frame: string): void {
+    const readyFrame = this.options.handshake.acceptReadyText(frame)
     if (readyFrame !== 'accepted') {
       this.options.finishError(
         new RemoteRuntimeClientError(
@@ -172,7 +170,7 @@ export class RemoteRuntimeRequestResponseRouter<TResult> {
       this.awaitingStatus = false
       this.awaitingRequestId = this.options.requestId
       this.options.refreshTimeout()
-      this.options.sendRequestedRpc(parsed.data.ok ? parsed.data.result : undefined)
+      this.options.sendRequestedRpc()
       return
     }
     this.options.finishResponse(parsed.data as RuntimeRpcResponse<TResult>)

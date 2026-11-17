@@ -1,7 +1,7 @@
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 
 export function ActionButton({
   icon: Icon,

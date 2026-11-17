@@ -17,8 +17,7 @@ import type {
   BitbucketConnectArgs,
   BitbucketConnectResult,
   BitbucketConnectionStatus
-} from '../../shared/bitbucket/bitbucket-credentials'
-import { bitbucketConnectFailure } from '../../shared/bitbucket/bitbucket-credentials'
+} from '../../shared/bitbucket-credentials'
 
 export type { BitbucketConnectArgs, BitbucketConnectResult, BitbucketConnectionStatus }
 
@@ -43,13 +42,23 @@ export async function connectBitbucket(
 ): Promise<BitbucketConnectResult> {
   const config = buildCandidateConfig(input)
   if (!hasAuth(config)) {
-    return bitbucketConnectFailure(
-      input.authMode === 'token' ? 'accessTokenRequired' : 'emailAndApiTokenRequired'
-    )
+    return {
+      ok: false,
+      error:
+        input.authMode === 'token'
+          ? 'Enter an access token.'
+          : 'Enter both an email and an API token.'
+    }
   }
   const result = await fetchBitbucketUserResult(config, VERIFY_TIMEOUT_MS)
   if (!result.ok) {
-    return bitbucketConnectFailure(result.reason === 'rejected' ? 'rejected' : 'unreachable')
+    return {
+      ok: false,
+      error:
+        result.reason === 'rejected'
+          ? 'Bitbucket rejected these credentials. Check the email and token, then try again.'
+          : 'Could not reach Bitbucket. Check your connection or the API base URL, then try again.'
+    }
   }
   const account = accountNameFromUser(result.user)
   saveBitbucketCredential({

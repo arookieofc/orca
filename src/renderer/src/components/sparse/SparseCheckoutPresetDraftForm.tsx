@@ -6,9 +6,9 @@ import { Label } from '@/components/ui/label'
 import { SparseDirectoryPicker } from './SparseDirectoryPicker'
 import { SparseSelectedDirectoryList } from './SparseSelectedDirectoryList'
 import { addSparseDirectoryEntries } from './sparse-directory-entry-input'
-import { useTranslate } from '@/i18n/use-translate'
-import { normalizeSparseDirectoryLines } from '@/lib/directory-input/sparse-paths'
-import type { SparsePresetDirectoryParseResult } from '@/components/sparse/sparse-preset-draft'
+import { translate } from '@/i18n/i18n'
+import { normalizeSparseDirectoryLines } from '@/lib/sparse-paths'
+import type { SparsePresetDirectoryParseResult } from '@/lib/sparse-preset-draft'
 
 export type SparsePresetDraft = {
   mode: 'new' | 'edit'
@@ -46,7 +46,6 @@ export function SparseCheckoutPresetDraftForm({
   repoRootPath,
   repoConnectionId
 }: SparseCheckoutPresetDraftFormProps): React.JSX.Element {
-  const t = useTranslate()
   const id = useId()
   const [nameTouched, setNameTouched] = useState(false)
   const visibleNameError = nameTouched || draft.name.length > 0 ? nameError : null
@@ -73,13 +72,13 @@ export function SparseCheckoutPresetDraftForm({
     >
       <div className="space-y-3">
         <div className="space-y-2">
-          <Label htmlFor={`${id}-name`}>{t('sparsePreset.name', 'Name')}</Label>
+          <Label htmlFor={`${id}-name`}>{translate('sparsePreset.name', 'Name')}</Label>
           <Input
             id={`${id}-name`}
             ref={setNameInputNode}
             value={draft.name}
             onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
-            placeholder={t('sparsePreset.namePlaceholder', 'Web app and shared UI')}
+            placeholder={translate('sparsePreset.namePlaceholder', 'Web app and shared UI')}
             disabled={submitting}
             autoComplete="off"
             spellCheck={false}
@@ -94,9 +93,11 @@ export function SparseCheckoutPresetDraftForm({
           ) : null}
         </div>
         <div className="space-y-2">
-          <Label id={`${id}-directories`}>{t('sparsePreset.directories', 'Directories')}</Label>
+          <Label id={`${id}-directories`}>
+            {translate('sparsePreset.directories', 'Directories')}
+          </Label>
           <p id={`${id}-help`} className="text-xs text-muted-foreground">
-            {t(
+            {translate(
               'sparsePreset.pathInstructions',
               'Pick folders from the repository, or type any repo-relative path.'
             )}
@@ -122,10 +123,10 @@ export function SparseCheckoutPresetDraftForm({
         </div>
         <details className="space-y-2 text-xs text-muted-foreground">
           <summary className="cursor-pointer">
-            {t('sparsePreset.details', 'What gets checked out?')}
+            {translate('sparsePreset.details', 'What gets checked out?')}
           </summary>
           <p>
-            {t(
+            {translate(
               'sparsePreset.coneHelp',
               'Git also keeps files at the repository root and along the parent folders of these directories.'
             )}
@@ -140,17 +141,17 @@ export function SparseCheckoutPresetDraftForm({
         ) : null}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
-            {t('sparsePreset.cancel', 'Cancel')}
+            {translate('sparsePreset.cancel', 'Cancel')}
           </Button>
           <Button
             type="submit"
             disabled={!canSave}
             aria-busy={submitting}
-            aria-label={t('sparsePreset.save', 'Save preset')}
+            aria-label={translate('sparsePreset.save', 'Save preset')}
           >
             <span className="relative">
               <span className="data-[saving=true]:invisible" data-saving={submitting}>
-                {t('sparsePreset.save', 'Save preset')}
+                {translate('sparsePreset.save', 'Save preset')}
               </span>
               {submitting ? (
                 <span className="absolute inset-0 flex items-center justify-center">

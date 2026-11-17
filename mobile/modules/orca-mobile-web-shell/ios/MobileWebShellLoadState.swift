@@ -11,24 +11,11 @@ enum MobileWebShellFailureReason: String {
 struct MobileWebShellLoadEmission: Equatable {
   let state: String
   let reason: String?
-  /// Renderer losses only: Orca was off screen, so the OS reclaimed the process rather than the page failing.
-  var background: Bool? = nil
-
-  var payload: [String: Any] {
-    var payload: [String: Any] = ["state": state]
-    if let reason {
-      payload["reason"] = reason
-    }
-    if let background {
-      payload["background"] = background
-    }
-    return payload
-  }
 }
 
 /// Failure is terminal and duplicate reports are dropped: late error-document/rule-list callbacks must never restore ready.
 final class MobileWebShellLoadStateMachine {
-  private(set) var isTerminal = false
+  private var isTerminal = false
   private var last: MobileWebShellLoadEmission?
 
   /// Accept messages only after the current props’ document commits; the replaced same-origin document can still speak before then.
@@ -76,13 +63,8 @@ final class MobileWebShellLoadStateMachine {
     return emit(MobileWebShellLoadEmission(state: "ready", reason: nil))
   }
 
-  func failed(
-    _ reason: MobileWebShellFailureReason,
-    background: Bool? = nil
-  ) -> MobileWebShellLoadEmission? {
-    let emission = emit(
-      MobileWebShellLoadEmission(state: "failed", reason: reason.rawValue, background: background)
-    )
+  func failed(_ reason: MobileWebShellFailureReason) -> MobileWebShellLoadEmission? {
+    let emission = emit(MobileWebShellLoadEmission(state: "failed", reason: reason.rawValue))
     isTerminal = true
     documentEnded()
     return emission

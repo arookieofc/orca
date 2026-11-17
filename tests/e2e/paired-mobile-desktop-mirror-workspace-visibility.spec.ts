@@ -7,9 +7,11 @@ import { expect, test } from './helpers/orca-app'
 import { NO_WORKSPACE_ROW_FILTERS } from '../../src/shared/workspace-view/workspace-row-filters'
 import { launchPhoneMirrorTopology } from './helpers/phone-mirror-topology'
 import type { PairedMobileSocket } from './helpers/paired-mobile-client'
-import { filterWorktrees } from '../../mobile/src/worktree/workspace-list/workspace-row-filtering'
-import { getWorktreeStatus } from '../../mobile/src/worktree/workspace-list/workspace-list-ordering'
-import type { Worktree } from '../../mobile/src/worktree/workspace-list/workspace-list-types'
+import {
+  filterWorktrees,
+  getWorktreeStatus,
+  type Worktree
+} from '../../mobile/src/worktree/workspace-list-sections'
 
 const ServerRowsSchema = z.object({
   worktrees: z.array(

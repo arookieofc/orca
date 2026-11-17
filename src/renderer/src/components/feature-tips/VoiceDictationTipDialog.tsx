@@ -1,13 +1,10 @@
 import { useRef, type JSX } from 'react'
-import type { FeatureTip } from '../../../../shared/feature-education/feature-tips'
+import type { FeatureTip } from '../../../../shared/feature-tips'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useShortcutKeyDetails } from '@/hooks/useShortcutLabel'
-import { i18n } from '@/i18n/i18n'
-import { useTranslate } from '@/i18n/use-translate'
-import { Trans } from 'react-i18next'
+import { translate } from '@/i18n/i18n'
 import { FeatureTipActions } from './FeatureTipActions'
-import { getLocalizedFeatureTipCopy } from './feature-tip-localized-copy'
 import {
   FeatureTipDialogFrame,
   FeatureTipEyebrow,
@@ -32,10 +29,8 @@ export function VoiceDictationTipDialog({
   onSkip: () => void
   onVoiceSettingsClick: () => void
 }): JSX.Element {
-  const t = useTranslate()
   const shortcut = useShortcutKeyDetails('voice.dictation')
   const primaryButtonRef = useRef<HTMLButtonElement>(null)
-  const copy = getLocalizedFeatureTipCopy(tip)
 
   return (
     <FeatureTipDialogFrame
@@ -49,44 +44,46 @@ export function VoiceDictationTipDialog({
     >
       <DialogHeader className="gap-4 text-left">
         <div>
-          <FeatureTipEyebrow label={copy.eyebrow} />
+          <FeatureTipEyebrow label={tip.eyebrow} />
           <DialogTitle className="text-2xl font-semibold leading-tight tracking-tight md:text-[1.75rem]">
-            {copy.title}
+            {tip.title}
           </DialogTitle>
           <DialogDescription className="mt-3 max-w-2xl space-y-3 text-sm leading-relaxed">
             {shortcut.keys.length > 0 ? (
               <span className="block">
-                <Trans
-                  i18n={i18n}
-                  defaults={t(
-                    'featureTips.voice.shortcutInstruction',
-                    'Focus a terminal, editor, or agent prompt, then press <shortcut/> to start voice dictation. Press <shortcut/> again to stop.'
-                  )}
-                  components={{
-                    shortcut: (
-                      <ShortcutKeyCombo
-                        keys={shortcut.keys}
-                        doubleTap={shortcut.doubleTap}
-                        className="mx-1 align-middle"
-                        keyCapClassName="min-w-0 bg-card px-1.5 py-0 text-[11px] text-foreground shadow-none"
-                      />
-                    )
-                  }}
-                />
+                {translate(
+                  'featureTips.voice.focusPaneInstruction',
+                  'Focus a terminal, editor, or agent prompt, then press'
+                )}{' '}
+                <ShortcutKeyCombo
+                  keys={shortcut.keys}
+                  doubleTap={shortcut.doubleTap}
+                  className="mx-1 align-middle"
+                  keyCapClassName="min-w-0 bg-card px-1.5 py-0 text-[11px] text-foreground shadow-none"
+                />{' '}
+                {translate('featureTips.voice.startInstruction', 'to start voice dictation. Press')}{' '}
+                <ShortcutKeyCombo
+                  keys={shortcut.keys}
+                  doubleTap={shortcut.doubleTap}
+                  className="mx-1 align-middle"
+                  keyCapClassName="min-w-0 bg-card px-1.5 py-0 text-[11px] text-foreground shadow-none"
+                />{' '}
+                {translate('featureTips.voice.stopInstruction', 'again to stop.')}
               </span>
             ) : (
               <span className="block">
-                {t(
+                {translate(
                   'featureTips.voice.unassignedInstruction',
                   'Assign a dictation shortcut before starting voice dictation in a focused pane.'
                 )}
               </span>
             )}
             <FeatureTipSettingsLine
-              text={t(
-                'featureTips.voice.changeInSettings',
-                'Change the model, dictation mode, or shortcut anytime in <link>Settings → Voice</link>.'
+              lead={translate(
+                'featureTips.voice.settingsInstruction',
+                'Change the model, dictation mode, or shortcut anytime in'
               )}
+              link={translate('featureTips.voice.settingsLink', 'Settings → Voice')}
               onClick={onVoiceSettingsClick}
             />
           </DialogDescription>

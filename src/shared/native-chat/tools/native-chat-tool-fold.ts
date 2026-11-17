@@ -5,17 +5,14 @@ import {
   isToolResultBlock,
   type NativeChatBlock,
   type NativeChatMessage
-} from '../native-chat-types'
-import { isKnownHarnessInjectedUserTurnText } from '../../agent-session/journal/harness-injected-user-turns'
-import { isNoiseMessage } from '../transcript/messages/native-chat-noise'
+} from '../../native-chat-types'
+import { isKnownHarnessInjectedUserTurnText } from '../../harness-injected-user-turns'
+import { isNoiseMessage } from '../../native-chat-noise'
 import {
   CODEX_PLAN_UPDATED_FRAME_KIND,
   isWordlessProviderFrameMessage
-} from '../transcript/notices/native-chat-provider-frame-summary'
-import {
-  FoldedToolResultSources,
-  type NativeChatOrphanOrigin
-} from './native-chat-folded-tool-results'
+} from '../native-chat-provider-frame-summary'
+import { FoldedToolResultSources } from './native-chat-folded-tool-results'
 
 function isToolOnlyMessage(message: NativeChatMessage): boolean {
   return (
@@ -79,55 +76,20 @@ function recordFoldedPosition(target: NativeChatMessage, folded: NativeChatMessa
   }
 }
 
-export type NativeChatToolFoldKind =
-  | 'orphan'
-  | 'sidecar'
-  | 'tool'
-  | 'assistant'
-  | 'pass'
-  | 'boundary'
-
-export function nativeChatToolFoldKind(message: NativeChatMessage): NativeChatToolFoldKind {
-  if (message.unpairedToolResults) {
-    return 'orphan'
-  }
-  if (isHarnessSidecarToolMessage(message)) {
-    return 'sidecar'
-  }
-  if (isToolOnlyMessage(message)) {
-    return 'tool'
-  }
-  if (message.role === 'assistant') {
-    return 'assistant'
-  }
-  return isSubagentRosterMessage(message) ||
-    isBackgroundTaskMessage(message) ||
-    isUndrawnProviderFrameMessage(message) ||
-    (isNoiseMessage(message) && !isInterruptionBoundary(message))
-    ? 'pass'
-    : 'boundary'
-}
-
 /** Fold consecutive tool-only messages into their preceding assistant turn. */
-export function foldToolMessages(
-  messages: readonly NativeChatMessage[],
-  allocatedIds?: ReadonlySet<string>,
-  kinds?: ReadonlyMap<NativeChatMessage, NativeChatToolFoldKind>,
-  recordOrphan?: (origin: NativeChatOrphanOrigin) => void
-): NativeChatMessage[] {
+export function foldToolMessages(messages: readonly NativeChatMessage[]): NativeChatMessage[] {
   const output: NativeChatMessage[] = []
-  const sources = new FoldedToolResultSources(messages, allocatedIds, recordOrphan)
+  const sources = new FoldedToolResultSources(messages)
   let mutableAssistantIndex = -1
   let clonedAssistantIndex = -1
   for (const message of messages) {
-    const kind = kinds?.get(message) ?? nativeChatToolFoldKind(message)
-    if (kind === 'orphan') {
+    if (message.unpairedToolResults) {
       output.push(message)
       mutableAssistantIndex = -1
       clonedAssistantIndex = -1
       continue
     }
-    if (kind === 'sidecar' && mutableAssistantIndex >= 0) {
+    if (isHarnessSidecarToolMessage(message) && mutableAssistantIndex >= 0) {
       const index = mutableAssistantIndex
       const assistant = output[index]
       if (assistant?.role === 'assistant') {
@@ -146,7 +108,7 @@ export function foldToolMessages(
         continue
       }
     }
-    if (kind === 'tool' && mutableAssistantIndex >= 0) {
+    if (isToolOnlyMessage(message) && mutableAssistantIndex >= 0) {
       const index = mutableAssistantIndex
       const assistant = output[index]
       if (assistant?.role !== 'assistant') {
@@ -167,7 +129,12 @@ export function foldToolMessages(
     if (message.role === 'assistant') {
       mutableAssistantIndex = output.length - 1
       clonedAssistantIndex = -1
-    } else if (kind !== 'pass') {
+    } else if (
+      !isSubagentRosterMessage(message) &&
+      !isBackgroundTaskMessage(message) &&
+      !isUndrawnProviderFrameMessage(message) &&
+      (!isNoiseMessage(message) || isInterruptionBoundary(message))
+    ) {
       mutableAssistantIndex = -1
       clonedAssistantIndex = -1
     }

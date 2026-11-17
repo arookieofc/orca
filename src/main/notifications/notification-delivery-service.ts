@@ -4,19 +4,12 @@ import type {
   NotificationDispatchRequest,
   NotificationDispatchResult,
   NotificationSettings
-} from '../../shared/notifications/notification-settings-types'
+} from '../../shared/notification-settings-types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import { buildNotificationOptions } from '../ipc/notifications/notification-options'
+import { buildNotificationOptions } from '../ipc/notification-options'
 import { translateMain } from '../i18n/main-i18n'
-import { reserveNotificationCooldown } from '../../shared/notifications/notification-burst-cooldown'
-import { toHostSessionPaneKey } from '../../shared/workspace-layout/terminal-surface-id'
-import { isNotificationSourceEnabled } from '../../shared/notifications/notification-source-gate'
-import { notificationDeliveryId } from '../../shared/notifications/notification-delivery-id'
-
-type NativeNotificationReservation = {
-  isCurrent: () => boolean
-  release: () => void
-}
+import { reserveNotificationCooldown } from '../../shared/notification-burst-cooldown'
+import { toHostSessionPaneKey } from '../../shared/terminal-surface-id'
 
 export type NotificationDeliveryDependencies = {
   readNotificationSettings: () => NotificationSettings
@@ -36,10 +29,6 @@ export type NotificationDeliveryDependencies = {
   ) => NotificationDispatchResult | Promise<NotificationDispatchResult>
   platform: NodeJS.Platform
   now: () => number
-  reserveNative?: (
-    request: NotificationDispatchRequest
-  ) => NativeNotificationReservation | undefined
-  wasRead?: (request: NotificationDispatchRequest) => boolean
   /** Called for each actual desktop banner or mobile alert. */
   recordAnnounced?: (request: NotificationDispatchRequest) => void
 }
@@ -58,21 +47,14 @@ export function createNotificationDeliveryService(
 
   // Keyed news is announced once by its producer, so only its own repeat may collapse it.
   const dedupeKeyFor = (request: NotificationDispatchRequest): string =>
-    JSON.stringify([
-      request.executionHost,
-      request.attentionKey ?? request.worktreeId ?? request.worktreeLabel ?? 'global'
-    ])
+    request.attentionKey ?? request.worktreeId ?? request.worktreeLabel ?? 'global'
 
   const deliverNativeAndRecord = (
     request: NotificationDispatchRequest,
     options: ReturnType<typeof buildNotificationOptions>,
-    settings: NotificationSettings,
-    reservation?: NativeNotificationReservation
+    settings: NotificationSettings
   ): NotificationDispatchResult | Promise<NotificationDispatchResult> => {
     const recordIfDelivered = (result: NotificationDispatchResult): NotificationDispatchResult => {
-      if (result.delivered && reservation?.isCurrent() === false) {
-        return { delivered: false, reason: 'already-read' }
-      }
       if (result.delivered) {
         deps.recordAnnounced?.(request)
       }
@@ -84,15 +66,6 @@ export function createNotificationDeliveryService(
 
   return {
     dispatch: (request) => {
-      if (request.executionHost && request.notificationId) {
-        request = {
-          ...request,
-          notificationId: notificationDeliveryId(request.notificationId, request.executionHost)
-        }
-      }
-      if (deps.wasRead?.(request)) {
-        return { delivered: false, reason: 'already-read' }
-      }
       // Desktop gates must not suppress tray attention.
       if (request.source === 'agent-task-complete' || request.source === 'terminal-bell') {
         if (!deps.isWindowVisible(deps.findActiveWindow())) {
@@ -105,11 +78,10 @@ export function createNotificationDeliveryService(
         request.notificationSourceId !== undefined &&
         settings.mutedNotificationSourceIds.includes(request.notificationSourceId)
       // Machine mutes leave mobile eligibility and its cooldown unchanged.
-      const desktopAllowed = isNotificationSourceEnabled(
-        settings,
-        request.source,
-        request.agentState
-      )
+      const desktopAllowed =
+        settings.enabled &&
+        (request.source !== 'agent-task-complete' || settings.agentTaskComplete) &&
+        (request.source !== 'terminal-bell' || settings.terminalBell)
 
       const notificationOptions = buildNotificationOptions(request, translateMain)
 
@@ -139,9 +111,6 @@ export function createNotificationDeliveryService(
             title: notificationOptions.title,
             body: notificationOptions.body,
             worktreeId: request.worktreeId,
-            ...(request.workspaceExecutionHostId !== undefined
-              ? { workspaceExecutionHostId: request.workspaceExecutionHostId }
-              : {}),
             // The phone asks the execution host for tabs, which never name this window's mirror tabs.
             ...(request.paneKey ? { paneKey: toHostSessionPaneKey(request.paneKey) } : {}),
             ...(request.executionHost ? { executionHost: request.executionHost } : {}),
@@ -190,33 +159,17 @@ export function createNotificationDeliveryService(
         return { delivered: false, reason: 'not-supported' }
       }
 
-      const reservation = deps.reserveNative?.(request)
-      const deliverNative = () =>
-        deliverNativeAndRecord(request, notificationOptions, settings, reservation)
-      try {
-        // macOS swallows denied/undecided notifications; allow the renderer fallback instead.
-        const result =
-          deps.platform !== 'darwin'
-            ? deliverNative()
-            : deps.readAuthorizationStatus().then((authorization) => {
-                if (deps.wasRead?.(request) || reservation?.isCurrent() === false) {
-                  return { delivered: false, reason: 'already-read' } as const
-                }
-                if (authorization === 'denied' || authorization === 'not-determined') {
-                  deps.recordDeliveryOutcome('failed')
-                  return { delivered: false, reason: 'blocked-by-system' } as const
-                }
-                return deliverNative()
-              })
-        if (result instanceof Promise) {
-          return result.finally(() => reservation?.release())
-        }
-        reservation?.release()
-        return result
-      } catch (error) {
-        reservation?.release()
-        throw error
+      if (deps.platform !== 'darwin') {
+        return deliverNativeAndRecord(request, notificationOptions, settings)
       }
+      // macOS swallows denied/undecided notifications; allow the renderer fallback instead.
+      return deps.readAuthorizationStatus().then((authorization) => {
+        if (authorization === 'denied' || authorization === 'not-determined') {
+          deps.recordDeliveryOutcome('failed')
+          return { delivered: false, reason: 'blocked-by-system' }
+        }
+        return deliverNativeAndRecord(request, notificationOptions, settings)
+      })
     }
   }
 }

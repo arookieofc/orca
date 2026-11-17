@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { ArtifactListItem } from '../../../../shared/artifacts/artifacts'
+import type { ArtifactListItem } from '../../../../shared/artifacts'
 import { Button } from '@/components/ui/button'
-import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
+import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 import { clampArtifactListSearchQuery, filterArtifactsBySearchQuery } from './artifact-list-search'
 import { ArtifactListRows } from './ArtifactListRows'
 import { ArtifactListTableHeader } from './ArtifactListTableHeader'
 import { ArtifactListToolbar } from './ArtifactListToolbar'
-import { LIST_TABLE_CONTAINER_CLASS } from '@/lib/list-interaction/list-table-layout'
+import { LIST_TABLE_CONTAINER_CLASS } from '@/lib/list-table-layout'
 
 export function ArtifactCollection({
   artifacts,
@@ -33,7 +33,6 @@ export function ArtifactCollection({
   onRefresh: () => void
   isRefreshing: boolean
 }): React.JSX.Element {
-  const t = useTranslate()
   const [query, setQuery] = useState('')
   // Clamp before state/filtering so multi-MB pastes cannot reach either.
   const onQueryChange = (next: string): void => setQuery(clampArtifactListSearchQuery(next))
@@ -68,7 +67,7 @@ export function ArtifactCollection({
             />
           ) : (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-              {t('auto.components.artifacts.ArtifactCollection.noMatches', 'No matches')}
+              {translate('auto.components.artifacts.ArtifactCollection.noMatches', 'No matches')}
             </p>
           )}
           {hasMore ? (
@@ -82,7 +81,7 @@ export function ArtifactCollection({
                 onClick={loadMore}
               >
                 {loadingMore ? <Loader2 className="animate-spin" /> : null}
-                {t('auto.components.artifacts.ArtifactCollection.loadMore', 'Load more')}
+                {translate('auto.components.artifacts.ArtifactCollection.loadMore', 'Load more')}
               </Button>
             </div>
           ) : null}

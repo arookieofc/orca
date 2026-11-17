@@ -1,7 +1,6 @@
 import { normalizeOrcadMigrationImportReceipts } from './orcad-migration-manifest-validation'
 import type {
   OrcadMigrationCatalogAbortResult,
-  OrcadMigrationCatalogReference,
   OrcadMigrationCatalogReferenceAbortResult,
   OrcadMigrationCatalogState,
   OrcadMigrationManifest
@@ -82,7 +81,7 @@ export function parseOrcadMigrationCatalogAbortResult(
 /** Absent only with the host's flush behind it: an unflushed abort could come back on restart. */
 export function parseOrcadMigrationCatalogReferenceAbortResult(
   value: unknown,
-  manifest: OrcadMigrationCatalogReference
+  manifest: OrcadMigrationManifest
 ): OrcadMigrationCatalogReferenceAbortResult {
   const record = requireRecord(value)
   if (
@@ -95,12 +94,7 @@ export function parseOrcadMigrationCatalogReferenceAbortResult(
     throw new Error('orcad_migration_catalog_abort_result_invalid')
   }
   if (record.state === 'committed') {
-    return {
-      state: 'committed',
-      ...migrationIdentity(manifest),
-      aborted: false,
-      ...(record.durableCommitted === true ? { durableCommitted: true as const } : {})
-    }
+    return { state: 'committed', ...migrationIdentity(manifest), aborted: false }
   }
   if (record.state === 'absent' && record.durableAbsent === true) {
     return {
@@ -113,7 +107,7 @@ export function parseOrcadMigrationCatalogReferenceAbortResult(
   throw new Error('orcad_migration_catalog_abort_durability_invalid')
 }
 
-function migrationIdentity(manifest: OrcadMigrationCatalogReference) {
+function migrationIdentity(manifest: OrcadMigrationManifest) {
   return { migrationId: manifest.migrationId, manifestSha256: manifest.manifestSha256 }
 }
 

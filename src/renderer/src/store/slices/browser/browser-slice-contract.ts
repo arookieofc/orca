@@ -1,6 +1,5 @@
 import type { StateCreator } from 'zustand'
-import type { BrowserPageLoadingOwner } from '@/lib/browser/browser-page-loading-ownership'
-import type { ManagedBrowserProfileOwner } from '../../../../../shared/browser/profiles/browser-profile-scope'
+import type { ManagedBrowserProfileOwner } from '../../../../../shared/browser-profile-scope'
 
 /** What a new tab opens on; a partition only when it must not be derived from the profile. */
 export type NewBrowserTabProfile = { sessionProfileId: string | null; sessionPartition?: string }
@@ -16,23 +15,26 @@ import type {
   BrowserSessionProfile,
   BrowserViewportPresetId,
   BrowserWorkspace
-} from '../../../../../shared/browser/workspaces/browser-workspace-types'
-import type { WorkspaceSessionState } from '../../../../../shared/workspace-session/workspace-session-state-types'
-import type { WorkspaceDocHistoryEntry } from '../../../../../shared/workspace-session/workspace-doc-history'
-import type { BrowserPageAnnotation } from '../../../../../shared/browser/element-grab/browser-grab-types'
+} from '../../../../../shared/browser-workspace-types'
+import type { WorkspaceSessionState } from '../../../../../shared/workspace-session-state-types'
+import type { WorkspaceDocHistoryEntry } from '../../../../../shared/workspace-doc-history'
+import type {
+  BrowserAnnotationIntent,
+  BrowserPageAnnotation
+} from '../../../../../shared/browser-grab-types'
 import type {
   BrowserPageConversionLeg,
   BrowserPageConversionTarget
-} from './pages/browser-page-conversion'
-import type { RecentlyClosedTabPosition } from '../tabs/recently-closed-tab-position'
+} from '../browser-page-conversion'
+import type { RecentlyClosedTabPosition } from '../recently-closed-tabs'
 import type {
   ClientHostedBrowserCloseIntentsByEnvironment,
   PendingClientHostedBrowserClose
-} from '@/runtime/browser/closing/client-hosted-browser-close-intents'
-import type { WorkspaceSessionHydrationOptions } from '@/lib/workspace/persistence/workspace-session-hydration-keys'
-import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
-import type { TabSplitDirection, TabSplitTarget } from '../tabs/tabs-slice-contract'
-import type { RuntimeBrowserPlacement } from '../../../../../shared/browser/client-hosting/runtime-browser-placement'
+} from '@/runtime/client-hosted-browser-close-intents'
+import type { WorkspaceSessionHydrationOptions } from '@/lib/workspace-session-hydration-keys'
+import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { TabSplitTarget } from '../tabs/tabs-slice-contract'
+import type { RuntimeBrowserPlacement } from '../../../../../shared/runtime-browser-placement'
 
 export type CreateBrowserTabOptions = {
   /** Link-only guard, checked before records and again at the unified-tab mutation. */
@@ -48,8 +50,6 @@ export type CreateBrowserTabOptions = {
   split?: TabSplitTarget
   /** Client-local unified tab id of the source; the new tab lands right after it when still live. */
   afterTabId?: string
-  /** Shows the tab in its pane without making it the active pane or browser surface. */
-  showInGroup?: boolean
   /** Verified execution host for the new wrapper; unset keeps createUnifiedTab's active-workspace fallback. */
   executionHostId?: ExecutionHostId
   // Explicit "New Tab" focuses the address bar even with a real home URL; link-opened tabs leave it unset.
@@ -86,10 +86,7 @@ export type ClosedBrowserWorkspaceSnapshot = {
   position?: RecentlyClosedTabPosition
 }
 
-import type { BrowserInitializationPresentation } from '@/runtime/web-session-tabs-sync/tab-projection/browser-initialization-presentation'
-
 export type RemoteBrowserPageHandle = {
-  initializationPresentation?: BrowserInitializationPresentation
   environmentId: string
   remotePageId: string
   /** Profile identity confirmed by the host's current page snapshot. */
@@ -149,10 +146,7 @@ export type BrowserSlice = {
     url: string,
     options?: CreateBrowserTabOptions
   ) => BrowserWorkspace
-  openNewBrowserTabInActiveWorkspace: (
-    groupId: string,
-    splitDirection?: TabSplitDirection
-  ) => Promise<void>
+  openNewBrowserTabInActiveWorkspace: (groupId: string) => Promise<void>
   /** `profileId: null` uses the workspace default profile. */
   openBrowserProfileTabInActiveWorkspace: (
     url: string,
@@ -191,16 +185,8 @@ export type BrowserSlice = {
     options?: { surfacePane?: boolean }
   ) => void
   consumeAddressBarFocusRequest: (pageId: string) => boolean
-  updateBrowserTabPageState: (
-    pageId: string,
-    updates: BrowserTabPageState,
-    loadingOwner?: BrowserPageLoadingOwner
-  ) => void
-  updateBrowserPageState: (
-    pageId: string,
-    updates: BrowserTabPageState,
-    loadingOwner?: BrowserPageLoadingOwner
-  ) => void
+  updateBrowserTabPageState: (pageId: string, updates: BrowserTabPageState) => void
+  updateBrowserPageState: (pageId: string, updates: BrowserTabPageState) => void
   setBrowserPageCertificateFailure: (
     pageId: string,
     failure: BrowserCertificateFailure | null
@@ -222,7 +208,7 @@ export type BrowserSlice = {
   updateBrowserPageAnnotation: (
     pageId: string,
     annotationId: string,
-    patch: Pick<BrowserPageAnnotation, 'comment' | 'intent' | 'imagePaths'>
+    patch: { comment: string; intent: BrowserAnnotationIntent }
   ) => void
   deleteBrowserPageAnnotation: (pageId: string, annotationId: string) => void
   clearBrowserPageAnnotations: (pageId: string) => void
@@ -251,13 +237,7 @@ export type BrowserSlice = {
     error: string | null
   } | null
   /** Loads one host's profiles; defaults to the host Browser settings is showing. */
-  fetchBrowserSessionProfiles: (hostId?: ExecutionHostId) => Promise<void | {
-    hostId: ExecutionHostId
-    environmentId: string
-    pairingRevision: number | undefined
-    profiles: BrowserSessionProfile[]
-    executorRuntimeId?: string
-  }>
+  fetchBrowserSessionProfiles: (hostId?: ExecutionHostId) => Promise<void>
   createBrowserSessionProfile: (
     scope: 'isolated' | 'imported',
     label: string
@@ -309,9 +289,13 @@ export type BrowserSlice = {
   /** The page whose history view is open; it opens what you pick in that page. */
   browserHistoryPageId: string | null
   setBrowserHistoryPageId: (pageId: string | null) => void
-  setDefaultBrowserSessionProfileId: (profileId: string | null) => Promise<void>
+  defaultBrowserSessionProfileId: string | null
+  defaultBrowserSessionProfileIdByHostId: Partial<Record<ExecutionHostId, string | null>>
+  setDefaultBrowserSessionProfileId: (profileId: string | null) => void
 }
 
 type BrowserStateCreator = StateCreator<AppState, [], [], BrowserSlice>
 export type BrowserSliceSet = Parameters<BrowserStateCreator>[0]
 export type BrowserSliceGet = Parameters<BrowserStateCreator>[1]
+
+export type { BrowserPageConversionLeg, BrowserPageConversionTarget, BrowserSessionProfile }

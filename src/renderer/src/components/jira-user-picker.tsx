@@ -3,10 +3,8 @@ import { LoaderCircle } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { jiraSearchUsers } from '@/runtime/jira/runtime-jira-user-fields-client'
-import type { RowLessSource as RuntimeJiraSettings } from '@/runtime/hosts/selection/default-creation-host'
-import { useTranslate } from '@/i18n/use-translate'
-import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
+import { jiraSearchUsers, type RuntimeJiraSettings } from '@/runtime/runtime-jira-client'
+import { translate } from '@/i18n/i18n'
 import type { JiraUser } from '../../../shared/jira/jira-types'
 
 const USER_SEARCH_DEBOUNCE_MS = 250
@@ -69,8 +67,6 @@ export function JiraUserPicker({
   searchUsers?: (query: string) => Promise<JiraUser[]>
   allowKnownUserId?: boolean
 }): React.JSX.Element {
-  const t = useTranslate()
-  const languageRevision = useUiLanguageRevision()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [users, setUsers] = useState<JiraUser[]>([])
@@ -113,12 +109,11 @@ export function JiraUserPicker({
     }
     return (
       value ||
-      t('components.jiraUserPicker.select', 'Select {{value0}}', {
+      translate('components.jiraUserPicker.select', 'Select {{value0}}', {
         value0: label
       })
     )
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- translate() reads the UI language implicitly.
-  }, [label, selectedUser, value, languageRevision, t])
+  }, [label, selectedUser, value])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -139,7 +134,7 @@ export function JiraUserPicker({
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={t('components.jiraUserPicker.search', 'Search users')}
+          placeholder={translate('components.jiraUserPicker.search', 'Search users')}
           className="mb-1 h-7 text-[12px]"
           autoFocus
         />
@@ -158,7 +153,7 @@ export function JiraUserPicker({
         ))}
         {users.length === 0 && !loading ? (
           <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
-            {t('components.jiraUserPicker.empty', 'No users found')}
+            {translate('components.jiraUserPicker.empty', 'No users found')}
           </p>
         ) : (
           <JiraUserOptionList
@@ -178,7 +173,7 @@ export function JiraUserPicker({
             }}
             className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent"
           >
-            {t('components.jiraUserPicker.useKnownId', 'Use known user ID "{{value0}}"', {
+            {translate('components.jiraUserPicker.useKnownId', 'Use known user ID "{{value0}}"', {
               value0: knownUserId
             })}
           </button>

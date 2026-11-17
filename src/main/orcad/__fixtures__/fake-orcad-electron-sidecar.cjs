@@ -54,7 +54,6 @@ function handle(method, params) {
   if (injected) {
     const error = new Error(injected.message)
     error.code = injected.code
-    error.data = injected.data
     throw error
   }
   if (method === 'status.get') {
@@ -86,7 +85,7 @@ function handle(method, params) {
     }
     return { browserPageId: params.page, url: params.url, title: 'Fake page' }
   }
-  return control().results?.[method] ?? { browserPageId: params.page ?? undefined, method }
+  return { browserPageId: params.page ?? undefined, method }
 }
 
 const endpoint =
@@ -131,7 +130,7 @@ const server = createServer((socket) => {
         response = {
           id: request.id,
           ok: false,
-          error: { code: error.code ?? 'browser_error', message: error.message, data: error.data }
+          error: { code: error.code ?? 'browser_error', message: error.message }
         }
       }
       socket.write(`${JSON.stringify(response)}\n`)

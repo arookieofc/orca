@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import {
   JIRA_LIST_COLUMNS,
   getJiraListColumnLabel,
@@ -22,8 +22,7 @@ export function JiraListColumnsMenu({
   ids: ReadonlySet<JiraListColumnId>
   onToggle: (column: JiraListColumnId) => void
 }): React.JSX.Element {
-  const t = useTranslate()
-  const label = t('auto.components.TaskPage.jiraColumnsPicker', 'Columns')
+  const label = translate('auto.components.TaskPage.jiraColumnsPicker', 'Columns')
   return (
     <DropdownMenu>
       <Tooltip>
@@ -45,7 +44,7 @@ export function JiraListColumnsMenu({
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => onToggle(column.id)}
           >
-            {getJiraListColumnLabel(column.id, t)}
+            {getJiraListColumnLabel(column.id)}
           </DropdownMenuCheckboxItem>
         ))}
       </DropdownMenuContent>

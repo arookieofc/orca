@@ -15,8 +15,7 @@ export function buildWorktreePurgeSurfacePatch(
   s: AppState,
   omitters: WorktreePurgeOmitters,
   doomedTabIds: ReadonlySet<string>,
-  sleeping: WorktreePurgeSleepingMaps,
-  changedPaneKeys?: Set<string>
+  sleeping: WorktreePurgeSleepingMaps
 ): Partial<AppState> {
   const {
     omitByTabId,
@@ -26,16 +25,7 @@ export function buildWorktreePurgeSurfacePatch(
     omitByPageId,
     omitByFileId
   } = omitters
-  const removedStatusKeys = new Set<string>()
-  for (const key of s.agentStatusByPaneKey.keys()) {
-    if (doomedTabIds.has(key.slice(0, key.indexOf(':')))) {
-      removedStatusKeys.add(key)
-      changedPaneKeys?.add(key)
-    }
-  }
-  const nextAgentStatusByPaneKey = s.agentStatusByPaneKey.replace(
-    Array.from(removedStatusKeys, (key) => [key, null] as const)
-  )
+  const nextAgentStatusByPaneKey = omitByPaneKeyTabPrefix(s.agentStatusByPaneKey)
   return {
     localOnlyScrollbackByTabId: omitByTabId(s.localOnlyScrollbackByTabId),
     runtimePaneTitlesByTabId: omitByTabId(s.runtimePaneTitlesByTabId),
@@ -58,9 +48,8 @@ export function buildWorktreePurgeSurfacePatch(
     migrationUnsupportedByPtyId: omitByPtyId(s.migrationUnsupportedByPtyId),
     suppressedPtyExitIds: omitByPtyId(s.suppressedPtyExitIds),
     pendingPaneAccountRestarts: omitByPtyId(s.pendingPaneAccountRestarts),
-    // Bulk purges skip pane teardown, so evict its agent identity and activity state here.
+    // Evict bulk-purged agent/unread/input state; retainedAgents and orchestration self-heal via pruning/full sync.
     agentStatusByPaneKey: nextAgentStatusByPaneKey,
-    agentConversationsByPaneKey: omitByPaneKeyTabPrefix(s.agentConversationsByPaneKey),
     ...(nextAgentStatusByPaneKey !== s.agentStatusByPaneKey
       ? { agentStatusEpoch: s.agentStatusEpoch + 1 }
       : {}),
@@ -75,7 +64,7 @@ export function buildWorktreePurgeSurfacePatch(
     browserPagesByWorkspace: omitByBrowserWorkspaceId(s.browserPagesByWorkspace),
     browserAnnotationsByPageId: omitByPageId(s.browserAnnotationsByPageId),
     browserAnnotationMarkerIdsByPageId: omitByPageId(s.browserAnnotationMarkerIdsByPageId),
-    remoteBrowserPageHandlesByPageId: omitters.omitBrowserPageHandles(),
+    remoteBrowserPageHandlesByPageId: omitByPageId(s.remoteBrowserPageHandlesByPageId),
     pendingAddressBarFocusByPageId: omitByPageId(s.pendingAddressBarFocusByPageId),
     // createBrowserTab writes both the workspace id and the page id into this map.
     pendingAddressBarFocusByTabId: omitByPageId(

@@ -1,4 +1,4 @@
-import { deleteProjectChatDrafts } from '../slices/worktrees/teardown/removed-worktree-chat-drafts'
+import { selectCanonicalProjects } from '../project-host-setup-selector'
 import type { StateCreator } from 'zustand'
 import { toast } from 'sonner'
 import type { AppState } from '../types'
@@ -7,17 +7,17 @@ import type {
   ProjectHostSetupDeleteResult,
   ProjectHostSetupResult,
   ProjectHostSetupUpdateResult
-} from '../../../../shared/project/project-types'
-import type { Repo } from '../../../../shared/repository/repo-types'
-import { omitSparsePresetsForRepos } from '../slices/worktrees/create/sparse-presets'
-import { repoMatchesHostIdentity } from '../repos/repo-host-identity'
-import { callRuntimeRpc } from '../../runtime/rpc/calls/runtime-rpc-call'
+} from '../../../../shared/project-types'
+import type { Repo } from '../../../../shared/repo-types'
+import { omitSparsePresetsForRepos } from '../slices/sparse-presets'
+import { repoMatchesHostIdentity } from '../slices/repo-host-identity'
+import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
 import { translate } from '@/i18n/i18n'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host/execution-host'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import type { RepoSlice } from '../repos/repo-state'
 import { ERROR_TOAST_DURATION } from '../repos/repo-state'
-import { adoptFromEndpoint } from '../host-catalog/endpoint-catalog-adoption'
-import { normalizeProjectRow } from '../../../../shared/project/catalog/project-catalog-row-normalization'
+import { adoptFromEndpoint } from '../adopt-from-endpoint'
+import { normalizeProjectRow } from '../../../../shared/project-catalog-row-normalization'
 import {
   assertNotSshProjectHost,
   assertProjectHostSetupMutationRuntimeCapabilities,
@@ -26,7 +26,6 @@ import {
   prepareProjectHostSetupMutation,
   upsertProjectHostSetup
 } from './project-host-routing'
-import { toastProjectAddFailure } from './project-add-failure-toast'
 
 export function createProjectHostSetupActions(
   set: Parameters<StateCreator<AppState>>[0],
@@ -47,7 +46,8 @@ export function createProjectHostSetupActions(
         await assertProjectHostSetupMutationRuntimeCapabilities(target)
         const projectProviderIdentity =
           args.projectProviderIdentity ??
-          get().projects.find((project) => project.id === args.projectId)?.providerIdentity
+          selectCanonicalProjects(get()).find((project) => project.id === args.projectId)
+            ?.providerIdentity
         // Why: the target host may not have a project record yet; carry the selected source-host identity across the boundary.
         const setupArgs = projectProviderIdentity ? { ...args, projectProviderIdentity } : args
         const result =
@@ -79,14 +79,14 @@ export function createProjectHostSetupActions(
                 repoMatchesHostIdentity(entry, repo.id, repoHostId) ? repo : entry
               )
             : [...s.repos, repo]
-          const nextProjects = s.projects.some((entry) => entry.id === project.id)
-            ? s.projects.map((entry) => (entry.id === project.id ? project : entry))
-            : [...s.projects, project]
-          const nextSetups = upsertProjectHostSetup(s.projectHostSetups, setup)
+          const nextProjects = s.endpointProjects.some((entry) => entry.id === project.id)
+            ? s.endpointProjects.map((entry) => (entry.id === project.id ? project : entry))
+            : [...s.endpointProjects, project]
+          const nextSetups = upsertProjectHostSetup(s.endpointProjectHostSetups, setup)
           return {
             repos: nextRepos,
-            projects: nextProjects,
-            projectHostSetups: nextSetups
+            endpointProjects: nextProjects,
+            endpointProjectHostSetups: nextSetups
           }
         })
         toast.success(translate('auto.store.slices.repos.8bb3ad7935', 'Project added'), {
@@ -95,7 +95,11 @@ export function createProjectHostSetupActions(
         return { ...result, project, repo, setup }
       } catch (err) {
         console.error('Failed to set up project on host:', err)
-        toastProjectAddFailure(err)
+        const message = err instanceof Error ? err.message : String(err)
+        toast.error(translate('auto.store.slices.repos.c6e022ddfc', 'Failed to add project'), {
+          description: message,
+          duration: ERROR_TOAST_DURATION
+        })
         return null
       }
     },
@@ -121,10 +125,10 @@ export function createProjectHostSetupActions(
         })
         const project = normalizeProjectRow(result.project)
         set((s) => ({
-          projects: s.projects.some((entry) => entry.id === project.id)
-            ? s.projects.map((entry) => (entry.id === project.id ? project : entry))
-            : [...s.projects, project],
-          projectHostSetups: upsertProjectHostSetup(s.projectHostSetups, setup)
+          endpointProjects: s.endpointProjects.some((entry) => entry.id === project.id)
+            ? s.endpointProjects.map((entry) => (entry.id === project.id ? project : entry))
+            : [...s.endpointProjects, project],
+          endpointProjectHostSetups: upsertProjectHostSetup(s.endpointProjectHostSetups, setup)
         }))
         return { project, setup }
       } catch (err) {
@@ -141,7 +145,7 @@ export function createProjectHostSetupActions(
     updateProjectHostSetup: async (args) => {
       try {
         const { target, hostArgs } = await prepareProjectHostSetupMutation(
-          get().projectHostSetups,
+          get().endpointProjectHostSetups,
           args
         )
         const result =
@@ -172,10 +176,10 @@ export function createProjectHostSetupActions(
                 )
               : [...s.repos, repo]
             : s.repos,
-          projects: s.projects.some((entry) => entry.id === project.id)
-            ? s.projects.map((entry) => (entry.id === project.id ? project : entry))
-            : [...s.projects, project],
-          projectHostSetups: upsertProjectHostSetup(s.projectHostSetups, setup)
+          endpointProjects: s.endpointProjects.some((entry) => entry.id === project.id)
+            ? s.endpointProjects.map((entry) => (entry.id === project.id ? project : entry))
+            : [...s.endpointProjects, project],
+          endpointProjectHostSetups: upsertProjectHostSetup(s.endpointProjectHostSetups, setup)
         }))
         return { ...result, project, repo, setup }
       } catch (err) {
@@ -192,7 +196,7 @@ export function createProjectHostSetupActions(
     deleteProjectHostSetup: async (args) => {
       try {
         const { target, hostArgs } = await prepareProjectHostSetupMutation(
-          get().projectHostSetups,
+          get().endpointProjectHostSetups,
           args
         )
         const result =
@@ -210,15 +214,12 @@ export function createProjectHostSetupActions(
           ? adoptFromEndpoint(target, { kind: 'repo', row: result.repo })
           : undefined
         const repoHostId = repo ? getRepoExecutionHostId(repo) : null
-        if (repo && repoHostId) {
-          deleteProjectChatDrafts(repo.id, repoHostId)
-        }
         const removedSetup = adoptFromEndpoint(target, {
           kind: 'projectHostSetup',
           row: result.setup
         })
         set((s) => {
-          const projectHostSetups = s.projectHostSetups.filter(
+          const projectHostSetups = s.endpointProjectHostSetups.filter(
             (setup) => !isSameProjectHostSetup(setup, removedSetup)
           )
           const repos =
@@ -227,14 +228,14 @@ export function createProjectHostSetupActions(
               : s.repos
           const projects =
             repo && !projectHostSetups.some((setup) => setup.projectId === result.project.id)
-              ? s.projects.filter((project) => project.id !== result.project.id)
-              : s.projects
+              ? s.endpointProjects.filter((project) => project.id !== result.project.id)
+              : s.endpointProjects
           const survivingRepoIds = new Set(repos.map((r) => r.id))
           const removedRepoIds = s.repos.filter((r) => !survivingRepoIds.has(r.id)).map((r) => r.id)
           return {
             repos,
-            projects,
-            projectHostSetups,
+            endpointProjects: projects,
+            endpointProjectHostSetups: projectHostSetups,
             ...omitSparsePresetsForRepos(s, removedRepoIds)
           }
         })
@@ -262,8 +263,7 @@ export function createProjectHostSetupActions(
           target.kind === 'local'
             ? await window.api.repos.clone({
                 url: args.url,
-                destination: args.destination,
-                folderName: args.folderName
+                destination: args.destination
               })
             : (
                 await callRuntimeRpc<{ repo: Repo }>(
@@ -271,8 +271,7 @@ export function createProjectHostSetupActions(
                   'repo.clone',
                   {
                     url: args.url,
-                    destination: args.destination,
-                    folderName: args.folderName
+                    destination: args.destination
                   },
                   { timeoutMs: 10 * 60_000 }
                 )
@@ -287,7 +286,11 @@ export function createProjectHostSetupActions(
         })
       } catch (err) {
         console.error('Failed to clone project on host:', err)
-        toastProjectAddFailure(err)
+        const message = err instanceof Error ? err.message : String(err)
+        toast.error(translate('auto.store.slices.repos.c6e022ddfc', 'Failed to add project'), {
+          description: message,
+          duration: ERROR_TOAST_DURATION
+        })
         return null
       }
     }

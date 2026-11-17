@@ -1,20 +1,17 @@
 import { useCallback, useRef } from 'react'
-import { toast } from 'sonner'
-import { translate } from '@/i18n/i18n'
-import { track } from '@/diagnostics/telemetry/telemetry'
-import { useAppStore } from '@/store/index'
+import { track } from '@/lib/telemetry'
+import { useAppStore } from '@/store'
 import {
   ONBOARDING_FINAL_STEP,
   ONBOARDING_FLOW_VERSION
-} from '../../../../shared/onboarding/onboarding-defaults'
-import type { EventProps } from '../../../../shared/telemetry/telemetry-event-classification'
-import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
-import type { OnboardingState } from '../../../../shared/onboarding/onboarding-state-types'
-import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
-import { applyAllAgentsPermission } from '../../../../shared/agent-launch/permissions/tui-agent-permission-choice'
-import type { AgentChatPermissionMode } from '../../../../shared/agent-launch/permissions/agent-chat-permission-mode'
-import type { AgentSurface, StepId, StepNumber } from './use-onboarding-flow-types'
-import { agentSurfaceSettingsUpdate } from './onboarding-flow-state'
+} from '../../../../shared/onboarding-defaults'
+import type { EventProps } from '../../../../shared/telemetry-events'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { OnboardingState } from '../../../../shared/onboarding-state-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import { applyAllAgentsPermission } from '../../../../shared/tui-agent-permission-choice'
+import type { AgentChatPermissionMode } from '../../../../shared/agent-chat-permission-mode'
+import type { StepId, StepNumber } from './use-onboarding-flow-types'
 
 export async function persistStep(
   stepNumber: number,
@@ -25,15 +22,6 @@ export async function persistStep(
     lastCompletedStep: Math.max(stepNumber, -1),
     ...updates
   })
-}
-
-function notifyProgressSaveFailure(): void {
-  toast.error(
-    translate(
-      'auto.components.onboarding.use.onboarding.flow.52acfbef51',
-      'Could not save progress'
-    )
-  )
 }
 
 function selectedAgentOrBlank(agent: TuiAgent | null): TuiAgent | 'blank' {
@@ -58,7 +46,6 @@ export function buildCompletedOnboardingNotificationSettings(
     ...notifications,
     enabled: true,
     agentTaskComplete: true,
-    agentNeedsInput: true,
     terminalBell: true
   }
 }
@@ -103,7 +90,7 @@ export function useCloseWith({ onOnboardingChange, startTimeRef, setError }: Clo
     async (
       outcome: 'completed' | 'dismissed',
       lastStepReached: StepNumber,
-      completedPath?: 'add_project_modal' | 'workspace',
+      completedPath?: 'add_project_modal',
       dismissedExtras?: DismissedExtras
     ): Promise<boolean> => {
       if (closedRef.current) {
@@ -123,7 +110,6 @@ export function useCloseWith({ onOnboardingChange, startTimeRef, setError }: Clo
         // A failed write did not close onboarding; release the latch for retry.
         closedRef.current = false
         setError(err instanceof Error ? err.message : String(err))
-        notifyProgressSaveFailure()
         return false
       }
       onOnboardingChange(nextState)
@@ -151,9 +137,7 @@ export function useCloseWith({ onOnboardingChange, startTimeRef, setError }: Clo
 
 type PersistCurrentStepDeps = {
   currentStepId: StepId
-  agentSurface: AgentSurface
   selectedAgent: TuiAgent | null
-  agentInteractedRef: { current: boolean }
   yoloPermissions: boolean
   /** Whether the person flipped Yolo mode in this flow; a replay left untouched keeps chats as set. */
   yoloPermissionsChosen: { readonly current: boolean }
@@ -171,9 +155,7 @@ export type PersistCurrentStepResult = {
 
 export function usePersistCurrentStep({
   currentStepId,
-  agentSurface,
   selectedAgent,
-  agentInteractedRef,
   yoloPermissions,
   yoloPermissionsChosen,
   theme,
@@ -188,24 +170,10 @@ export function usePersistCurrentStep({
       return { ok: false }
     }
     try {
-      if (currentStepId === 'agent_surface') {
-        // Why: the Chat UI choice saves with the default agent, so leaving mid-step changes nothing.
-        return { ok: true }
-      }
-      if (currentStepId === 'agent' || currentStepId === 'notifications') {
-        if (currentStepId === 'agent') {
-          // Continue confirms the visible choice before late detection can replace it during the save.
-          agentInteractedRef.current = true
-        }
+      if (currentStepId === 'agent') {
         const defaultTuiAgent = selectedAgentOrBlank(selectedAgent)
         await updateSettings({
-          ...agentSurfaceSettingsUpdate(settings, agentSurface),
           defaultTuiAgent,
-          ...(currentStepId === 'notifications'
-            ? {
-                notifications: buildCompletedOnboardingNotificationSettings(settings.notifications)
-              }
-            : {}),
           // Off adds no flag, as it always has: each agent's own settings apply.
           ...(yoloPermissionsChosen.current
             ? applyAllAgentsPermission(settings, yoloPermissions ? 'full-access' : 'own')
@@ -219,7 +187,7 @@ export function usePersistCurrentStep({
         const choseAgent = defaultTuiAgent !== 'blank'
         const wasAlreadyChosen = onboardingChecklist.choseAgent
         onOnboardingChange(
-          await persistStep(currentStepId === 'agent' ? 1 : ONBOARDING_FINAL_STEP, {
+          await persistStep(1, {
             checklist: { ...onboardingChecklist, choseAgent }
           })
         )
@@ -229,14 +197,19 @@ export function usePersistCurrentStep({
             time_since_completed_ms: 0
           })
         }
-        if (currentStepId === 'notifications') {
-          useAppStore.getState().recordFeatureInteraction('notifications')
-        }
         return { ok: true }
       }
       if (currentStepId === 'theme') {
         await updateSettings({ theme })
         onOnboardingChange(await persistStep(2))
+        return { ok: true }
+      }
+      if (currentStepId === 'notifications') {
+        await updateSettings({
+          notifications: buildCompletedOnboardingNotificationSettings(settings.notifications)
+        })
+        useAppStore.getState().recordFeatureInteraction('notifications')
+        onOnboardingChange(await persistStep(ONBOARDING_FINAL_STEP))
         return { ok: true }
       }
       if (currentStepId === 'windows_terminal') {
@@ -252,12 +225,9 @@ export function usePersistCurrentStep({
       return { ok: false }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-      notifyProgressSaveFailure()
       return { ok: false }
     }
   }, [
-    agentInteractedRef,
-    agentSurface,
     currentStepId,
     onboardingChecklist,
     onOnboardingChange,

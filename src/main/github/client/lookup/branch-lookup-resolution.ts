@@ -1,16 +1,17 @@
-import type { PRRefreshOutcome } from '../../../../shared/github/pull-requests/refresh/pull-request-refresh-types'
-import type { ghRepoExecOptions } from '../../repositories/github-repository-identity'
-import type { GitHubRepositoryIdentity as OwnerRepo } from '../../../../shared/github/repositories/repository-identity'
-import { mergedPRHeadMembership } from '../../pull-requests/refresh/merged-pr-head-membership'
-import type { MergedPRHeadRelationship } from '../../pull-requests/refresh/merged-pr-commit-membership'
-import { shouldHideNonOpenReviewOnDefaultBranch } from '../../../source-control/repo-default-branch'
-import { resolveGitHubApiRepositoryCandidates } from '../../repositories/github-api-repository'
-import { exactRepositoryCandidates } from '../pull-request-lookup-candidates'
-import { mapPRState } from '../../api/github-read-response'
+import type { PRRefreshOutcome } from '../../../../shared/github/pull-request-refresh-types'
+import type { ghRepoExecOptions, OwnerRepo } from '../../gh-utils'
 import {
-  ownerRepoFromPullRequestUrl,
-  type HostedReviewLocalGitOptions
-} from './../github-exec-scope'
+  isCommitPartOfMergedPR,
+  type MergedPRCommitMembership
+} from '../../merged-pr-commit-membership'
+import { shouldHideNonOpenReviewOnDefaultBranch } from '../../../source-control/repo-default-branch'
+import {
+  getGitHubApiRepositoryForRemote,
+  resolveGitHubApiRepositoryCandidates
+} from '../../github-api-repository'
+import { mapPRState } from '../../mappers'
+import { noteRepositoryRateLimitSpend } from '../../rate-limit'
+import { ownerRepoFromPullRequestUrl } from './../github-exec-scope'
 import { prRefreshUpstreamError } from './../gh-error-predicates'
 import {
   isMergedImplicitPR,
@@ -25,12 +26,14 @@ import { lookupPRByBranchName } from './pr-branch-lookup'
 import { lookupPRByNumber } from './pr-number-lookup'
 import { derivePRRefreshData } from './branch-lookup-derived-data'
 import { assemblePRRefreshFoundOutcome } from './pr-refresh-outcome-assembly'
-import { branchHeadKey, getConfiguredPushHead, getTrackedUpstreamHead } from './branch-review-heads'
+import { shouldRetryTrackedUpstreamBranch } from './tracked-upstream-cache'
+import { getTrackedUpstreamBranch } from './tracked-upstream-branch'
 import {
   createImplicitDefaultBranchPRPolicy,
   type ImplicitDefaultBranchPRContext
 } from './implicit-default-branch-pr'
-
+import { PR_BRANCH_LOOKUP_BUCKETS } from './pr-lookup-rate-limit'
+import type { HostedReviewLocalGitOptions } from './../github-exec-scope'
 export async function resolvePRForBranchOutcome(input: {
   repoPath: string
   branchName: string
@@ -53,17 +56,18 @@ export async function resolvePRForBranchOutcome(input: {
     ghOptions,
     executionScope
   } = input
-  const resolved = await resolveGitHubApiRepositoryCandidates(
+  const { candidates, headRepo } = await resolveGitHubApiRepositoryCandidates(
     repoPath,
     connectionId,
     localGitOptions
   )
-  const { headRepo } = resolved
-  const candidates = exactRepositoryCandidates(resolved.candidates, options.exactRepository)
-  const reads = { checkPageLimit: options.checkPageLimit, userRefresh: options.userRefresh }
   // Without local cwd, unresolved connection-backed lookups could follow ambient GH_REPO/GH_HOST.
   if (connectionId && candidates.length === 0) {
     return { kind: 'no-pr', fetchedAt: Date.now() }
+  }
+  // Renderer-direct lookups bypass coordinator accounting; debit both paths here.
+  for (const bucket of PR_BRANCH_LOOKUP_BUCKETS) {
+    noteRepositoryRateLimitSpend(headRepo ?? candidates[0], bucket, 1, ghOptions)
   }
   let data: PullRequestLookupData | null = null
   let dataRepo: OwnerRepo | null = null
@@ -74,7 +78,7 @@ export async function resolvePRForBranchOutcome(input: {
   let usedExactNumberLookup = false
   const defaultBranchPRContext: ImplicitDefaultBranchPRContext = {
     originHeadRepo: headRepo,
-    secondaryHeads: [],
+    trackedUpstream: null,
     branchName,
     linkedPRNumber,
     repoPath,
@@ -89,24 +93,19 @@ export async function resolvePRForBranchOutcome(input: {
       ? options.currentHeadOid.trim()
       : null
   let confirmedContainedHeadOid: string | null = null
-  const mergedPRHeadRelationship = async (
+  const mergedPRContainsHead = async (
     candidate: PullRequestLookupData,
     candidateRepo: OwnerRepo | null,
     headOid: string | null
-  ): Promise<MergedPRHeadRelationship> => {
+  ): Promise<MergedPRCommitMembership> => {
     if (!candidateRepo || !headOid) {
       return 'unknown'
     }
-    const membership = await mergedPRHeadMembership({
+    const membership = await isCommitPartOfMergedPR({
       ownerRepo: candidateRepo,
       prNumber: candidate.number,
-      prHeadOid: candidate.headRefOid,
-      baseRefName: candidate.baseRefName,
-      headOid,
-      ghOptions,
-      repoPath,
-      connectionId,
-      localGitOptions
+      commitOid: headOid,
+      ghOptions
     })
     if (membership === 'contained') {
       confirmedContainedHeadOid = headOid
@@ -128,9 +127,10 @@ export async function resolvePRForBranchOutcome(input: {
     if (!shouldHideMergedImplicitPR(candidate, linkedPRNumber, currentHeadOidForMergedImplicit)) {
       return false
     }
-    // Historical association keeps the review visible without granting cleanup containment proof.
-    return !['contained', 'associated'].includes(
-      await mergedPRHeadRelationship(candidate, candidateRepo, currentHeadOidForMergedImplicit)
+    // PR-history membership preserves merged work after web commits or update-branch merges.
+    return (
+      (await mergedPRContainsHead(candidate, candidateRepo, currentHeadOidForMergedImplicit)) !==
+      'contained'
     )
   }
 
@@ -140,8 +140,7 @@ export async function resolvePRForBranchOutcome(input: {
       candidates,
       number: linkedPRNumber,
       ghOptions,
-      executionScope,
-      reads
+      executionScope
     })
     data = exactLookup.data
     dataRepo = exactLookup.dataRepo
@@ -153,8 +152,7 @@ export async function resolvePRForBranchOutcome(input: {
       branchName,
       ghOptions,
       executionScope,
-      policy: implicitPRPolicy,
-      reads
+      policy: implicitPRPolicy
     })
     data = branchLookup.data
     dataRepo = branchLookup.dataRepo
@@ -162,37 +160,48 @@ export async function resolvePRForBranchOutcome(input: {
       pendingBranchLookupError = branchLookup.pendingError
       hasPendingBranchLookupError = true
     }
-    // Tracked upstream, then the configured push head, disambiguate head branch and fork owner.
-    const triedHeads = new Set(headRepo ? [branchHeadKey(headRepo, branchName)] : [])
-    const secondaryHeads = [
-      () => getTrackedUpstreamHead(repoPath, branchName, connectionId, localGitOptions, headRepo),
-      () => getConfiguredPushHead(repoPath, branchName, connectionId, localGitOptions)
-    ]
-    for (const resolveHead of secondaryHeads) {
-      const head = data ? null : await resolveHead()
-      const key = head ? branchHeadKey(head.headRepo, head.branch.branchName) : null
-      if (!head || !key || triedHeads.has(key)) {
-        continue
-      }
-      triedHeads.add(key)
-      defaultBranchPRContext.secondaryHeads.push(head)
-      const headLookup = await lookupPRByBranchName({
-        candidates,
-        headRepo: head.headRepo,
-        branchName: head.branch.branchName,
-        ghOptions,
-        executionScope,
-        policy: implicitPRPolicy,
-        reads
-      })
-      data = headLookup.data
-      dataRepo = headLookup.dataRepo
-      if (!hasPendingBranchLookupError && 'pendingError' in headLookup) {
-        pendingBranchLookupError = headLookup.pendingError
-        hasPendingBranchLookupError = true
-      }
-      if (data) {
-        dataHeadRepo = head.headRepo
+    if (!data) {
+      // Tracked upstream disambiguates head branch and fork owner beyond local branch names.
+      const upstreamBranch = await getTrackedUpstreamBranch(
+        repoPath,
+        branchName,
+        connectionId,
+        localGitOptions
+      )
+      if (upstreamBranch) {
+        const upstreamHeadRepo =
+          (await getGitHubApiRepositoryForRemote(
+            repoPath,
+            upstreamBranch.remoteName,
+            connectionId,
+            localGitOptions
+          )) ?? headRepo
+        if (
+          upstreamHeadRepo &&
+          shouldRetryTrackedUpstreamBranch(upstreamBranch, branchName, upstreamHeadRepo, headRepo)
+        ) {
+          defaultBranchPRContext.trackedUpstream = {
+            branch: upstreamBranch,
+            headRepo: upstreamHeadRepo
+          }
+          const upstreamLookup = await lookupPRByBranchName({
+            candidates,
+            headRepo: upstreamHeadRepo,
+            branchName: upstreamBranch.branchName,
+            ghOptions,
+            executionScope,
+            policy: implicitPRPolicy
+          })
+          data = upstreamLookup.data
+          dataRepo = upstreamLookup.dataRepo
+          if (!hasPendingBranchLookupError && 'pendingError' in upstreamLookup) {
+            pendingBranchLookupError = upstreamLookup.pendingError
+            hasPendingBranchLookupError = true
+          }
+          if (data) {
+            dataHeadRepo = upstreamHeadRepo
+          }
+        }
       }
     }
   }
@@ -210,8 +219,7 @@ export async function resolvePRForBranchOutcome(input: {
       number: fallbackPRNumber,
       ghOptions,
       executionScope,
-      policy: implicitPRPolicy,
-      reads
+      policy: implicitPRPolicy
     })
     data = fallbackLookup.data
     dataRepo = fallbackLookup.dataRepo
@@ -233,14 +241,12 @@ export async function resolvePRForBranchOutcome(input: {
     data,
     linkedPRNumber,
     explicitCurrentHeadOid,
-    async (candidate, headOid) => {
-      const relationship = await mergedPRHeadRelationship(
+    (candidate, headOid) =>
+      mergedPRContainsHead(
         candidate,
         dataRepo ?? ownerRepoFromPullRequestUrl(candidate.url),
         headOid
       )
-      return relationship === 'associated' ? 'unknown' : relationship
-    }
   )
   const fallbackConfirmedMergedBranch =
     typeof fallbackPRNumber === 'number' &&
@@ -249,9 +255,7 @@ export async function resolvePRForBranchOutcome(input: {
   const explicitHeadHidesMergedImplicitPR =
     explicitCurrentHeadOid !== null &&
     shouldHideMergedImplicitPR(data, linkedPRNumber, explicitCurrentHeadOid) &&
-    !['contained', 'associated'].includes(
-      await mergedPRHeadRelationship(data, dataRepo, explicitCurrentHeadOid)
-    )
+    (await mergedPRContainsHead(data, dataRepo, explicitCurrentHeadOid)) !== 'contained'
   // Fallback preservation already checked head identity; repeating lazy-HEAD checks could hide valid deleted heads.
   const shouldPreserveMergedFallback =
     !explicitHeadHidesMergedImplicitPR &&
@@ -283,8 +287,7 @@ export async function resolvePRForBranchOutcome(input: {
     localGitOptions,
     ghOptions,
     executionScope,
-    usedExactNumberLookup,
-    includeDerivedData: options.includeDerivedData
+    usedExactNumberLookup
   })
 
   return assemblePRRefreshFoundOutcome({

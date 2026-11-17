@@ -1,22 +1,15 @@
 import { useCallback, useRef, useState } from 'react'
-import { ActivityIndicator, Pressable, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import { KeyRound } from 'lucide-react-native'
-import { LIST_ROW_PADDING } from '../components/list/ListGroup'
-import { colors, feedback, radii, spacing, typography } from '../theme/mobile-theme'
-import { themedStyleSheet } from '../theme/themed-styles'
-import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import {
   loadPendingHostCredentialCleanup,
   subscribePendingHostCredentialCleanup
-} from '../host-credentials/host-credential-cleanup'
-import { retryPendingHostCredentialCleanup } from '../host-catalog/host-store'
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
-import { SettingsSection } from './settings-screen-frame'
+} from '../transport/host-credential-cleanup'
+import { retryPendingHostCredentialCleanup } from '../transport/host-store'
 
 export function PendingCredentialCleanupCard() {
-  useMobileColorScheme()
-  const t = useMobileTranslation()
   const [pendingCredentialIds, setPendingCredentialIds] = useState<string[]>([])
   const [credentialStorageUnreadable, setCredentialStorageUnreadable] = useState(false)
   const [retryingCredentialCleanup, setRetryingCredentialCleanup] = useState(false)
@@ -68,51 +61,29 @@ export function PendingCredentialCleanupCard() {
     }
   }, [retryingCredentialCleanup])
 
-  const count = pendingCredentialIds.length
+  const pendingCredentialCount = pendingCredentialIds.length
   // Unreadable durable queues may hide orphaned tokens; keep cleanup and Retry visible.
-  if (count === 0 && !credentialStorageUnreadable) {
+  if (pendingCredentialCount === 0 && !credentialStorageUnreadable) {
     return null
   }
 
   return (
-    // A custom row: the status line is a live region and Retry sits inline.
-    <SettingsSection>
-      <View key="cleanup" style={styles.credentialCleanupRow}>
+    <View style={[styles.section, styles.sectionSpacer]}>
+      <View style={styles.credentialCleanupRow}>
         <KeyRound size={16} color={colors.statusAmber} />
         <View style={styles.credentialCleanupCopy}>
-          <Text style={styles.credentialCleanupTitle}>
-            {t('settings.pendingCredentialCleanupCard.title', 'Pairing credential cleanup')}
-          </Text>
+          <Text style={styles.credentialCleanupTitle}>Pairing credential cleanup</Text>
           <Text accessibilityLiveRegion="polite" style={styles.rowHint}>
             {credentialRetryFailed
-              ? t(
-                  'settings.pendingCredentialCleanupCard.retryFailed',
-                  "Cleanup still couldn't be confirmed. Try again later."
-                )
-              : count > 0
-                ? count === 1
-                  ? t(
-                      'settings.pendingCredentialCleanupCard.cleanupUnconfirmed_one',
-                      "Couldn't confirm cleanup for {{count}} credential on this device.",
-                      { count }
-                    )
-                  : t(
-                      'settings.pendingCredentialCleanupCard.cleanupUnconfirmed_other',
-                      "Couldn't confirm cleanup for {{count}} credentials on this device.",
-                      { count }
-                    )
-                : t(
-                    'settings.pendingCredentialCleanupCard.statusCheckFailed',
-                    "Couldn't check cleanup status on this device. Retry to be safe."
-                  )}
+              ? "Cleanup still couldn't be confirmed. Try again later."
+              : pendingCredentialCount > 0
+                ? `Couldn't confirm cleanup for ${pendingCredentialCount} credential${pendingCredentialCount === 1 ? '' : 's'} on this device.`
+                : "Couldn't check cleanup status on this device. Retry to be safe."}
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t(
-            'settings.pendingCredentialCleanupCard.retryCleanup',
-            'Retry clearing pairing credentials'
-          )}
+          accessibilityLabel="Retry clearing pairing credentials"
           accessibilityState={{
             busy: retryingCredentialCleanup,
             disabled: retryingCredentialCleanup
@@ -128,43 +99,51 @@ export function PendingCredentialCleanupCard() {
           {retryingCredentialCleanup ? (
             <ActivityIndicator size="small" color={colors.textSecondary} />
           ) : (
-            <Text style={styles.retryButtonText}>{t('common.retry', 'Retry')}</Text>
+            <Text style={styles.retryButtonText}>Retry</Text>
           )}
         </Pressable>
       </View>
-    </SettingsSection>
+    </View>
   )
 }
 
-const styles = themedStyleSheet(() => ({
+const styles = StyleSheet.create({
+  section: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
+    overflow: 'hidden'
+  },
+  sectionSpacer: {
+    marginTop: spacing.md
+  },
   rowPressed: {
-    opacity: feedback.pressedOpacity
+    backgroundColor: colors.bgRaised
   },
   credentialCleanupRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm + 2,
     paddingVertical: spacing.md,
-    paddingHorizontal: LIST_ROW_PADDING
+    paddingHorizontal: spacing.md + 2
   },
   credentialCleanupCopy: {
     flex: 1,
     gap: spacing.xs
   },
   credentialCleanupTitle: {
-    fontSize: 15,
+    fontSize: typography.bodySize,
     fontWeight: '500',
     color: colors.textPrimary
   },
   rowHint: {
-    fontSize: 13,
+    fontSize: typography.metaSize,
     color: colors.textSecondary,
     lineHeight: 17
   },
   retryButton: {
     width: 72,
     height: 32,
-    borderRadius: radii.control,
+    borderRadius: radii.button,
     backgroundColor: colors.bgRaised,
     alignItems: 'center',
     justifyContent: 'center'
@@ -174,4 +153,4 @@ const styles = themedStyleSheet(() => ({
     fontWeight: '600',
     color: colors.textPrimary
   }
-}))
+})

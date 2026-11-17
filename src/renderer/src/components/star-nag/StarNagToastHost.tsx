@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, ExternalLink, Loader2, Star, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 const ORCA_REPO_URL = 'https://github.com/stablyai/orca'
 type StarNagMode = 'gh' | 'web'
@@ -21,7 +21,6 @@ function StarNagToast({
   markResolved,
   setDismissSuppressed
 }: StarNagToastProps): React.JSX.Element {
-  const t = useTranslate()
   const [mode, setMode] = useState(initialMode)
   const [status, setStatus] = useState<StarNagToastStatus>('idle')
   const busy = status === 'busy'
@@ -78,16 +77,16 @@ function StarNagToast({
 
   const actionLabel =
     status === 'starred'
-      ? t('auto.components.star.nag.StarNagToastHost.starredThanks', 'Starred — thank you!')
+      ? translate('auto.components.star.nag.StarNagToastHost.starredThanks', 'Starred — thank you!')
       : status === 'opened'
-        ? t('auto.components.star.nag.StarNagToastHost.githubOpened', 'GitHub opened')
+        ? translate('auto.components.star.nag.StarNagToastHost.githubOpened', 'GitHub opened')
         : busy
           ? mode === 'web'
-            ? t('auto.components.star.nag.StarNagToastHost.opening', 'Opening…')
-            : t('auto.components.star.nag.StarNagToastHost.starring', 'Starring…')
+            ? translate('auto.components.star.nag.StarNagToastHost.opening', 'Opening…')
+            : translate('auto.components.star.nag.StarNagToastHost.starring', 'Starring…')
           : mode === 'web'
-            ? t('auto.components.star.nag.StarNagToastHost.openGithub', 'Open GitHub')
-            : t('auto.components.star.nag.StarNagToastHost.starOnGithub', 'Star on GitHub')
+            ? translate('auto.components.star.nag.StarNagToastHost.openGithub', 'Open GitHub')
+            : translate('auto.components.star.nag.StarNagToastHost.starOnGithub', 'Star on GitHub')
 
   const completedStar = status === 'starred'
   const primaryActionClass = completedStar
@@ -95,7 +94,7 @@ function StarNagToast({
     : 'min-w-0 flex-1 gap-1.5 border-amber-400/60 bg-amber-400/15 text-amber-800 hover:bg-amber-400/25 dark:text-amber-100'
 
   return (
-    <div className="relative w-[340px] max-w-[calc(100vw-32px)] overflow-hidden rounded-lg border border-(--notice-border) bg-popover p-3.5 text-popover-foreground shadow-notice">
+    <div className="relative w-[340px] max-w-[calc(100vw-32px)] overflow-hidden rounded-lg border border-border bg-popover p-3.5 text-popover-foreground shadow-xs">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1.5">
           <div className="flex items-center gap-2">
@@ -114,14 +113,14 @@ function StarNagToast({
               )}
             </span>
             <div className="text-sm font-semibold">
-              {t(
+              {translate(
                 'auto.components.star.nag.StarNagToastHost.onboardingCompleted',
                 'Onboarding completed!'
               )}
             </div>
           </div>
           <p className="text-sm leading-5 text-muted-foreground">
-            {t(
+            {translate(
               'auto.components.star.nag.StarNagToastHost.body',
               'If you’re enjoying Orca so far, a GitHub star helps other developers discover it.'
             )}
@@ -134,7 +133,7 @@ function StarNagToast({
           data-close-button
           onClick={close}
           disabled={busy}
-          aria-label={t('auto.components.star.nag.StarNagToastHost.dismiss', 'Dismiss')}
+          aria-label={translate('auto.components.star.nag.StarNagToastHost.dismiss', 'Dismiss')}
         >
           <X className="size-3.5" />
         </Button>
@@ -163,7 +162,7 @@ function StarNagToast({
           onClick={later}
           disabled={busy || status === 'starred' || status === 'opened'}
         >
-          {t('auto.components.star.nag.StarNagToastHost.later', 'Later')}
+          {translate('auto.components.star.nag.StarNagToastHost.later', 'Later')}
         </Button>
       </div>
     </div>

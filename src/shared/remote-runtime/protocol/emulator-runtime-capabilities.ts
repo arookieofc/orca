@@ -1,2 +1,0 @@
-export const EMULATOR_OPENING_PREFERENCES_CAPABILITY = 'emulator.opening-preferences.v1' as const
-export const EMULATOR_RUNTIME_CAPABILITIES = [EMULATOR_OPENING_PREFERENCES_CAPABILITY] as const

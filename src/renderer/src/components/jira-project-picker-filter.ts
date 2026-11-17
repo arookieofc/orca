@@ -1,4 +1,4 @@
-import { isClipboardTextByteLengthOverLimit } from '../../../shared/clipboard/clipboard-text'
+import { isClipboardTextByteLengthOverLimit } from '../../../shared/clipboard-text'
 import type { JiraProject } from '../../../shared/jira/jira-types'
 
 export const JIRA_PROJECT_PICKER_QUERY_MAX_BYTES = 2 * 1024
@@ -29,7 +29,7 @@ function getJiraProjectPickerSearchText(project: JiraProject, includeSiteName: b
     project.siteName ?? ''
   ]
     .join(' ')
-    .toLowerCase()
+    .toLocaleLowerCase()
 }
 
 export function filterJiraProjectPickerProjects({
@@ -48,7 +48,7 @@ export function filterJiraProjectPickerProjects({
   if (!trimmedQuery) {
     return [...projects]
   }
-  const normalizedQuery = trimmedQuery.toLowerCase()
+  const normalizedQuery = trimmedQuery.toLocaleLowerCase()
   return projects.filter((project) =>
     getJiraProjectPickerSearchText(project, includeSiteName).includes(normalizedQuery)
   )

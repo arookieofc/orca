@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react'
-import type { TerminalConfigImportPreview } from '../../../../shared/terminal/appearance/terminal-config-import-preview'
+import type { GhosttyImportPreview } from '../../../../shared/global-settings-types'
 import ghosttyIcon from '../../../../../resources/ghostty.svg'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import type { DiscoveryState } from './ThemeStep'
 
 export function GhosttyDiscoveryRow({
@@ -13,9 +13,8 @@ export function GhosttyDiscoveryRow({
   discovery: DiscoveryState
   importing: boolean
   disabled: boolean
-  onImport: (preview: TerminalConfigImportPreview) => void
+  onImport: (preview: GhosttyImportPreview) => void
 }) {
-  const t = useTranslate()
   // Non-Mac discovery remains idle; hide it instead of leaving a permanent looking placeholder.
   if (discovery.status === 'absent' || discovery.status === 'idle') {
     return null
@@ -25,7 +24,10 @@ export function GhosttyDiscoveryRow({
     return (
       <div className="flex items-center gap-2.5 rounded-lg border border-dashed border-border bg-transparent px-3.5 py-2.5 text-[12px] text-muted-foreground">
         <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
-        {t('auto.components.onboarding.ThemeStep.2c3aa538f8', 'Looking for a Ghostty config…')}
+        {translate(
+          'auto.components.onboarding.ThemeStep.2c3aa538f8',
+          'Looking for a Ghostty config…'
+        )}
       </div>
     )
   }
@@ -36,7 +38,7 @@ export function GhosttyDiscoveryRow({
         <Check className="size-3.5" />
         <span className="flex-1">
           <span className="font-medium">
-            {t('auto.components.onboarding.ThemeStep.78b6386140', 'Imported from Ghostty.')}
+            {translate('auto.components.onboarding.ThemeStep.78b6386140', 'Imported from Ghostty.')}
           </span>
           {discovery.fields.length > 0 && (
             <span className="text-muted-foreground"> {discovery.fields.join(' · ')}</span>
@@ -53,13 +55,16 @@ export function GhosttyDiscoveryRow({
       <div className="min-w-0 flex-1">
         <div className="text-[12px] text-foreground">
           <span className="font-medium">
-            {t('auto.components.onboarding.ThemeStep.7ee9234e54', 'Ghostty config detected.')}
+            {translate(
+              'auto.components.onboarding.ThemeStep.7ee9234e54',
+              'Ghostty config detected.'
+            )}
           </span>{' '}
           <span className="text-muted-foreground">
-            {t('auto.components.onboarding.ThemeStep.248c812283', 'Import')}{' '}
+            {translate('auto.components.onboarding.ThemeStep.248c812283', 'Import')}{' '}
             {fields.length > 0
               ? fields.map((f) => f.toLowerCase()).join(', ')
-              : t('auto.components.onboarding.ThemeStep.906c4373fe', 'settings')}
+              : translate('auto.components.onboarding.ThemeStep.906c4373fe', 'settings')}
             ?
           </span>
         </div>
@@ -78,8 +83,8 @@ export function GhosttyDiscoveryRow({
         onClick={() => onImport(preview)}
       >
         {importing
-          ? t('auto.components.onboarding.ThemeStep.ad19e5c916', 'Importing…')
-          : t('auto.components.onboarding.ThemeStep.248c812283', 'Import')}
+          ? translate('auto.components.onboarding.ThemeStep.ad19e5c916', 'Importing...')
+          : translate('auto.components.onboarding.ThemeStep.248c812283', 'Import')}
       </button>
     </div>
   )

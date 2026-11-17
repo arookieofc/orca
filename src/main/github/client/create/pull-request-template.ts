@@ -1,13 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { ghExecFileAsync } from '../../../git/command-runner/hosted-cli/gh-exec-file'
-import { ghRepoExecOptions, githubRepoContext } from '../../repositories/github-repository-identity'
+import { ghExecFileAsync, ghRepoExecOptions, githubRepoContext } from '../../gh-utils'
 import {
   getHostedReviewLocalGitOptions,
   type HostedReviewExecutionOptions
 } from '../../../source-control/hosted-review-git-options'
-import { githubHostExecOptions } from '../../repositories/github-repository-host'
-import type { GitHubRepositoryIdentity as GitHubApiRepository } from '../../../../shared/github/repositories/repository-identity'
+import { githubHostExecOptions, type GitHubApiRepository } from '../../github-api-repository'
 export async function findOpenPRByHeadBase(args: {
   repoPath: string
   repo: GitHubApiRepository
@@ -37,6 +35,7 @@ export async function findOpenPRByHeadBase(args: {
     ],
     {
       ...ghRepoExecOptions(context),
+      ...(args.connectionId ? {} : localGitOptions),
       ...githubHostExecOptions(args.repo)
     }
   )

@@ -1,5 +1,5 @@
 import { Copy, ExternalLink, Loader2, MoreHorizontal, Trash2 } from 'lucide-react'
-import type { ArtifactListItem } from '../../../../shared/artifacts/artifacts'
+import type { ArtifactListItem } from '../../../../shared/artifacts'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import { copyArtifactLink, openArtifactInBrowser } from './artifact-link-actions'
 
 type ArtifactActionsProps = {
@@ -22,15 +22,14 @@ export function ArtifactActions({
   item,
   onDelete
 }: ArtifactActionsProps): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div
       className="flex shrink-0 items-center gap-2"
-      aria-label={t('auto.components.artifacts.actions', 'Artifact actions')}
+      aria-label={translate('auto.components.artifacts.actions', 'Artifact actions')}
     >
       <Button size="sm" onClick={() => void copyArtifactLink(item.shareUrl)}>
         <Copy />
-        {t('auto.components.artifacts.copyLink', 'Copy link')}
+        {translate('auto.components.artifacts.copyLink', 'Copy link')}
       </Button>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -39,13 +38,13 @@ export function ArtifactActions({
             size="icon-sm"
             className="text-muted-foreground hover:text-foreground"
             onClick={() => openArtifactInBrowser(item.shareUrl)}
-            aria-label={t('auto.components.artifacts.openInBrowser', 'Open in browser')}
+            aria-label={translate('auto.components.artifacts.openInBrowser', 'Open in browser')}
           >
             <ExternalLink />
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={6}>
-          {t('auto.components.artifacts.openInBrowser', 'Open in browser')}
+          {translate('auto.components.artifacts.openInBrowser', 'Open in browser')}
         </TooltipContent>
       </Tooltip>
       <DropdownMenu>
@@ -56,7 +55,7 @@ export function ArtifactActions({
             size="icon-sm"
             className="text-muted-foreground hover:text-foreground"
             disabled={deleting}
-            aria-label={t(
+            aria-label={translate(
               'auto.components.artifacts.ArtifactActions.more',
               'More artifact actions'
             )}
@@ -71,7 +70,7 @@ export function ArtifactActions({
             onSelect={() => onDelete(item)}
           >
             <Trash2 className="size-3.5" />
-            {t('auto.components.artifacts.ArtifactsPage.deleteArtifact', 'Delete artifact')}
+            {translate('auto.components.artifacts.ArtifactsPage.deleteArtifact', 'Delete artifact')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

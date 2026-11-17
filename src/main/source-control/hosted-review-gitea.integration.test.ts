@@ -36,7 +36,6 @@ describe('Gitea hosted review integration', () => {
 
   it('resolves a Gitea PR through real git remote parsing and HTTP API calls', async () => {
     const seen: SeenRequest[] = []
-    let merged = false
     const server = createServer((req: IncomingMessage, res: ServerResponse) => {
       const url = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`)
       seen.push({
@@ -50,8 +49,7 @@ describe('Gitea hosted review integration', () => {
           {
             number: 9,
             title: 'Local Gitea branch',
-            state: merged ? 'closed' : 'open',
-            merged,
+            state: 'open',
             html_url: 'http://127.0.0.1/team/repo/pulls/9',
             updated_at: '2026-05-15T00:00:00Z',
             mergeable: true,
@@ -109,17 +107,6 @@ describe('Gitea hosted review integration', () => {
       ])
       expect(seen.every((request) => request.authorization === 'token local-token')).toBe(true)
       expect(new URLSearchParams(seen[0].search).get('state')).toBe('all')
-
-      // Merged on the web: a click inside the 30s repository-scan window still reads the new state.
-      merged = true
-      await expect(
-        getHostedReviewForBranch({
-          executionHostId: 'local',
-          repoPath,
-          branch: 'refs/heads/feature/gitea',
-          userRefresh: true
-        })
-      ).resolves.toMatchObject({ provider: 'gitea', number: 9, state: 'merged' })
     } finally {
       await rm(repoPath, { recursive: true, force: true })
       await new Promise<void>((resolve, reject) => {

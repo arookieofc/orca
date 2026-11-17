@@ -1,13 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import './runtime-test-module-registration.spec'
-import { OrcaRuntimeService } from '../orca-runtime'
-import { join } from 'node:path'
-import { store, syncSinglePty } from './orca-runtime-test-fixtures.spec'
+import { OrcaRuntimeService, join } from '../orca-runtime-test-mocks.spec'
+import { store, syncSinglePty } from '../orca-runtime-test-fixtures.spec'
 import {
   clearNativeWindowsConptyPty,
   markNativeWindowsConptyPty
-} from '../terminal/output/terminal-model-query-authority'
+} from '../terminal-model-query-authority'
 
 // Captured pwsh 7.6/ConPTY: grey PSReadLine predictions from history are overwritten by absolute cursor moves.
 const PSREADLINE_PREDICTION_TRANSCRIPT = readFileSync(
@@ -16,7 +14,7 @@ const PSREADLINE_PREDICTION_TRANSCRIPT = readFileSync(
 )
 const PROMPT = 'PS C:\\Users\\user\\orca\\workspaces\\orca\\run-ownership-validation>'
 
-async function startConptyRuntime(ptyId: string): Promise<InstanceType<typeof OrcaRuntimeService>> {
+function startConptyRuntime(ptyId: string): InstanceType<typeof OrcaRuntimeService> {
   const runtime = new OrcaRuntimeService(store)
   runtime.setPtyController({
     write: () => true,
@@ -24,7 +22,7 @@ async function startConptyRuntime(ptyId: string): Promise<InstanceType<typeof Or
     getForegroundProcess: async () => null,
     getSize: () => ({ cols: 120, rows: 30 })
   })
-  await syncSinglePty(runtime, ptyId)
+  syncSinglePty(runtime, ptyId)
   return runtime
 }
 
@@ -33,7 +31,7 @@ describe('OrcaRuntimeService ConPTY stream reads', () => {
     const ptyId = 'pty-conpty-prediction'
     markNativeWindowsConptyPty(ptyId)
     try {
-      const runtime = await startConptyRuntime(ptyId)
+      const runtime = startConptyRuntime(ptyId)
       const [terminal] = (await runtime.listTerminals()).terminals
       runtime.onPtyData(ptyId, PSREADLINE_PREDICTION_TRANSCRIPT, 100)
 
@@ -45,5 +43,34 @@ describe('OrcaRuntimeService ConPTY stream reads', () => {
     } finally {
       clearNativeWindowsConptyPty(ptyId)
     }
+  })
+
+  it('fills the requested line count even when blank rows sit below the prompt', async () => {
+    const ptyId = 'pty-conpty-limit'
+    markNativeWindowsConptyPty(ptyId)
+    try {
+      const runtime = startConptyRuntime(ptyId)
+      const [terminal] = (await runtime.listTerminals()).terminals
+      const output = Array.from({ length: 40 }, (_, index) => `line-${index}\r\n`).join('')
+      runtime.onPtyData(ptyId, output, 100)
+
+      const read = await runtime.readTerminal(terminal.handle, { limit: 3 })
+
+      expect(read.tail).toEqual(['line-37', 'line-38', 'line-39'])
+    } finally {
+      clearNativeWindowsConptyPty(ptyId)
+    }
+  })
+
+  it('keeps accumulated-stream reads for terminals that are not ConPTY', async () => {
+    const ptyId = 'pty-posix-prediction'
+    const runtime = startConptyRuntime(ptyId)
+    const [terminal] = (await runtime.listTerminals()).terminals
+    runtime.onPtyData(ptyId, 'one\r\ntwo\rTWO\r\n', 100)
+
+    const read = await runtime.readTerminal(terminal.handle)
+
+    expect(read.tail).toEqual(['one', 'TWO'])
+    expect(read.source).toBe('stream')
   })
 })

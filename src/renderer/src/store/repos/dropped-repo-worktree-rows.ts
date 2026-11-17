@@ -1,15 +1,9 @@
 import type { AppState } from '../types'
-import type { Repo } from '../../../../shared/repository/repo-types'
-import {
-  getRepoExecutionHostId,
-  type ExecutionHostId
-} from '../../../../shared/execution-host/execution-host'
-import { getRepoHostIdentity } from '../../../../shared/repository/repo-host-identity'
+import type { Repo } from '../../../../shared/repo-types'
+import { getRepoExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
+import { getRepoHostIdentity } from '../slices/repo-host-identity'
 import { worktreeMatchesHost } from '../slices/worktrees/listing/worktree-host-ownership'
-import {
-  selectDetectedWorktreesByRepo,
-  selectWorktreesByRepo
-} from '../workspaces/catalog/workspace-record-fields'
+import { selectDetectedWorktreesByRepo, selectWorktreesByRepo } from '../workspace-record-selectors'
 
 type HostedRow = { hostId?: ExecutionHostId; runtimeOwnerEnvironmentId?: string }
 type RowState = Pick<AppState, 'worktreesByRepo' | 'detectedWorktreesByRepo' | 'sortEpoch'>

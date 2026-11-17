@@ -17,17 +17,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { FooterKey } from '@/components/worktree-jump/rows/worktree-jump-palette-row-content'
+import { FooterKey } from '@/components/worktree-jump-palette-primitives'
 import { getIntlLocale, translate } from '@/i18n/i18n'
-import { useIntlLocale, useTranslate, type Translate } from '@/i18n/use-translate'
 import { getShortcutPlatform } from '@/hooks/useShortcutLabel'
-import { useAppStore } from '@/store/index'
-import { requestBrowserFocus } from '../host-guest/input/browser-focus'
-import type { BrowserPageDocLocation } from '../../../../../shared/browser/workspaces/browser-workspace-types'
-import { startOfLocalDay } from '../../../../../shared/automations/scheduling/automation-cron-occurrence'
+import { useAppStore } from '@/store'
+import { requestBrowserFocus } from '../host-guest/browser-focus'
+import type { BrowserPageDocLocation } from '../../../../../shared/browser-workspace-types'
+import { startOfLocalDay } from '../../../../../shared/automation-cron-occurrence'
 import { formatKeybinding } from '../../../../../shared/keybindings/formatting'
 import type { RemovedBrowserHistory } from '@/store/slices/browser/browser-slice-contract'
-import type { BrowserAddressBarSuggestion } from '../assemble-chrome/address-bar/browser-address-bar-suggestions'
+import type { BrowserAddressBarSuggestion } from '../assemble-chrome/browser-address-bar-suggestions'
 import BrowserHistoryRowRemoveButton from './BrowserHistoryRowRemoveButton'
 import { isRemoveRowShortcut, useRemoveHistoryRow } from './browser-history-row-removal'
 import {
@@ -59,10 +58,8 @@ let historyFormats: {
   timeFormat: Intl.DateTimeFormat
 } | null = null
 
-function getHistoryFormats(
-  intlLocale: string = getIntlLocale()
-): NonNullable<typeof historyFormats> {
-  const locale = intlLocale
+function getHistoryFormats(): NonNullable<typeof historyFormats> {
+  const locale = getIntlLocale()
   if (historyFormats?.locale !== locale) {
     historyFormats = {
       locale,
@@ -73,31 +70,26 @@ function getHistoryFormats(
   return historyFormats
 }
 
-function formatDayHeading(
-  startsAt: number,
-  now: number,
-  dateFormat: Intl.DateTimeFormat,
-  t: Translate = translate
-): string {
+function formatDayHeading(startsAt: number, now: number, dateFormat: Intl.DateTimeFormat): string {
   const today = startOfLocalDay(now)
   if (startsAt === today) {
-    return t('browser.history.today', 'Today')
+    return translate('browser.history.today', 'Today')
   }
   if (startsAt === startOfLocalDay(today - 1)) {
-    return t('browser.history.yesterday', 'Yesterday')
+    return translate('browser.history.yesterday', 'Yesterday')
   }
   return dateFormat.format(startsAt)
 }
 
 const CLEAR_RANGES: readonly BrowserHistoryClearRange[] = ['hour', 'today', 'all']
 
-function clearRangeLabel(range: BrowserHistoryClearRange, t: Translate = translate): string {
+function clearRangeLabel(range: BrowserHistoryClearRange): string {
   if (range === 'hour') {
-    return t('browser.history.clearLastHour', 'Last hour')
+    return translate('browser.history.clearLastHour', 'Last hour')
   }
   return range === 'today'
-    ? t('browser.history.clearToday', 'Today')
-    : t('browser.history.clearAllTime', 'All time')
+    ? translate('browser.history.clearToday', 'Today')
+    : translate('browser.history.clearAllTime', 'All time')
 }
 
 function BrowserHistoryDialogContent({
@@ -105,8 +97,6 @@ function BrowserHistoryDialogContent({
   onNavigate,
   onOpenWorkspaceDoc
 }: BrowserHistoryDialogProps): React.JSX.Element {
-  const t = useTranslate()
-  const intlLocale = useIntlLocale()
   const browserUrlHistory = useAppStore((s) => s.browserUrlHistory)
   const workspaceDocHistory = useAppStore((s) => s.workspaceDocHistory)
   const setBrowserHistoryPageId = useAppStore((s) => s.setBrowserHistoryPageId)
@@ -123,7 +113,7 @@ function BrowserHistoryDialogContent({
     [browserUrlHistory, workspaceDocHistory, deferredQuery]
   )
   const days = useMemo(() => groupBrowserHistoryRowsByDay(rows), [rows])
-  const { dateFormat, timeFormat } = getHistoryFormats(intlLocale)
+  const { dateFormat, timeFormat } = getHistoryFormats()
   const openedRowRef = useRef(false)
   const close = (): void => setBrowserHistoryPageId(null)
 
@@ -159,8 +149,8 @@ function BrowserHistoryDialogContent({
         event.preventDefault()
         requestBrowserFocus({ pageId, target: 'webview' })
       }}
-      title={t('browser.history.title', 'History')}
-      description={t('browser.history.description', 'Search and manage browsing history')}
+      title={translate('browser.history.title', 'History')}
+      description={translate('browser.history.description', 'Search and manage browsing history')}
       contentClassName="top-[min(10%,4rem)] w-[720px] max-w-[96vw] overflow-hidden"
       commandProps={{
         loop: true,
@@ -183,7 +173,7 @@ function BrowserHistoryDialogContent({
       }}
     >
       <CommandInput
-        placeholder={t('browser.history.search', 'Search history')}
+        placeholder={translate('browser.history.search', 'Search history')}
         value={query}
         onValueChange={setQuery}
         className="h-11 min-w-0 flex-1"
@@ -191,13 +181,13 @@ function BrowserHistoryDialogContent({
       <CommandList className="max-h-[min(560px,calc(100vh-14rem))]">
         <CommandEmpty>
           {hasHistory
-            ? t('browser.history.noMatches', 'No pages match your search')
-            : t('browser.history.empty', 'Pages you visit will show up here')}
+            ? translate('browser.history.noMatches', 'No pages match your search')
+            : translate('browser.history.empty', 'Pages you visit will show up here')}
         </CommandEmpty>
         {days.map((day) => (
           <CommandGroup
             key={day.startsAt}
-            heading={formatDayHeading(day.startsAt, now, dateFormat, t)}
+            heading={formatDayHeading(day.startsAt, now, dateFormat)}
           >
             {day.rows.map((row) => {
               const key = browserHistoryRowKey(row)
@@ -242,7 +232,7 @@ function BrowserHistoryDialogContent({
       >
         {cleared ? (
           <div className="flex items-center gap-2">
-            <span>{t('browser.history.cleared', 'Cleared browsing history')}</span>
+            <span>{translate('browser.history.cleared', 'Cleared browsing history')}</span>
             <Button
               variant="ghost"
               size="xs"
@@ -251,7 +241,7 @@ function BrowserHistoryDialogContent({
                 setCleared(null)
               }}
             >
-              {t('browser.newTab.undo', 'Undo')}
+              {translate('browser.newTab.undo', 'Undo')}
             </Button>
           </div>
         ) : (
@@ -259,28 +249,28 @@ function BrowserHistoryDialogContent({
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="xs" disabled={!hasHistory}>
                 <Trash2 />
-                {t('browser.history.clear', 'Clear browsing history')}
+                {translate('browser.history.clear', 'Clear browsing history')}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="top">
               <DropdownMenuLabel>
-                {t('browser.history.clearRange', 'Clear history from')}
+                {translate('browser.history.clearRange', 'Clear history from')}
               </DropdownMenuLabel>
               {CLEAR_RANGES.map((range) => (
                 <DropdownMenuItem key={range} onSelect={() => clear(range)}>
-                  {clearRangeLabel(range, t)}
+                  {clearRangeLabel(range)}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
         )}
         <div className="flex items-center gap-2">
-          <FooterKey>{t('browser.history.enterKey', 'Enter')}</FooterKey>
-          <span>{t('browser.history.open', 'Open')}</span>
+          <FooterKey>{translate('browser.history.enterKey', 'Enter')}</FooterKey>
+          <span>{translate('browser.history.open', 'Open')}</span>
           <FooterKey>{formatKeybinding('Shift+Delete', getShortcutPlatform()).join(' ')}</FooterKey>
-          <span>{t('browser.history.removeShort', 'Remove')}</span>
-          <FooterKey>{t('browser.history.escKey', 'Esc')}</FooterKey>
-          <span>{t('browser.history.close', 'Close')}</span>
+          <span>{translate('browser.history.removeShort', 'Remove')}</span>
+          <FooterKey>{translate('browser.history.escKey', 'Esc')}</FooterKey>
+          <span>{translate('browser.history.close', 'Close')}</span>
         </div>
       </div>
     </CommandDialog>

@@ -1,4 +1,3 @@
-import type { RuntimeTerminalCreate } from '../../shared/terminal/runtime/runtime-terminal-create-contract'
 /**
  * The factories `executeAgentLaunch` is handed: how a surface and a workspace are BUILT once the
  * executor has decided which. Separate from the executor because they are the contract each caller
@@ -9,14 +8,13 @@ import type {
   AgentLaunchIntent,
   AgentLaunchPrompt,
   AgentLaunchMode
-} from '../../shared/agent-launch/contracts/agent-launch-intent'
-import type { StructuredAgentId } from '../../shared/agent-session/lifecycle/provider-handles/agent-session-provider-handle'
-import type { StructuredAgentSessionFirstMessage } from '../../shared/agent-session/lifecycle/operations/structured-agent-session-create'
-import type { TuiAgent } from '../../shared/agent-launch/catalog/tui-agent'
-import type { SetupTrustMismatch } from '../../shared/worktree/create-types'
-import type { AgentLaunchParams } from '../../shared/rpc-contract/agent-launch/agent-launch-params'
-import { toAgentLaunchPreferences } from '../../shared/agent-launch/choices/agent-launch-preferences'
-import { assertOpenCodeModelLaunchPreferencesAbsent } from '../opencode/model-launch/opencode-model-startup-plan'
+} from '../../shared/agent-launch-intent'
+import type { StructuredAgentId } from '../../shared/agent-session-provider-handle'
+import type { StructuredAgentSessionFirstMessage } from '../../shared/structured-agent-session-create'
+import type { TuiAgent } from '../../shared/tui-agent'
+import type { AgentLaunchParams } from '../../shared/rpc-contract/agent-launch-params'
+import { toAgentLaunchPreferences } from '../../shared/agent-launch-preferences'
+import { assertOpenCodeModelLaunchPreferencesAbsent } from '../opencode/opencode-model-startup-plan'
 
 /** Inject creation so orchestration can add subscriptions without duplicating launch sequencing. */
 export type AgentLaunchSurfaceFactory = {
@@ -54,7 +52,6 @@ export type AgentLaunchSurfaceFactory = {
     /** Omit when the runtime reports no pane; never invent one. */
     paneKey?: string
     warning?: string
-    terminalCreation?: RuntimeTerminalCreate
     promptRodeLaunchCommand?: boolean
   }>
   /** Paste into a live PTY; return false on failure without failing the running launch. */
@@ -63,7 +60,6 @@ export type AgentLaunchSurfaceFactory = {
     agent: TuiAgent
     /** Reused terminals have no fresh launch readiness signal to await. */
     freshLaunch: boolean
-    terminalCreation?: RuntimeTerminalCreate
     prompt: AgentLaunchPrompt
     /** Abort readiness waits and refuse pending pastes. */
     signal?: AbortSignal
@@ -117,15 +113,16 @@ export type AgentLaunchWorkspaceFactory = {
     /** Null means local; absent means unresolved. */
     connectionId?: string | null
     startupTerminalHandle: string | undefined
-    startupTerminalCreation?: RuntimeTerminalCreate
     startupTerminalPaneKey?: string
-    setupTrustMismatch?: SetupTrustMismatch
     warning?: string
     promptRodeLaunchCommand?: boolean
   }>
   /** Leave a usable workspace when chat creation has an indeterminate outcome. */
   createRecoveryShell?: (worktreeId: string) => Promise<void>
-  createFolderWorkspace?: AgentLaunchWorkspaceFactory['createWorktree']
+  /** Folders have no startup terminal; the executor launches their agent after creation. */
+  createFolderWorkspace?(args: {
+    create: Readonly<Record<string, unknown>>
+  }): Promise<{ worktreeId: string; workspacePath?: string; connectionId: string | null }>
 }
 
 /** The options a terminal leg starts with: a caller's saved chat choice applies to it too. */

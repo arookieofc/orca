@@ -238,10 +238,8 @@ export abstract class SpeechModelHttpDownload {
             }
           })
           .catch((error: Error) => {
-            const activeRequest = request
             cleanupResponseProgressListener()
             rejectOnce(error)
-            activeRequest?.abort()
           })
       }
 

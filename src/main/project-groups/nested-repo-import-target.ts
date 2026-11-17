@@ -1,6 +1,6 @@
 import type { GitWorktreeInfo } from '../../shared/worktree/types'
-import { normalizeRuntimePathForComparison } from '../../shared/file-access/cross-platform-path'
-import { listWorktreeGraph } from '../git/worktrees/catalog/worktree-scan-cache'
+import { normalizeRuntimePathForComparison } from '../../shared/cross-platform-path'
+import { listWorktreeGraph } from '../git/worktree'
 
 export type NestedRepoImportTargetResolver = {
   resolveLocal: (repoPath: string) => Promise<string>

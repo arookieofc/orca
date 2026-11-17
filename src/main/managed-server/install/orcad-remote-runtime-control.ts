@@ -1,4 +1,4 @@
-import { ORCAD_STARTUP_READINESS_TIMEOUT_MS } from '../../../shared/remote-runtime/orcad-distribution/orcad-profile-preflight'
+import { ORCAD_STARTUP_READINESS_TIMEOUT_MS } from '../../../shared/orcad-profile-preflight'
 import {
   orcadLaunchCommand,
   parseOrcadReadinessOutput,
@@ -6,7 +6,6 @@ import {
   type OrcadReadinessParse
 } from './orcad-remote-launch'
 import {
-  hasWindowsOrcadLaunchReport,
   readWindowsOrcadLaunchReport,
   readWindowsOrcadSlotRuntime,
   readWindowsOrcadSlotEntry,
@@ -19,11 +18,10 @@ import {
   orcadReadinessWaitCommand,
   parseOrcadReadinessWaitOutput
 } from './orcad-remote-readiness-wait'
-import type { OrcadHostTransport } from './orcad-host-transport'
-import { errorMessage } from '../../../shared/errors/error-message'
+import type { OrcadHostTransport } from '../../ssh/orcad-host-transport'
+import { errorMessage } from '../../../shared/error-message'
 import {
   execCommand,
-  isSshCommandExitError,
   isUnconfirmedSshCommandTermination
 } from '../../ssh/remote-exec/remote-exec-command'
 import {
@@ -34,10 +32,7 @@ import {
 } from '../activation/orcad-activation-fence-scope'
 import { orcadWindowsHomeOpCommand } from './orcad-remote-windows-node'
 import { ORCAD_WINDOWS_FENCE_ARG } from '../host-state/orcad-windows-host-fence-ops'
-import {
-  isWindowsRemoteHost,
-  type RemoteHostPlatform
-} from '../../ssh/remote-host/ssh-remote-platform'
+import { isWindowsRemoteHost, type RemoteHostPlatform } from '../../ssh/ssh-remote-platform'
 
 // Pause even after early host answers to avoid a tight retry loop.
 const READINESS_RETRY_PAUSE_MS = 1_000
@@ -119,7 +114,7 @@ export async function launchOrcadAndAwaitReadiness(
     const slotRuntime = readWindowsOrcadSlotRuntime(slotAnswer)
     const slotEntry = readWindowsOrcadSlotEntry(slotAnswer, target.host, spec.remoteInstallDir)
     readWindowsOrcadLaunchReport(
-      await windowsLaunchReportOutput(
+      await execOrcadRemote(
         target,
         windowsOrcadLaunchCommand(target.host, spec, slotRuntime, slotEntry)
       )
@@ -179,20 +174,4 @@ export async function launchOrcadAndAwaitReadiness(
     throw lastWaitError
   }
   return last
-}
-
-/** The launcher writes its report before exiting nonzero, so a failed launch still names its cause. */
-async function windowsLaunchReportOutput(
-  target: OrcadRemoteExecTarget,
-  command: string
-): Promise<string> {
-  try {
-    return await execOrcadRemote(target, command)
-  } catch (error) {
-    // Without a report the command error carries the better diagnostic.
-    if (isSshCommandExitError(error) && hasWindowsOrcadLaunchReport(error.stdout)) {
-      return error.stdout
-    }
-    throw error
-  }
 }

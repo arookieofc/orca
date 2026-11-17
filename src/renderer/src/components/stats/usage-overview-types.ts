@@ -2,22 +2,22 @@ import type {
   ClaudeUsageDailyPoint,
   ClaudeUsageScanState,
   ClaudeUsageSummary
-} from '../../../../shared/agent-usage/analytics/claude-usage-types'
+} from '../../../../shared/claude-usage-types'
 import type {
   CodexUsageDailyPoint,
   CodexUsageScanState,
   CodexUsageSummary
-} from '../../../../shared/agent-usage/analytics/codex-usage-types'
+} from '../../../../shared/codex-usage-types'
 import type {
   OpenCodeUsageDailyPoint,
   OpenCodeUsageScanState,
   OpenCodeUsageSummary
-} from '../../../../shared/agent-usage/analytics/opencode-usage-types'
+} from '../../../../shared/opencode-usage-types'
 import type {
   MuseUsageDailyPoint,
   MuseUsageScanState,
   MuseUsageSummary
-} from '../../../../shared/agent-usage/analytics/muse-usage-types'
+} from '../../../../shared/muse-usage-types'
 
 export type UsageProviderId = 'claude' | 'codex' | 'opencode' | 'muse'
 

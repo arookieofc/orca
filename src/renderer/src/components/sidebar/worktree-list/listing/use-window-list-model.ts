@@ -46,7 +46,6 @@ export function useWindowSidebarListModel(args: SidebarListModelArgs): SidebarLi
   })
   const rowModel = useSidebarSectionRows({
     groupBy: args.groupBy,
-    sortBy: args.sortBy,
     projectOrderBy: args.projectOrderBy,
     pinnedDisplayPolicy: args.pinnedDisplayPolicy,
     defaultHostId,

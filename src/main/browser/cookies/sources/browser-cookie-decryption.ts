@@ -1,6 +1,6 @@
 import { createDecipheriv, createHash } from 'node:crypto'
-import type { BrowserCookieImportSummary } from '../../../../shared/browser/workspaces/browser-workspace-types'
-import type { EncryptionKeyResult } from './chromium-encryption-key-contract'
+import type { BrowserCookieImportSummary } from '../../../../shared/browser-workspace-types'
+import type { EncryptionKeyResult } from './browser-cookie-sqlite'
 
 // The fallback heuristic treats 8 nonprintable bytes in a 32-byte prefix as a host hash.
 const CHROMIUM_COOKIE_HMAC_LEN = 32
@@ -83,15 +83,6 @@ export function decryptCookieValueRaw(
   keyResult: EncryptionKeyResult,
   hostKey: string
 ): Buffer | null {
-  const decrypted = decryptChromiumEncryptedValue(encryptedBuffer, keyResult)
-  return decrypted && stripHmac(decrypted, hostKey)
-}
-
-/** Decrypts a v10/v11 `os_crypt` value with no cookie-specific prefix handling (e.g. saved passwords). */
-export function decryptChromiumEncryptedValue(
-  encryptedBuffer: Buffer,
-  keyResult: EncryptionKeyResult
-): Buffer | null {
   if (!encryptedBuffer || encryptedBuffer.length === 0) {
     return null
   }
@@ -101,7 +92,7 @@ export function decryptChromiumEncryptedValue(
   }
 
   if (keyResult.mode === 'aes-256-gcm') {
-    return decryptAes256Gcm(encryptedBuffer.subarray(3), keyResult.key)
+    return decryptAes256Gcm(encryptedBuffer.subarray(3), keyResult.key, hostKey)
   }
 
   const key = version === 'v10' || version === 'v11' ? keyResult.keysByVersion[version] : undefined
@@ -118,13 +109,14 @@ export function decryptChromiumEncryptedValue(
     const iv = Buffer.alloc(16, ' ')
     const decipher = createDecipheriv('aes-128-cbc', key, iv)
     decipher.setAutoPadding(true)
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()])
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+    return stripHmac(decrypted, hostKey)
   } catch {
     return null
   }
 }
 
-function decryptAes256Gcm(payload: Buffer, key: Buffer): Buffer | null {
+function decryptAes256Gcm(payload: Buffer, key: Buffer, hostKey: string): Buffer | null {
   // Windows GCM payload: 12-byte nonce, ciphertext, then 16-byte authentication tag.
   if (payload.length < 12 + 16) {
     return null
@@ -135,7 +127,8 @@ function decryptAes256Gcm(payload: Buffer, key: Buffer): Buffer | null {
   try {
     const decipher = createDecipheriv('aes-256-gcm', key, nonce)
     decipher.setAuthTag(authTag)
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()])
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+    return stripHmac(decrypted, hostKey)
   } catch {
     return null
   }

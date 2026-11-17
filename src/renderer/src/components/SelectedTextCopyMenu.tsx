@@ -1,9 +1,9 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { Copy } from 'lucide-react'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import { addViewportSizeChangeListener } from '@/hooks/viewport-size-change-listener'
-import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
+import { addAppKeyListener, removeAppKeyListener } from '@/lib/app-keyboard-router'
 
 type SelectedTextCopyMenuProps = {
   children: React.ReactNode
@@ -43,7 +43,6 @@ export function SelectedTextCopyMenu({
   children,
   className
 }: SelectedTextCopyMenuProps): React.JSX.Element {
-  const t = useTranslate()
   const [menu, setMenu] = React.useState<MenuState | null>(null)
 
   React.useEffect(() => {
@@ -118,7 +117,7 @@ export function SelectedTextCopyMenu({
               onClick={handleCopy}
             >
               <Copy className="size-3.5 text-muted-foreground" />
-              {t('auto.components.SelectedTextCopyMenu.9b40d7b018', 'Copy')}
+              {translate('auto.components.SelectedTextCopyMenu.9b40d7b018', 'Copy')}
             </button>
           </div>,
           document.body

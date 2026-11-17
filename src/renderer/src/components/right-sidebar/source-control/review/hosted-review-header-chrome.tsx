@@ -1,9 +1,8 @@
 import React from 'react'
 import { GitMerge, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react'
-import type { HostedReviewInfo } from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
-import { cn } from '@/lib/class-names'
-import { PullRequestIcon } from '../../checks-panel/presentation/check-presentation'
-import { openAppHttpLinkFromAnchor } from '@/lib/browser/navigation/app-http-link-open'
+import type { HostedReviewInfo } from '../../../../../../shared/hosted-review'
+import { cn } from '@/lib/utils'
+import { PullRequestIcon } from '../../checks-panel/check-presentation'
 
 function hostedReviewStateClass(review: HostedReviewInfo): string {
   if (review.state === 'merged') {
@@ -83,10 +82,7 @@ export function HostedReviewHeaderLink({
       target="_blank"
       rel="noreferrer"
       className={className}
-      onClick={(e) => {
-        e.stopPropagation()
-        openAppHttpLinkFromAnchor(e)
-      }}
+      onClick={(e) => e.stopPropagation()}
     >
       {label}
     </a>

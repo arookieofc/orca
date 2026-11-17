@@ -1,24 +1,22 @@
-import { useMemo } from 'react'
-import { createAutomationManagementActions } from './authoring/automation-management-actions'
-import { createAutomationRunActions } from './runs/automation-run-actions'
-import { createAutomationRunWorkspaceAction } from './runs/automation-run-workspace-action'
-import { createAutomationSaveAction } from './authoring/automation-save-action'
-import { useAutomationDraftEffects } from './authoring/use-automation-draft-effects'
-import { useAutomationEditorActions } from './authoring/use-automation-editor-actions'
-import { useAutomationMigrateAction } from './authoring/use-automation-migrate-action'
-import { useAutomationRunPageState } from './runs/use-automation-run-page-state'
+import { createAutomationManagementActions } from './automation-management-actions'
+import { createAutomationRunActions } from './automation-run-actions'
+import { createAutomationRunWorkspaceAction } from './automation-run-workspace-action'
+import { createAutomationSaveAction } from './automation-save-action'
+import { useAutomationDraftEffects } from './use-automation-draft-effects'
+import { useAutomationEditorActions } from './use-automation-editor-actions'
+import { useAutomationRunPageState } from './use-automation-run-page-state'
+import { useAutomationSourceAvailability } from './use-automation-source-availability'
 import { useAutomationsPageEscape } from './use-automations-page-escape'
-import { useAutomationsPageListState } from './listing/use-automations-page-list-state'
+import { useAutomationsPageListState } from './use-automations-page-list-state'
 import { useAutomationsPageLocalState } from './use-automations-page-local-state'
-import { useAutomationsPageDestinationState } from './authoring/use-automations-page-destination-state'
-import { useAutomationsPageDestinationForm } from './authoring/use-automations-page-destination-form'
+import { useAutomationsPageDestinationState } from './use-automations-page-destination-state'
+import { useAutomationsPageDestinationForm } from './use-automations-page-destination-form'
 import { useAutomationsPagePresentationState } from './use-automations-page-presentation-state'
 import { useAutomationsPageRefresh } from './use-automations-page-refresh'
-import { useAutomationsPageSetupState } from './authoring/use-automations-page-setup-state'
+import { useAutomationsPageSetupState } from './use-automations-page-setup-state'
 import { useAutomationsPageStoreState } from './use-automations-page-store-state'
-import { useExternalAutomationActions } from './external/use-external-automation-actions'
-import { useAutomationRunsDashboard } from './runs/use-automation-runs-dashboard'
-import { createAutomationsPageNavigation } from './automations-page-navigation'
+import { useExternalAutomationActions } from './use-external-automation-actions'
+import { useAutomationRunsDashboard } from './use-automation-runs-dashboard'
 
 export function useAutomationsPageController() {
   const store = useAutomationsPageStoreState()
@@ -39,19 +37,16 @@ export function useAutomationsPageController() {
     list,
     base: destination
   })
-  const setup = useAutomationsPageSetupState({
-    store,
-    local,
-    list,
-    draftRepos: destinationForm.dialogRepos
-  })
+  const setup = useAutomationsPageSetupState({ store, local, list })
   const runPage = useAutomationRunPageState({ store, local, list, setup })
+  const sourceAvailability = useAutomationSourceAvailability(list.visibleRows)
   const presentation = useAutomationsPagePresentationState({
     store,
     local,
     list,
     destination,
-    destinationForm
+    destinationForm,
+    sourceAvailability
   })
   const pageRefresh = useAutomationsPageRefresh({
     store,
@@ -72,9 +67,15 @@ export function useAutomationsPageController() {
     destination,
     destinationForm
   })
-  const saveContext = { store, local, list, setup, destination, destinationForm, pageRefresh }
-  const saveAutomation = createAutomationSaveAction(saveContext)
-  const migrateAction = useAutomationMigrateAction(saveContext, editorActions)
+  const saveAutomation = createAutomationSaveAction({
+    store,
+    local,
+    list,
+    setup,
+    destination,
+    destinationForm,
+    pageRefresh
+  })
   const actionContext = {
     store,
     local,
@@ -82,6 +83,7 @@ export function useAutomationsPageController() {
     setup,
     destination,
     destinationForm,
+    sourceAvailability,
     presentation,
     pageRefresh
   }
@@ -89,52 +91,7 @@ export function useAutomationsPageController() {
   const runActions = createAutomationRunActions(actionContext)
   const externalActions = useExternalAutomationActions(actionContext)
   const openRunWorkspace = createAutomationRunWorkspaceAction(actionContext)
-  const { setPendingAutomationRunNavigation } = store
-  const {
-    setPageView,
-    setIsDetailOpen,
-    setActivePaneTab,
-    setSelectedAutomationRunPageId,
-    setRunPageOrigin,
-    setRunNotFound,
-    selectExternalKey,
-    setListSearchQuery
-  } = local
-  const { selectAutomationRow } = list
-  const selectHost = list.hostCatalog.selectHost
-  const navigation = useMemo(
-    () =>
-      createAutomationsPageNavigation({
-        store: { setPendingAutomationRunNavigation },
-        local: {
-          setPageView,
-          setIsDetailOpen,
-          setActivePaneTab,
-          setSelectedAutomationRunPageId,
-          setRunPageOrigin,
-          setRunNotFound,
-          selectExternalKey,
-          setListSearchQuery
-        },
-        selectAutomationRow,
-        // The Runs page always spans every host, as the Runs tab sets it.
-        showAllHosts: () => selectHost({ kind: 'all' })
-      }),
-    [
-      selectHost,
-      selectAutomationRow,
-      selectExternalKey,
-      setListSearchQuery,
-      setActivePaneTab,
-      setIsDetailOpen,
-      setPageView,
-      setPendingAutomationRunNavigation,
-      setRunNotFound,
-      setRunPageOrigin,
-      setSelectedAutomationRunPageId
-    ]
-  )
-  useAutomationsPageEscape({ store, local, navigation })
+  useAutomationsPageEscape({ store, local })
 
   return {
     store,
@@ -145,17 +102,16 @@ export function useAutomationsPageController() {
     destinationForm,
     setup,
     runPage,
+    sourceAvailability,
     presentation,
     pageRefresh,
     draftEffects,
     editorActions,
     saveAutomation,
-    migrateAction,
     managementActions,
     runActions,
     externalActions,
-    openRunWorkspace,
-    navigation
+    openRunWorkspace
   }
 }
 

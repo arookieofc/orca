@@ -1,15 +1,11 @@
-import type { RuntimeRpcResponse } from '../../../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
+import type { RuntimeRpcResponse } from '../../../../../shared/runtime-rpc-envelope'
 import type {
   BrowserScreencastReadyResult,
   BrowserScreencastResult
-} from '../../../../../shared/browser/runtime/runtime-browser-contracts'
-import { withBrowserPaneUiRuntimeRpcSource } from '../../../../../shared/remote-runtime/rpc/runtime-rpc-feature-interaction-source'
-import { e2eConfig } from '@/app-shell/startup/e2e-config'
+} from '../../../../../shared/runtime-types'
+import { withBrowserPaneUiRuntimeRpcSource } from '../../../../../shared/runtime-rpc-feature-interaction-source'
+import { e2eConfig } from '@/lib/e2e-config'
 import { isRemoteBrowserPageMissingCode } from './remote-browser-stream-errors'
-import type {
-  RemoteBrowserDialogPage,
-  RemoteBrowserJavaScriptDialog
-} from './remote-browser-javascript-dialog'
 import type { RemoteBrowserViewportSize } from './remote-browser-stream-tokens'
 
 export type RemoteBrowserScreencastSubscribe = (
@@ -58,8 +54,6 @@ export type RemoteBrowserScreencastEvents = {
   onPageMissing: () => void
   onFrame: (bytes: Uint8Array<ArrayBufferLike>) => void
   onClosed: () => void
-  /** This stream's page dialog; a stopped stream's host dismisses it, so it closes with the stream. */
-  javaScriptDialog: RemoteBrowserJavaScriptDialog
 }
 
 export async function openRemoteBrowserScreencastStream(
@@ -68,12 +62,7 @@ export async function openRemoteBrowserScreencastStream(
   events: RemoteBrowserScreencastEvents
 ): Promise<{ unsubscribe: () => void }> {
   recordE2eScreencastSubscribe()
-  const dialogPage: RemoteBrowserDialogPage = {
-    target: { kind: 'environment', environmentId: request.environmentId },
-    worktree: request.worktree,
-    pageId: request.pageId
-  }
-  const subscription = await subscribe(
+  return subscribe(
     {
       selector: request.environmentId,
       method: 'browser.screencast',
@@ -92,7 +81,7 @@ export async function openRemoteBrowserScreencastStream(
       timeoutMs: 15_000
     },
     {
-      onResponse: (response) => dispatchScreencastResponse(response, events, dialogPage),
+      onResponse: (response) => dispatchScreencastResponse(response, events),
       onBinary: (bytes) => events.onFrame(bytes),
       onError: (error) => {
         if (!events.isCurrent()) {
@@ -104,24 +93,14 @@ export async function openRemoteBrowserScreencastStream(
         }
         events.onTransportError(error.message)
       },
-      onClose: () => {
-        events.javaScriptDialog.close()
-        events.onClosed()
-      }
+      onClose: () => events.onClosed()
     }
   )
-  return {
-    unsubscribe: () => {
-      events.javaScriptDialog.close()
-      subscription.unsubscribe()
-    }
-  }
 }
 
 function dispatchScreencastResponse(
   response: RuntimeRpcResponse<unknown>,
-  events: RemoteBrowserScreencastEvents,
-  dialogPage: RemoteBrowserDialogPage
+  events: RemoteBrowserScreencastEvents
 ): void {
   if (!events.isCurrent()) {
     return
@@ -142,10 +121,6 @@ function dispatchScreencastResponse(
     events.onReady(event)
   } else if (event.type === 'end') {
     events.onEnded()
-  } else if (event.type === 'dialog') {
-    events.javaScriptDialog.show(event, dialogPage)
-  } else if (event.type === 'dialogClosed') {
-    events.javaScriptDialog.close()
   } else if (event.type === 'error') {
     events.onFailed(event.message)
   }

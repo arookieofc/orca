@@ -1,9 +1,6 @@
-import { useSourceControlScope, useSourceControlState } from '../panel/worktree-scope'
-import { useDiffCommentView } from '@/components/diff-comments/use-diff-comment-owner'
-import type { AppState } from '@/store/types'
 import React from 'react'
 import { Check, ChevronDown, Copy, MessageSquare, MoreHorizontal, Trash2 } from 'lucide-react'
-import { DiffNotesSendMenu } from '@/components/editor/diff/review/DiffNotesSendMenu'
+import { DiffNotesSendMenu } from '@/components/editor/DiffNotesSendMenu'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,9 +8,9 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
-import type { DiffComment } from '../../../../../../shared/file-review/diff-comment-types'
+import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
+import type { DiffComment } from '../../../../../../shared/diff-comment-types'
 import type { PendingDiffCommentsClear } from './diff-comments-clear-dialog-state'
 import { DiffCommentsInlineList } from './diff-comments-list'
 
@@ -39,15 +36,9 @@ export function SourceControlNotesShelf({
   diffCommentsCopied: boolean
   handleCopyDiffComments: () => Promise<void>
   setPendingDiffCommentsClear: React.Dispatch<React.SetStateAction<PendingDiffCommentsClear | null>>
-  deleteDiffComment: AppState['deleteDiffComment']
+  deleteDiffComment: (worktreeId: string, id: string) => Promise<void> | void
   handleOpenComment: (comment: DiffComment) => void
 }): React.JSX.Element {
-  const t = useTranslate()
-  const scope = useSourceControlScope()
-  const placementGroupId = useSourceControlState((s) =>
-    scope ? s.activeGroupIdByWorktree[scope.placementWorkspaceId] : undefined
-  )
-  const { owner } = useDiffCommentView(activeWorktreeId, 'selection')
   return (
     <div className="border-b border-border">
       <div className="flex items-center gap-1 pl-3 pr-2 py-1.5">
@@ -58,8 +49,11 @@ export function SourceControlNotesShelf({
           aria-expanded={diffCommentsExpanded}
           title={
             diffCommentsExpanded
-              ? t('auto.components.right.sidebar.SourceControl.d13edef890', 'Collapse notes')
-              : t('auto.components.right.sidebar.SourceControl.72f2bea3f4', 'Expand notes')
+              ? translate(
+                  'auto.components.right.sidebar.SourceControl.d13edef890',
+                  'Collapse notes'
+                )
+              : translate('auto.components.right.sidebar.SourceControl.72f2bea3f4', 'Expand notes')
           }
         >
           <ChevronDown
@@ -69,7 +63,9 @@ export function SourceControlNotesShelf({
             )}
           />
           <MessageSquare className="size-3.5 shrink-0" />
-          <span>{t('auto.components.right.sidebar.SourceControl.cc474e0b8c', 'Notes')}</span>
+          <span>
+            {translate('auto.components.right.sidebar.SourceControl.cc474e0b8c', 'Notes')}
+          </span>
           {diffCommentCount > 0 && (
             <span className="text-[11px] leading-none text-muted-foreground tabular-nums">
               {diffCommentCount}
@@ -78,22 +74,21 @@ export function SourceControlNotesShelf({
         </button>
         <div className="ml-1 flex shrink-0 items-center gap-1.5">
           <DiffNotesSendMenu
-            owner={owner}
             worktreeId={activeWorktreeId}
-            groupId={placementGroupId ?? activeGroupId ?? activeWorktreeId}
+            groupId={activeGroupId ?? activeWorktreeId}
             comments={diffCommentsForActive}
             triggerClassName="size-6"
             respondToOpenRequest
           />
           {diffCommentCount > 0 && (
-            <TooltipProvider>
+            <TooltipProvider delayDuration={400}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     className="inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     onClick={() => void handleCopyDiffComments()}
-                    aria-label={t(
+                    aria-label={translate(
                       'auto.components.right.sidebar.SourceControl.3baf6c77b4',
                       'Copy all notes to clipboard'
                     )}
@@ -106,20 +101,23 @@ export function SourceControlNotesShelf({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" sideOffset={6}>
-                  {t('auto.components.right.sidebar.SourceControl.eae2d051af', 'Copy all notes')}
+                  {translate(
+                    'auto.components.right.sidebar.SourceControl.eae2d051af',
+                    'Copy all notes'
+                  )}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
           <DropdownMenu>
-            <TooltipProvider>
+            <TooltipProvider delayDuration={400}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
                       className="inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      aria-label={t(
+                      aria-label={translate(
                         'auto.components.right.sidebar.SourceControl.2fe2a67580',
                         'More note actions'
                       )}
@@ -129,7 +127,10 @@ export function SourceControlNotesShelf({
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" sideOffset={6}>
-                  {t('auto.components.right.sidebar.SourceControl.2fe2a67580', 'More note actions')}
+                  {translate(
+                    'auto.components.right.sidebar.SourceControl.2fe2a67580',
+                    'More note actions'
+                  )}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -138,19 +139,17 @@ export function SourceControlNotesShelf({
                 className="text-destructive focus:text-destructive"
                 disabled={diffCommentCount === 0}
                 onSelect={() => {
-                  if (!owner || !activeWorktreeId || diffCommentCount === 0) {
+                  if (!activeWorktreeId || diffCommentCount === 0) {
                     return
                   }
-                  setPendingDiffCommentsClear({
-                    kind: 'all',
-                    worktreeId: activeWorktreeId,
-                    owner,
-                    count: diffCommentCount
-                  })
+                  setPendingDiffCommentsClear({ kind: 'all', worktreeId: activeWorktreeId })
                 }}
               >
                 <Trash2 className="size-3.5" />
-                {t('auto.components.right.sidebar.SourceControl.1406954883', 'Clear all notes...')}
+                {translate(
+                  'auto.components.right.sidebar.SourceControl.1406954883',
+                  'Clear all notes...'
+                )}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -159,16 +158,13 @@ export function SourceControlNotesShelf({
       {diffCommentsExpanded && (
         <DiffCommentsInlineList
           comments={diffCommentsForActive}
-          onDelete={(id) => void (owner && deleteDiffComment(owner, id))}
+          onDelete={(id) => void deleteDiffComment(activeWorktreeId, id)}
           onOpen={(comment) => handleOpenComment(comment)}
           onClearFile={(filePath) =>
-            owner &&
             setPendingDiffCommentsClear({
               kind: 'file',
-              owner,
               worktreeId: activeWorktreeId,
-              filePath,
-              count: diffCommentsForActive.filter((comment) => comment.filePath === filePath).length
+              filePath
             })
           }
         />

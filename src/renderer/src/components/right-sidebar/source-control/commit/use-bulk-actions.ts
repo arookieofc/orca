@@ -1,26 +1,26 @@
 import { useCallback, useMemo, useState } from 'react'
-import { requireGitOwnerTarget } from '../sync/worktree-git-owner-target'
-import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import { requireGitOwnerTarget } from '../../worktree-git-owner-target'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { toast } from 'sonner'
-import { sourceControlConnectionId, useSourceControlScope } from '../panel/worktree-scope'
+import { getConnectionId } from '@/lib/connection-context'
 import { translate } from '@/i18n/i18n'
-import { readIpcErrorMessage } from '@/runtime/errors/ipc-error'
+import { readIpcErrorMessage } from '@/lib/ipc-error'
 import {
   bulkStageRuntimeGitPaths,
   bulkUnstageRuntimeGitPaths,
   stageRuntimeGitWorktreeScope
-} from '@/runtime/source-control/git/runtime-git-working-tree-client'
+} from '@/runtime/runtime-git-working-tree-client'
 import {
   getStageAllPaths,
   getUnstageAllPaths,
   isStageableStatusEntry
-} from '../../../../../../shared/source-control/listing/source-control-discard-all-sequence'
+} from '../../../../../../shared/source-control-discard-all-sequence'
 import type {
   SourceControlDisplaySectionId,
   SourceControlEntryGroups
-} from '../../../../../../shared/source-control/listing/source-control-section-order'
+} from '../../../../../../shared/source-control-section-order'
 import type { FlatEntry } from '../listing/use-selection'
-import type { GitStageWorktreeScope } from '../../../../../../shared/git/paths/git-stage-worktree-scope'
+import type { GitStageWorktreeScope } from '../../../../../../shared/git-stage-worktree-scope'
 
 /** Handlers run with void; catch Git failures to avoid silent unhandled rejections. */
 function reportBulkMutationFailure(error: unknown): void {
@@ -56,7 +56,6 @@ export function useSourceControlBulkActions({
   clearSelection: () => void
   refreshActiveGitStatusAfterMutation: () => Promise<void>
 }) {
-  const sourceControlScope = useSourceControlScope()
   const [isExecutingBulk, setIsExecutingBulk] = useState(false)
   // Reset during render so switches never paint the previous worktree's busy state.
   const [bulkActionsWorktreeId, setBulkActionsWorktreeId] = useState(activeWorktreeId)
@@ -93,7 +92,7 @@ export function useSourceControlBulkActions({
     }
     setIsExecutingBulk(true)
     try {
-      const connectionId = sourceControlConnectionId(sourceControlScope, activeWorktreeId ?? null)
+      const connectionId = getConnectionId(activeWorktreeId ?? null) ?? undefined
       await bulkStageRuntimeGitPaths(
         {
           // Route staging through workspace ownership rather than focused runtime.
@@ -118,8 +117,7 @@ export function useSourceControlBulkActions({
     clearSelection,
     activeWorktreeId,
     isExecutingBulk,
-    refreshActiveGitStatusAfterMutation,
-    sourceControlScope
+    refreshActiveGitStatusAfterMutation
   ])
 
   const handleBulkUnstage = useCallback(async () => {
@@ -128,7 +126,7 @@ export function useSourceControlBulkActions({
     }
     setIsExecutingBulk(true)
     try {
-      const connectionId = sourceControlConnectionId(sourceControlScope, activeWorktreeId ?? null)
+      const connectionId = getConnectionId(activeWorktreeId ?? null) ?? undefined
       await bulkUnstageRuntimeGitPaths(
         {
           // Route unstaging through workspace ownership rather than focused runtime.
@@ -153,8 +151,7 @@ export function useSourceControlBulkActions({
     clearSelection,
     activeWorktreeId,
     isExecutingBulk,
-    refreshActiveGitStatusAfterMutation,
-    sourceControlScope
+    refreshActiveGitStatusAfterMutation
   ])
 
   // Scopes replace explicit paths; only the host can enumerate changes beyond the listing cap.
@@ -170,7 +167,7 @@ export function useSourceControlBulkActions({
           target: requireGitOwnerTarget(activeRepoTarget),
           worktreeId: activeWorktreeId,
           worktreePath,
-          connectionId: sourceControlConnectionId(sourceControlScope, activeWorktreeId ?? null)
+          connectionId: getConnectionId(activeWorktreeId ?? null) ?? undefined
         }
         await (scope
           ? stageRuntimeGitWorktreeScope(context, scope)
@@ -184,7 +181,6 @@ export function useSourceControlBulkActions({
       }
     },
     [
-      sourceControlScope,
       activeRepoTarget,
       activeWorktreeId,
       clearSelection,
@@ -213,7 +209,7 @@ export function useSourceControlBulkActions({
       }
       setIsExecutingBulk(true)
       try {
-        const connectionId = sourceControlConnectionId(sourceControlScope, activeWorktreeId ?? null)
+        const connectionId = getConnectionId(activeWorktreeId ?? null) ?? undefined
         await bulkUnstageRuntimeGitPaths(
           {
             // Route unstaging through workspace ownership rather than focused runtime.
@@ -233,7 +229,6 @@ export function useSourceControlBulkActions({
       }
     },
     [
-      sourceControlScope,
       activeRepoTarget,
       activeWorktreeId,
       clearSelection,

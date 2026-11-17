@@ -1,4 +1,3 @@
-import type { ProfileSaveDomains } from '../profile-save-domains'
 import type {
   Project,
   ProjectHostSetup,
@@ -9,21 +8,13 @@ import type {
   ProjectHostSetupUpdateArgs,
   ProjectHostSetupUpdateResult,
   ProjectUpdateArgs
-} from '../../../shared/project/project-types'
-import type { PersistedState } from '../../../shared/orca-profiles/persisted-state-types'
-import type { Repo } from '../../../shared/repository/repo-types'
-import type { RepoHostTarget } from '../../../shared/repository/repo-host-identity'
-import {
-  getRepoExecutionHostId,
-  normalizeExecutionHostId,
-  type ExecutionHostId
-} from '../../../shared/execution-host/execution-host'
-import {
-  createRepoRowExecutionHostLookup,
-  type RepoRowExecutionHostLookup
-} from '../../../shared/execution-host/worktree-execution-host-resolution'
-import { normalizeProjectRuntimePreference } from '../../../shared/execution-host/project-runtime-preference'
-import { findProjectHostSetup } from '../../../shared/project/host-setup/project-host-setup-target'
+} from '../../../shared/project-types'
+import type { PersistedState } from '../../../shared/persisted-state-types'
+import type { Repo } from '../../../shared/repo-types'
+import type { RepoHostTarget } from '../../../shared/repo-host-identity'
+import { getRepoExecutionHostId, normalizeExecutionHostId } from '../../../shared/execution-host'
+import { normalizeProjectRuntimePreference } from '../../../shared/project-execution-runtime'
+import { findProjectHostSetup } from '../../../shared/project-host-setup-target'
 import { makeProjectHostSetupId } from './project-host-compatibility'
 import { repoGitUsernameCacheKey } from './repo-hydration'
 
@@ -42,32 +33,11 @@ export type ProjectHostMutationOperations = {
     updates: ProjectHostSetupUpdateArgs['updates']
   ) => ProjectHostSetup
   removeProjectForHost: (target: RepoHostTarget) => void
-  scheduleSave: (domains: ProfileSaveDomains) => void
+  scheduleSave: () => void
 }
 
 export class ProjectHostPersistenceOperations {
-  /** Repo rows by id, for keyed reads; dropped by every `repos` write and rebuilt on next use. */
-  private repoIndex: { source: Repo[]; lookup: RepoRowExecutionHostLookup<Repo> } | null = null
-
   constructor(private readonly operations: ProjectHostMutationOperations) {}
-
-  /** A write changed the repo collection (membership, order or a row's host). */
-  invalidateRepoIndex(): void {
-    this.repoIndex = null
-  }
-
-  /** The repo registered under `id` on `hostId`, by key: never a pass over every registration. */
-  getRepoForHost(id: string, hostId: ExecutionHostId): Repo | undefined {
-    // A replaced collection is a new array, even with no write notice.
-    if (this.repoIndex?.source !== this.state.repos) {
-      this.repoIndex = {
-        source: this.state.repos,
-        lookup: createRepoRowExecutionHostLookup(this.state.repos)
-      }
-    }
-    const repo = this.repoIndex.lookup.byHost(id, hostId)
-    return repo ? this.hydrateRepo(repo) : undefined
-  }
 
   private get state(): PersistedState {
     return this.operations.state
@@ -100,8 +70,8 @@ export class ProjectHostPersistenceOperations {
     this.operations.removeProjectForHost(target)
   }
 
-  private scheduleSave(domains: ProfileSaveDomains): void {
-    this.operations.scheduleSave(domains)
+  private scheduleSave(): void {
+    this.operations.scheduleSave()
   }
 
   getRepos(): Repo[] {
@@ -130,7 +100,7 @@ export class ProjectHostPersistenceOperations {
       }
     }
     project.updatedAt = Date.now()
-    this.scheduleSave(['projects'])
+    this.scheduleSave()
     return { ...project }
   }
 
@@ -172,7 +142,7 @@ export class ProjectHostPersistenceOperations {
     }
     // Independent setup persistence survives future repo projection sync.
     this.state.projectHostSetups.push(setup)
-    this.scheduleSave(['projectHostSetups'])
+    this.scheduleSave()
     return { project, setup }
   }
 
@@ -227,7 +197,7 @@ export class ProjectHostPersistenceOperations {
       return { project, setup, repo: this.hydrateRepo(repo) }
     }
     this.state.projectHostSetups = this.state.projectHostSetups.filter((entry) => entry !== setup)
-    this.scheduleSave(['projectHostSetups'])
+    this.scheduleSave()
     return { project, setup }
   }
 
@@ -264,7 +234,7 @@ export class ProjectHostPersistenceOperations {
     } else {
       delete repo.gitUsername
     }
-    this.scheduleSave(['repos'])
+    this.scheduleSave()
     return true
   }
 }

@@ -1,4 +1,4 @@
-import { parseAgentJournalItemKey } from '../../shared/agent-session/journal/agent-session-journal-item-key'
+import { parseAgentJournalItemKey } from '../../shared/agent-session-journal-item-key'
 import {
   createProviderTimelineAssembler,
   type ProviderTimelineAssembler
@@ -6,7 +6,7 @@ import {
 import type { ProviderTimelineEvent } from '../native-chat/agent-session-timeline/provider-timeline-event'
 import { createLegacyProviderTimelineIdentityScheme } from '../native-chat/agent-session-timeline/provider-timeline-identity'
 import type { ProviderTimelineSink } from '../native-chat/agent-session-timeline/provider-timeline-plan'
-import type { StructuredAgentSessionCommandRun } from '../native-chat/agent-session-wire/providers/structured-agent-session-adapter'
+import type { StructuredAgentSessionCommandRun } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 
 const MAX_HELD_EVENTS = 256
 const MAX_HELD_BYTES = 4 * 1024 * 1024
@@ -36,11 +36,21 @@ export class JsonlRpcTimelineLane {
   private heldBytes = 0
   private draining = false
   private ended = false
+  private finalizing = false
   private retryTimer?: ReturnType<typeof setTimeout>
   private readonly watchers = new Set<() => void>()
 
   constructor(private readonly deps: JsonlRpcTimelineLaneDeps) {
-    this.assembler = createProviderTimelineAssembler(deps)
+    this.assembler = createProviderTimelineAssembler({
+      ...deps,
+      sink: {
+        ...deps.sink,
+        tryAppendTransition: (transition) =>
+          deps.sink.tryAppendTransition(
+            this.finalizing ? { ...transition, lifecycle: true, finalTail: true } : transition
+          )
+      }
+    })
     this.identity = createLegacyProviderTimelineIdentityScheme(deps)
   }
 
@@ -193,7 +203,9 @@ export class JsonlRpcTimelineLane {
     if (this.sealed || this.ended) {
       return
     }
+    // At most 256 held events + 128 dirty streams + this internal end: below 512 tail slots.
     this.sealed = true
+    this.finalizing = true
     this.retry()
     if (this.ended) {
       return

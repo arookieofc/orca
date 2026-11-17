@@ -2,7 +2,7 @@ import { createServer, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { Page, TestInfo } from '@stablyai/playwright-test'
 import { RuntimeClient } from '../../src/cli/runtime/client'
-import type { RuntimeMobileSessionTabsResult } from '../../src/shared/remote-runtime/session-graph/runtime-session-contracts'
+import type { RuntimeMobileSessionTabsResult } from '../../src/shared/runtime-types'
 import { expect, test } from './helpers/orca-app'
 import {
   createRuntimeDesktopPairingOffer,

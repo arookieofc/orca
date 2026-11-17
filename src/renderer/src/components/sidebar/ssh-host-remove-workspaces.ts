@@ -1,10 +1,7 @@
 import type { ConfirmedUnsavedDiscards } from '@/store/slices/worktrees/teardown/removed-workspace-unsaved-files'
-import {
-  getRepoExecutionHostId,
-  toSshExecutionHostId
-} from '../../../../shared/execution-host/execution-host'
+import { getRepoExecutionHostId, toSshExecutionHostId } from '../../../../shared/execution-host'
 import { useAppStore } from '@/store'
-import { runEnclosingWorktreeRemoval } from '@/store/workspaces/selection/active-worktree-deselection-intent'
+import { runEnclosingWorktreeRemoval } from '@/store/active-worktree-deselection-intent'
 import type { SshHostRemoveResolution } from './ssh-host-remove-resolution'
 
 export type ClearSshHostWorkspacesResult = {
@@ -12,20 +9,24 @@ export type ClearSshHostWorkspacesResult = {
   failedIds: string[]
 }
 
-/** Forget children before root repos, collecting failures for the caller. */
+/** Remove children before root repos; delete remotely or forget records locally, collecting failures for the caller. */
 async function clearSshHostWorkspacesImpl(
   resolution: SshHostRemoveResolution,
+  mode: 'delete-remote' | 'forget-local',
   confirmedDiscards: ConfirmedUnsavedDiscards | undefined
 ): Promise<ClearSshHostWorkspacesResult> {
   const store = useAppStore.getState()
+  const forgetLocalOnly = mode === 'forget-local'
   const failedIds: string[] = []
   // Pin removals to this SSH target so a same-path local checkout cannot be deleted.
   const hostId = toSshExecutionHostId(resolution.targetId)
   for (const worktreeId of resolution.workspaceWorktreeIds) {
-    const result = await store.removeWorktree({ id: worktreeId, executionHostId: hostId }, false, {
-      mode: 'forget-local',
-      confirmedDiscards
-    })
+    // Sequential deletes avoid Git ref-lock contention on the same repo.
+    const result = await store.removeWorktree(
+      { id: worktreeId, executionHostId: hostId },
+      false,
+      forgetLocalOnly ? { mode: 'forget-local', confirmedDiscards } : { confirmedDiscards }
+    )
     if (!result.ok) {
       failedIds.push(worktreeId)
     }
@@ -52,9 +53,10 @@ async function clearSshHostWorkspacesImpl(
 
 export async function clearSshHostWorkspaces(
   resolution: SshHostRemoveResolution,
+  mode: 'delete-remote' | 'forget-local',
   confirmedDiscards?: ConfirmedUnsavedDiscards
 ): Promise<ClearSshHostWorkspacesResult> {
   return runEnclosingWorktreeRemoval({ hostId: toSshExecutionHostId(resolution.targetId) }, () =>
-    clearSshHostWorkspacesImpl(resolution, confirmedDiscards)
+    clearSshHostWorkspacesImpl(resolution, mode, confirmedDiscards)
   )
 }

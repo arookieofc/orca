@@ -1,19 +1,16 @@
 import { ORCAD_MIGRATION_MANIFEST_VERSION } from '../../../../shared/orcad-migration/orcad-migration-manifest-validation'
-import type { OrcadMigrationDormantStatePayload } from '../../../../shared/orcad-migration/orcad-migration-manifest'
 import {
   wslMoveJournalKey,
   type WslMoveCutover,
   type WslMoveCutoverPhase
 } from '../../../../shared/wsl-move/wsl-move-cutover'
-import { computeOrcadMigrationManifestSha256 } from '../../../orcad/migration/orcad-migration-manifest-digest'
+import { computeOrcadMigrationManifestSha256 } from '../../../orcad/orcad-migration-manifest-digest'
 
 export function wslMoveCutoverFixture(
   migrationId = 'move-1',
   phase: WslMoveCutoverPhase = 'prepared',
   extra: Partial<WslMoveCutover> = {},
-  scope: { repoIds?: string[]; folderWorkspaceIds?: string[] } = {},
-  dormantState?: OrcadMigrationDormantStatePayload,
-  distro = 'Ubuntu'
+  scope: { repoIds?: string[]; folderWorkspaceIds?: string[] } = {}
 ): WslMoveCutover {
   const repoIds = scope.repoIds ?? ['repo-1']
   const folderWorkspaceIds = scope.folderWorkspaceIds ?? []
@@ -23,7 +20,7 @@ export function wslMoveCutoverFixture(
     createdAt: '2026-10-13T00:00:00.000Z',
     source: {
       kind: 'local-wsl' as const,
-      distro,
+      distro: 'Ubuntu',
       scopeRepoIds: repoIds,
       scopeFolderWorkspaceIds: folderWorkspaceIds,
       generation: 1
@@ -51,10 +48,9 @@ export function wslMoveCutoverFixture(
         lastActivityAt: 0,
         createdAt: 0,
         updatedAt: 0
-      })),
-      ...(dormantState ? { dormantState } : {})
+      }))
     },
-    destinationEnvironmentId: `wsl:${distro}`
+    destinationEnvironmentId: 'wsl:Ubuntu'
   }
   const manifest = { ...unsigned, manifestSha256: computeOrcadMigrationManifestSha256(unsigned) }
   return {
@@ -63,9 +59,9 @@ export function wslMoveCutoverFixture(
     phase,
     startedAt: '2026-10-13T00:00:00.000Z',
     updatedAt: '2026-10-13T00:00:00.000Z',
-    destinationEnvironmentId: `wsl:${distro}`,
-    destinationName: distro,
-    journalKey: wslMoveJournalKey(distro),
+    destinationEnvironmentId: 'wsl:Ubuntu',
+    destinationName: 'Ubuntu',
+    journalKey: wslMoveJournalKey('Ubuntu'),
     manifestSha256: manifest.manifestSha256,
     provenExitedSessionIds: [],
     rewrittenStores: [],

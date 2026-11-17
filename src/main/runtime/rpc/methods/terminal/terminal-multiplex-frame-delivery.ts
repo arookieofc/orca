@@ -4,28 +4,18 @@ import {
   encodeTerminalStreamFrame,
   encodeTerminalStreamJson,
   encodeTerminalStreamText
-} from '../../../../../shared/terminal/stream/terminal-stream-protocol'
+} from '../../../../../shared/terminal-stream-protocol'
 import { appendAckPendingOutput } from './terminal-stream-replay'
 import { notePausedOutputDropped } from './terminal-multiplex-paused-output-drop'
-import {
-  markYieldedQueriesDiscardedInFrames,
-  settleDeliveredYieldedQueries,
-  settleReplayedYieldedQuery
-} from './terminal-multiplex-yielded-queries'
+import { settleDeliveredYieldedQueries } from './terminal-multiplex-yielded-queries'
 import {
   isMultiplexStreamAttached,
   type TerminalMultiplexConnection
 } from './terminal-multiplex-connection'
-import type { TerminalOutputFrameChunk } from '../../terminal/terminal-output-frame-chunks'
+import type { TerminalOutputFrameChunk } from '../../terminal-output-frame-chunks'
 import type { TerminalStreamInputOutcome } from './terminal-input-delivery'
 import type { TerminalMultiplexStream } from './terminal-stream-types'
-import {
-  ackPendingOutputBudgetBytes,
-  ackWindowAdmits,
-  chargeAckWindow,
-  noteAckGatedSend
-} from './terminal-multiplex-ack-window'
-import type { RpcBinarySendResult } from '../../transports/rpc-binary-sender'
+import type { RpcBinarySendResult } from '../../rpc-binary-sender'
 
 export function installMultiplexFrameDelivery(state: TerminalMultiplexConnection): void {
   const { sendBinary, emit } = state
@@ -43,12 +33,7 @@ export function installMultiplexFrameDelivery(state: TerminalMultiplexConnection
       typeof seq === 'number' ? seq : opcode === TerminalStreamOpcode.Output ? 0 : state.cursor++
     let sent: RpcBinarySendResult
     try {
-      sent = sendBinary(
-        encodeTerminalStreamFrame({ opcode, streamId, seq: resolvedSeq, payload }),
-        {
-          compressible: true
-        }
-      )
+      sent = sendBinary(encodeTerminalStreamFrame({ opcode, streamId, seq: resolvedSeq, payload }))
     } catch {
       state.closeMultiplex()
       return false
@@ -110,12 +95,14 @@ export function installMultiplexFrameDelivery(state: TerminalMultiplexConnection
     if (!stream.ackOutput) {
       return true
     }
-    return ackWindowAdmits(state, stream, bytes)
+    return (
+      stream.ackInFlightBytes + bytes <= stream.ackWindowBytes &&
+      state.ackTotalInFlightBytes + bytes <= state.ackTotalWindowBytes
+    )
   }
   state.sendAckGatedOutput = (
     stream: TerminalMultiplexStream,
-    chunk: TerminalOutputFrameChunk,
-    fromBacklog = false
+    chunk: TerminalOutputFrameChunk
   ): boolean => {
     const sent = state.sendFrame(
       stream.streamId,
@@ -126,21 +113,10 @@ export function installMultiplexFrameDelivery(state: TerminalMultiplexConnection
     if (!sent) {
       return false
     }
-    if (chunk.replayedQuery) {
-      settleReplayedYieldedQuery(stream, chunk.replayedQuery)
-    } else {
-      settleDeliveredYieldedQueries(stream, chunk.seq)
-    }
+    settleDeliveredYieldedQueries(stream, chunk.seq)
     if (stream.ackOutput) {
-      if (state.linkEstimate.enabled) {
-        noteAckGatedSend(
-          state,
-          stream,
-          chunk.bytes.byteLength,
-          fromBacklog || stream.ackOutputWaited
-        )
-      }
-      chargeAckWindow(state, stream, chunk.bytes.byteLength)
+      stream.ackInFlightBytes += chunk.bytes.byteLength
+      state.ackTotalInFlightBytes += chunk.bytes.byteLength
     }
     return true
   }
@@ -160,11 +136,7 @@ export function installMultiplexFrameDelivery(state: TerminalMultiplexConnection
       stream.ackPendingOutput.length > 0 ||
       !state.canSendAckGatedOutput(stream, chunk.bytes.byteLength)
     ) {
-      stream.ackOutputWaited = true
-      markYieldedQueriesDiscardedInFrames(
-        stream,
-        appendAckPendingOutput(stream, chunk, ackPendingOutputBudgetBytes(state, stream))
-      )
+      appendAckPendingOutput(stream, chunk)
       return
     }
     state.sendAckGatedOutput(stream, chunk)

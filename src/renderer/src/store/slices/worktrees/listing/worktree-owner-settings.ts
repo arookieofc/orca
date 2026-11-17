@@ -1,15 +1,15 @@
 import { tryRuntimeTargetForWorktreeOwner } from './worktree-owner-target'
-import { warnAmbiguousOwnerOnce } from '@/lib/workspace/ownership/ambiguous-owner-warning'
+import { warnAmbiguousOwnerOnce } from '@/lib/ambiguous-owner-warning'
 import type { Worktree } from '../../../../../../shared/worktree/types'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { AppState } from '../../../types'
 import { worktreeHostMatchOptions, worktreeMatchesHost } from './worktree-host-ownership'
 import type { WorktreeMeta } from '../../../../../../shared/worktree/meta-types'
-import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
+import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import { isRuntimeSelectorNotFoundError } from './runtime-worktree-rpc-errors'
 import { persistWorktreeMeta } from '../metadata/worktree-meta-persist'
 import type { WorktreeSliceGet } from './worktree-slice-types'
-import { selectWorktreesByRepo } from '../../../workspaces/catalog/workspace-record-fields'
+import { selectWorktreesByRepo } from '../../../workspace-record-selectors'
 
 /** Replaces only the copy on `hostId`; a same-id twin on another host is a different worktree. */
 export function replaceWorktreeInRepoLists(
@@ -37,10 +37,9 @@ export function persistPassiveWorktreeMetaForOwner(
   get: WorktreeSliceGet,
   worktreeId: string,
   updates: Partial<WorktreeMeta>,
-  errorLabel: string,
-  executionHostId?: ExecutionHostId
+  errorLabel: string
 ): void {
-  const ownerTarget = tryRuntimeTargetForWorktreeOwner(get(), worktreeId, executionHostId)
+  const ownerTarget = tryRuntimeTargetForWorktreeOwner(get(), worktreeId)
   if (!ownerTarget) {
     warnAmbiguousOwnerOnce(worktreeId, errorLabel)
     return

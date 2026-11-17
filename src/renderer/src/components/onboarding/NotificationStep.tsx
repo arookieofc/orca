@@ -1,8 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { BellRing, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
-import { usesCustomNotificationSound } from '../../../../shared/notifications/notification-settings-types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -12,14 +11,14 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { sendNotificationSettingsTestNotification } from '@/components/notifications/notification-test-delivery'
+import { sendNotificationSettingsTestNotification } from '@/components/settings/notification-settings-copy'
 import { getNotificationSoundOptions } from '@/components/notification-sound-options'
 import {
   MacNotificationPermissionCard,
   useMacNotificationPermissionState
 } from '@/components/notifications/mac-notification-permission-card'
 import { useMountedRef } from '@/hooks/useMountedRef'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 type NotificationStepProps = {
   settings: GlobalSettings | null
@@ -32,7 +31,6 @@ export function NotificationStep({
   settings,
   updateSettings
 }: NotificationStepProps): React.JSX.Element {
-  const t = useTranslate()
   const notificationSettings = settings?.notifications
   const notificationSettingsRef = useRef(notificationSettings)
   // Unloaded settings use enabled’s default so fresh-install permission checks can start immediately.
@@ -78,7 +76,7 @@ export function NotificationStep({
   const previewSound = async (
     customSoundId: GlobalSettings['notifications']['customSoundId']
   ): Promise<void> => {
-    if (!usesCustomNotificationSound(customSoundId)) {
+    if (customSoundId === 'system') {
       return
     }
     const result = await window.api.notifications.playSound({
@@ -88,7 +86,7 @@ export function NotificationStep({
     if (!result.played) {
       if (mountedRef.current) {
         toast.error(
-          t(
+          translate(
             'auto.components.onboarding.NotificationStep.b6a994e36e',
             'Notification sound could not be played'
           )
@@ -130,7 +128,7 @@ export function NotificationStep({
   const handleSendTestNotification = async (): Promise<void> => {
     if (!notificationSettings) {
       toast.error(
-        t(
+        translate(
           'auto.components.onboarding.NotificationStep.3cd5374e22',
           'Notification settings are still loading'
         )
@@ -157,7 +155,7 @@ export function NotificationStep({
   if (!notificationSettings) {
     return (
       <div className="rounded-xl border border-border bg-muted/20 px-5 py-4 text-sm text-muted-foreground">
-        {t(
+        {translate(
           'auto.components.onboarding.NotificationStep.e52aacf380',
           'Loading notification settings…'
         )}
@@ -176,10 +174,10 @@ export function NotificationStep({
       <section className="space-y-3">
         <div className="space-y-1">
           <h2 className="text-sm font-semibold text-foreground">
-            {t('auto.components.onboarding.NotificationStep.0af746e41f', 'Choose a sound')}
+            {translate('auto.components.onboarding.NotificationStep.0af746e41f', 'Choose a sound')}
           </h2>
           <p className="text-[13px] leading-relaxed text-muted-foreground">
-            {t(
+            {translate(
               'auto.components.onboarding.NotificationStep.0fe570690c',
               'Pick the alert Orca plays after a desktop notification is delivered.'
             )}
@@ -194,7 +192,7 @@ export function NotificationStep({
           >
             <SelectTrigger className="w-56 max-w-full" size="sm">
               <SelectValue
-                placeholder={t(
+                placeholder={translate(
                   'auto.components.onboarding.NotificationStep.dc897423e1',
                   'Choose notification sound'
                 )}
@@ -219,11 +217,11 @@ export function NotificationStep({
                 <Upload className="size-4" />
                 <span>
                   {customPath
-                    ? t(
+                    ? translate(
                         'auto.components.onboarding.NotificationStep.ac80d97e02',
                         'Change custom file'
                       )
-                    : t(
+                    : translate(
                         'auto.components.onboarding.NotificationStep.c0692baa52',
                         'Choose custom file'
                       )}
@@ -239,7 +237,10 @@ export function NotificationStep({
             onClick={() => void handleSendTestNotification()}
           >
             <BellRing className="size-3.5" />
-            {t('auto.components.onboarding.NotificationStep.3bede04483', 'Send test notification')}
+            {translate(
+              'auto.components.onboarding.NotificationStep.3bede04483',
+              'Send test notification'
+            )}
           </Button>
         </div>
       </section>

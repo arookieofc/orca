@@ -1,9 +1,6 @@
 import { ipcMain } from 'electron'
 import type { SshConnectionManager } from '../../ssh/connection/ssh-connection-manager'
-import {
-  browseSshDirectory,
-  type RemoteBrowseResult
-} from '../../ssh/filesystem/ssh-remote-directory-browse'
+import { browseSshDirectory, type RemoteBrowseResult } from '../../ssh/ssh-remote-directory-browse'
 
 export function registerSshBrowseHandler(
   getConnectionManager: () => SshConnectionManager | null

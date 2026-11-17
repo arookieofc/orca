@@ -1,8 +1,6 @@
 import type { ScrcpyVideoMeta } from './android/scrcpy-video-frame-parser'
-import type { ScrcpyControlTarget } from './android/scrcpy-stream-session'
 
-// Cache metadata, decoder config, and the current GOP for late subscribers. The entry also
-// holds the session's control channel so input reaches the server that produces the video.
+// Cache metadata, decoder config, and the current GOP for late subscribers.
 
 // Bound high-motion replay caches while retaining their leading keyframe.
 const MAX_GOP_FRAMES = 120
@@ -17,8 +15,6 @@ export type ScrcpyVideoFrameMessage = {
 export type ScrcpyVideoEvent =
   | { type: 'meta'; meta: ScrcpyVideoMeta }
   | { type: 'frame'; frame: ScrcpyVideoFrameMessage }
-  // The scrcpy session is gone; subscribers must restart it rather than wait for frames.
-  | { type: 'end' }
 
 export type ScrcpyVideoSubscriber = (event: ScrcpyVideoEvent) => void
 
@@ -28,7 +24,6 @@ type RegistryEntry = {
   gop: ScrcpyVideoFrameMessage[]
   subscribers: Set<ScrcpyVideoSubscriber>
   close: () => void
-  control?: ScrcpyControlTarget
 }
 
 class ScrcpyVideoRegistry {
@@ -36,17 +31,6 @@ class ScrcpyVideoRegistry {
 
   register(deviceId: string, close: () => void): void {
     this.entries.set(deviceId, { subscribers: new Set(), gop: [], close })
-  }
-
-  attachControl(deviceId: string, control: ScrcpyControlTarget): void {
-    const entry = this.entries.get(deviceId)
-    if (entry) {
-      entry.control = control
-    }
-  }
-
-  control(deviceId: string): ScrcpyControlTarget | null {
-    return this.entries.get(deviceId)?.control ?? null
   }
 
   pushMeta(deviceId: string, meta: ScrcpyVideoMeta): void {
@@ -85,7 +69,6 @@ class ScrcpyVideoRegistry {
   subscribe(deviceId: string, subscriber: ScrcpyVideoSubscriber): () => void {
     const entry = this.entries.get(deviceId)
     if (!entry) {
-      subscriber({ type: 'end' })
       return () => {}
     }
     if (entry.meta) {
@@ -106,12 +89,9 @@ class ScrcpyVideoRegistry {
     if (!entry) {
       return
     }
-    this.entries.delete(deviceId)
     entry.close()
-    for (const subscriber of entry.subscribers) {
-      subscriber({ type: 'end' })
-    }
     entry.subscribers.clear()
+    this.entries.delete(deviceId)
   }
 
   has(deviceId: string): boolean {

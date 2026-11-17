@@ -1,5 +1,7 @@
-import { pickParsedAgentStatusPayload } from '../../../shared/agent-status/contracts/agent-status-types'
-import type { AgentStatusIpcPayload } from '../../../shared/agent-status/contracts/agent-status-ipc-payload'
+import {
+  pickParsedAgentStatusPayload,
+  type AgentStatusIpcPayload
+} from '../../../shared/agent-status-types'
 import type { EnrichedAgentHookEventPayload } from './server-types'
 
 /** Canonical rows supply legacy fanout without retaining a writable pane copy. */

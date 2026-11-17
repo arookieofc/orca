@@ -1,9 +1,8 @@
 import type WebSocket from 'ws'
 import { sendRemoteRuntimeTokenAuth } from '../remote-runtime-client-handshake'
 import { toRemoteRuntimeClientError } from './remote-runtime-shared-control-protocol'
-import type { PairedE2EEClientHandshake } from '../e2ee/paired-e2ee-client-handshake'
-import { handleSharedControlFrame } from './remote-runtime-shared-control-frame-handler'
-import type { RemoteRuntimeSealedFrame } from '../remote-runtime-sealed-frame'
+import type { PairedE2EEClientHandshake } from '../../paired-e2ee-client-handshake'
+import { handleSharedControlTextFrame } from './remote-runtime-shared-control-frame-handler'
 import type { RemoteRuntimeClientError } from '../remote-runtime-client-error'
 import type {
   SharedControlConnectionState,
@@ -13,8 +12,8 @@ import type {
 } from './remote-runtime-shared-control-types'
 import type { SharedControlRetiredRequestIds } from '../requests/remote-runtime-shared-control-retired-request-ids'
 
-export function handleRuntimeControlFrame(args: {
-  frame: RemoteRuntimeSealedFrame
+export function handleRuntimeControlTextFrame(args: {
+  frame: string
   socketGeneration: number
   isCurrent: (generation: number) => boolean
   getState: () => SharedControlConnectionState
@@ -37,7 +36,7 @@ export function handleRuntimeControlFrame(args: {
   if (!args.isCurrent(args.socketGeneration)) {
     return
   }
-  handleSharedControlFrame({
+  handleSharedControlTextFrame({
     frame: args.frame,
     state: args.getState(),
     handshake: args.getHandshake(),

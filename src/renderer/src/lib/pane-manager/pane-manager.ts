@@ -1,27 +1,28 @@
+import { focusPanePreservingOverlays } from './pane-overlay-focus'
 import type {
   PaneManagerOptions,
   PaneStyleOptions,
   ManagedPane,
   ManagedPaneInternal,
   PaneRenderingDiagnostics,
-  DropZone,
-  PaneActivationOptions
+  DropZone
 } from './pane-manager-types'
-import type { SplitPaneAroundLeafIdsOptions } from './pane-layout/pane-subtree-split'
+import type { SplitPaneAroundLeafIdsOptions } from './pane-subtree-split'
 import type { PaneManagerHost } from './pane-manager-host'
-import { disposeDividersIn } from './pane-layout/pane-divider'
 import {
-  cancelActivePaneDrag,
-  createDragReorderState,
-  handlePaneDrop
-} from './pane-layout/pane-drag-reorder'
-import { beginPaneDragFromPointerDown } from './pane-layout/pane-drag-pointer'
+  applyDividerStyles,
+  applyPaneOpacity,
+  applyRootBackground,
+  disposeDividersIn
+} from './pane-divider'
+import { cancelActivePaneDrag, createDragReorderState, handlePaneDrop } from './pane-drag-reorder'
+import { beginPaneDragFromPointerDown } from './pane-drag-pointer'
 import { setLigaturesEnabled, disposePane } from './pane-lifecycle'
-import { setInlineImagesEnabled } from './terminal-rendering/pane-inline-images'
-import { fitAllPanesInternal } from './pane-layout/pane-tree-ops'
+import { setInlineImagesEnabled } from './pane-inline-images'
+import { fitAllPanesInternal } from './pane-tree-ops'
 import { collectPublicPanes, toPublicPane } from './pane-public-view'
-import { applyTerminalGpuAcceleration } from './terminal-rendering/pane-terminal-gpu-acceleration'
-import { detachPanesWebglForRebuild } from './terminal-rendering/pane-webgl-reattach'
+import { applyTerminalGpuAcceleration } from './pane-terminal-gpu-acceleration'
+import { rebuildAttachedWebgl } from './pane-webgl-reattach'
 import {
   markPaneComplexScriptOutput,
   clearPaneWebglTextureAtlases,
@@ -30,16 +31,13 @@ import {
   resumePaneRendering,
   setPaneGpuRenderingState,
   suspendPaneRendering
-} from './terminal-rendering/pane-rendering-control'
-import type { TerminalLeafId } from '../../../../shared/workspace-layout/stable-pane-id'
+} from './pane-rendering-control'
+import type { TerminalLeafId } from '../../../../shared/stable-pane-id'
 import { registerLivePaneManager, unregisterLivePaneManager } from './pane-manager-registry'
-import { releaseHiddenWebglRetention } from './terminal-rendering/terminal-webgl-hidden-retention'
-import {
-  schedulePaneRevealPresent,
-  schedulePaneRevealRepaint
-} from './terminal-rendering/pane-reveal-repaint'
+import { releaseHiddenWebglRetention } from './terminal-webgl-hidden-retention'
+import { schedulePaneRevealPresent, schedulePaneRevealRepaint } from './pane-reveal-repaint'
 import { PaneIdentityRegistry } from './pane-identity-registry'
-import { PaneReparentFrameTracker } from './pane-layout/pane-reparent-frame-tracker'
+import { PaneReparentFrameTracker } from './pane-reparent-frame-tracker'
 import {
   closePaneOnManager,
   detachPaneForExternalMoveOnManager,
@@ -48,8 +46,6 @@ import {
   splitPaneOnManager
 } from './pane-manager-tree-mutations'
 import {
-  activateManagedPane,
-  applyManagedPaneStyles,
   createInitialManagedPane,
   createManagedPaneInternal,
   publishManagedPaneCreated
@@ -60,10 +56,19 @@ import {
   fitRevealedPanes,
   refreshAllPaneTerminals
 } from './pane-manager-layout-sweeps'
-import { collectPaneRenderingDiagnostics } from './terminal-rendering/pane-rendering-diagnostics'
-import { applyPaneLayoutGeometry } from './pane-layout/pane-layout-geometry-apply'
-import type { TerminalPaneLayoutNode } from '../../../../shared/workspace-layout/terminal-tab-types'
-import { FIRST_PANE_ID } from '../../../../shared/workspace-layout/pane-key'
+import { collectPaneRenderingDiagnostics } from './pane-rendering-diagnostics'
+import { applyPaneLayoutGeometry, type TerminalPaneLayoutNode } from './pane-layout-geometry-apply'
+import { FIRST_PANE_ID } from '../../../../shared/pane-key'
+
+export type {
+  PaneManagerOptions,
+  PaneStyleOptions,
+  ManagedPane,
+  DropZone,
+  PaneExternalDropTarget,
+  PaneExternalDropResolver,
+  PaneExternalDropHandler
+} from './pane-manager-types'
 
 export class PaneManager {
   private root: HTMLElement
@@ -110,7 +115,7 @@ export class PaneManager {
       requestPaneReparentFrame: (callback) => this.reparentFrames.request(callback)
     }
     // Atlas recovery must reach every manager (resetAndRefreshAllTerminalWebglAtlases explains shared generations).
-    registerLivePaneManager(this, () => detachPanesWebglForRebuild(this.panes.values()))
+    registerLivePaneManager(this)
   }
 
   createInitialPane(opts?: { focus?: boolean; leafId?: string }): ManagedPane {
@@ -218,17 +223,29 @@ export class PaneManager {
     return this.identities.adoptPaneLeafId(numericPaneId, pane, leafId)
   }
 
-  setActivePane(paneId: number, opts?: PaneActivationOptions): void {
+  setActivePane(paneId: number, opts?: { focus?: boolean }): void {
     const pane = this.panes.get(paneId)
     if (!pane) {
       return
     }
-    activateManagedPane(this.host, pane, opts)
+    const changed = this.activePaneId !== paneId
+    this.activePaneId = paneId
+    applyPaneOpacity(this.panes.values(), this.activePaneId, this.styleOptions)
+
+    if (opts?.focus !== false) {
+      focusPanePreservingOverlays(pane)
+    }
+
+    if (changed) {
+      this.options.onActivePaneChange?.(toPublicPane(pane))
+    }
   }
 
   setPaneStyleOptions(opts: PaneStyleOptions): void {
     this.styleOptions = { ...opts }
-    applyManagedPaneStyles(this.host)
+    applyPaneOpacity(this.panes.values(), this.activePaneId, this.styleOptions)
+    applyDividerStyles(this.root, this.styleOptions)
+    applyRootBackground(this.root, this.styleOptions)
   }
 
   private withPane<T>(paneId: number, apply: (pane: ManagedPaneInternal) => T): T | undefined {
@@ -254,6 +271,10 @@ export class PaneManager {
 
   markPaneHasComplexScriptOutput(paneId: number): void {
     markPaneComplexScriptOutput(this.panes, paneId)
+  }
+
+  rebuildPaneWebgl(paneId: number): void {
+    this.withPane(paneId, rebuildAttachedWebgl)
   }
 
   resetWebglTextureAtlases(): void {

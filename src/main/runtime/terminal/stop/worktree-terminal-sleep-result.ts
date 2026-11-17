@@ -1,4 +1,4 @@
-import type { RuntimeWorktreeTerminalSleepResult } from '../../../../shared/terminal/runtime/runtime-terminal-contracts'
+import type { RuntimeWorktreeTerminalSleepResult } from '../../../../shared/runtime-types'
 
 /** A sleep that stopped nothing, leaving `livePtyIds` running. */
 export function sleptNothing(

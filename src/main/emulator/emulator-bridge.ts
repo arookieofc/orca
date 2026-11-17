@@ -1,6 +1,6 @@
 import { platform } from 'node:os'
 import { EmulatorError } from './emulator-errors'
-import type { EmulatorActiveSession, EmulatorSessionInfo } from './emulator-types'
+import type { EmulatorSessionInfo } from './emulator-types'
 import type { SimulatorDevice } from './simctl-simulator-devices'
 import type { EmulatorBridgeOptions } from './emulator-bridge-types'
 import type { EmulatorGesturePoint } from './emulator-gesture-sender'
@@ -47,8 +47,8 @@ export class EmulatorBridge {
     return this.iosBackend.listSimulators()
   }
 
-  async listActiveSessions(worktreeId?: string): Promise<EmulatorActiveSession[]> {
-    return this.sessionRegistry.listLiveActive(worktreeId, (kind) => this.backendForKind(kind))
+  async listRunningHelpers(): Promise<unknown> {
+    return this.iosBackend.listRunningHelpers()
   }
 
   async checkServeSimAvailable(): Promise<void> {
@@ -211,11 +211,6 @@ export class EmulatorBridge {
     })
   }
 
-  /** Renderers name only a device; main resolves its registered helper so they cannot pick hosts. */
-  getIosVideoStreamUrl(deviceUdid: string): string | null {
-    return this.sessionRegistry.getIosVideoStreamUrl(deviceUdid)
-  }
-
   async runCapability<T>(
     capability: keyof EmulatorBackendCapabilities,
     opts: EmulatorTargetOpts | undefined,
@@ -322,14 +317,16 @@ export class EmulatorBridge {
 
   private backendForActiveWorktree(worktreeId: string): EmulatorBackend | null {
     const key = this.sessionRegistry.getActiveSessionKey(worktreeId)
-    const session = key ? this.sessionRegistry.getSession(key) : undefined
+    if (!key) {
+      return null
+    }
+    const session = this.sessionRegistry.getSession(key)
     return session ? this.backendForKind(session.backend) : null
   }
 
   private async backendForDevice(device: string): Promise<EmulatorBackend> {
-    const registered = this.sessionRegistry.getSession(device)
     for (const backend of this.backends) {
-      if (registered ? backend.kind === registered.backend : await backend.ownsDevice(device)) {
+      if (await backend.ownsDevice(device)) {
         return backend
       }
     }

@@ -1,37 +1,30 @@
-import { useGitHubImagePending } from '@/components/github/use-github-image-uploads'
-import type { GitHubImageUploadAddress } from '@/components/github/github-image-upload'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
-import { cn } from '@/lib/class-names'
-import { isScreenSubmitShortcut } from '@/lib/keyboard/screen-submit-shortcut'
+import { cn } from '@/lib/utils'
+import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
 import {
   getCommentBodySubmitState,
   hasBoundedCommentBodyText
-} from '@/lib/source-control/review/comments/comment-body-submit-state'
+} from '@/lib/comment-body-submit-state'
 import { translate } from '@/i18n/i18n'
-import { useTranslate } from '@/i18n/use-translate'
 import type { MentionOption } from '../page-types'
 import { MentionTextarea } from '../mentions/textarea'
 
 export function CommentReplyForm({
   className,
-  imageUploadAddress,
   placeholder,
   mentionOptions,
   onCancel,
   onSubmit
 }: {
-  imageUploadAddress?: GitHubImageUploadAddress
   className?: string
   placeholder: string
   mentionOptions: MentionOption[]
   onCancel: () => void
   onSubmit: (body: string) => Promise<boolean>
 }): React.JSX.Element {
-  const t = useTranslate()
-  const images = useGitHubImagePending()
   const [body, setBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -43,7 +36,7 @@ export function CommentReplyForm({
 
   const submit = useCallback(async () => {
     const bodyState = getCommentBodySubmitState(body)
-    if (bodyState.status === 'empty' || submitting || images.pendingRef.current) {
+    if (bodyState.status === 'empty' || submitting) {
       return
     }
     if (bodyState.status === 'too-large-leading-whitespace') {
@@ -77,17 +70,12 @@ export function CommentReplyForm({
         setSubmitting(false)
       }
     }
-  }, [body, images.pendingRef, mountedRef, onSubmit, submitting])
+  }, [body, mountedRef, onSubmit, submitting])
   const canSubmitReply = hasBoundedCommentBodyText(body)
 
   return (
     <div className={cn('rounded-md border border-border/50 bg-background/60 p-2', className)}>
       <MentionTextarea
-        imageUpload={{
-          address: imageUploadAddress,
-          onPending: images.onPending,
-          enabled: !submitting
-        }}
         textareaRef={textareaRef}
         value={body}
         onValueChange={setBody}
@@ -109,16 +97,12 @@ export function CommentReplyForm({
       />
       <div className="mt-2 flex justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel}>
-          {t('auto.components.PullRequestPage.6591b1fa82', 'Cancel')}
+          {translate('auto.components.PullRequestPage.6591b1fa82', 'Cancel')}
         </Button>
-        <Button
-          size="sm"
-          disabled={!canSubmitReply || submitting || images.pending}
-          onClick={() => void submit()}
-        >
+        <Button size="sm" disabled={!canSubmitReply || submitting} onClick={() => void submit()}>
           {submitting
-            ? t('auto.components.PullRequestPage.894cfd884b', 'Posting…')
-            : t('auto.components.PullRequestPage.f119e5f5ef', 'Reply')}
+            ? translate('auto.components.PullRequestPage.894cfd884b', 'Posting…')
+            : translate('auto.components.PullRequestPage.f119e5f5ef', 'Reply')}
         </Button>
       </div>
     </div>

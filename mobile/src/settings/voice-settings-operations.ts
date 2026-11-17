@@ -6,7 +6,6 @@ export interface VoiceSettingsOperations {
     enabled?: boolean
     modelId?: string
     dictationMode?: 'toggle' | 'hold'
-    dictationHoldToRecord?: boolean
   }): Promise<MobileSpeechSetup>
   download(modelId: string): Promise<void>
   delete(modelId: string): Promise<MobileSpeechSetup>

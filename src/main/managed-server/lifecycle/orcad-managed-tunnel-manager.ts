@@ -1,10 +1,10 @@
 import {
   getRuntimeSshAccess,
   type KnownRuntimeEnvironment
-} from '../../../shared/remote-runtime/host-catalog/runtime-environments'
-import type { SshTarget } from '../../../shared/remote-runtime/ssh/ssh-types'
+} from '../../../shared/runtime-environments'
+import type { SshTarget } from '../../../shared/ssh-types'
 import type { SshConnection } from '../../ssh/connection/ssh-connection'
-import { isAuthError } from '../../ssh/connection/reconnect/ssh-reconnect-error-classification'
+import { isAuthError } from '../../ssh/ssh-reconnect-error-classification'
 import type { SshConnectionManager } from '../../ssh/connection/ssh-connection-manager'
 import { SshPortForwardManager } from '../../ssh/port-forwarding/ssh-port-forward'
 import { OrcadManagedTunnelTransportProvider } from './orcad-managed-tunnel-transport'
@@ -85,10 +85,7 @@ export class OrcadManagedTunnelManager {
 
   ensure(
     environment: KnownRuntimeEnvironment,
-    resolveCurrent: () =>
-      | KnownRuntimeEnvironment
-      | null
-      | Promise<KnownRuntimeEnvironment | null> = () => environment,
+    resolveCurrent: () => KnownRuntimeEnvironment | null = () => environment,
     retryJoined = true
   ): Promise<void> {
     if (!getRuntimeSshAccess(environment)) {
@@ -114,10 +111,7 @@ export class OrcadManagedTunnelManager {
 
   async rebuild(
     environment: KnownRuntimeEnvironment,
-    resolveCurrent: () =>
-      | KnownRuntimeEnvironment
-      | null
-      | Promise<KnownRuntimeEnvironment | null> = () => environment
+    resolveCurrent: () => KnownRuntimeEnvironment | null = () => environment
   ): Promise<void> {
     await this.inFlight.get(environment.id)?.catch(() => undefined)
     const active = this.active.get(environment.id)
@@ -246,7 +240,7 @@ export class OrcadManagedTunnelManager {
 
   private async ensureManagedTunnel(
     environment: KnownRuntimeEnvironment,
-    resolveCurrent: () => KnownRuntimeEnvironment | null | Promise<KnownRuntimeEnvironment | null>,
+    resolveCurrent: () => KnownRuntimeEnvironment | null,
     rebound = false
   ): Promise<void> {
     const { deployment, targetStore, connectionManager, target } = resolveManagedTunnelBinding(
@@ -257,15 +251,17 @@ export class OrcadManagedTunnelManager {
     const managerGeneration = this.managerGeneration
     const ownershipGeneration = this.ownershipGenerations.get(environment.id) ?? 0
     const expected = { environmentId: environment.id, ...deployment }
-    const stillOwned = async (): Promise<() => boolean> => {
-      const current = await resolveCurrent()
-      return () =>
-        this.managerGeneration === managerGeneration &&
-        (this.ownershipGenerations.get(environment.id) ?? 0) === ownershipGeneration &&
-        managedTunnelStillPaired(environment, current, targetStore.getTarget(target.id), expected)
-    }
+    const stillOwned = (): boolean =>
+      this.managerGeneration === managerGeneration &&
+      (this.ownershipGenerations.get(environment.id) ?? 0) === ownershipGeneration &&
+      managedTunnelStillPaired(
+        environment,
+        resolveCurrent(),
+        targetStore.getTarget(target.id),
+        expected
+      )
     const connection = await connectionManager.connect(target)
-    if (!(await stillOwned())()) {
+    if (!stillOwned()) {
       throw supersededTunnelError()
     }
     const transportGeneration = connection.getConnectGeneration()
@@ -278,10 +274,10 @@ export class OrcadManagedTunnelManager {
       target,
       connection
     })
-    if (active && (await stillOwned())()) {
+    if (active && stillOwned()) {
       await dropActiveOrcadTunnel(this.active, this.forwards, environment.id, active)
     }
-    if (!(await stillOwned())()) {
+    if (!stillOwned()) {
       throw supersededTunnelError()
     }
     const forward = await forwardToVerifiedOrcad({
@@ -291,10 +287,7 @@ export class OrcadManagedTunnelManager {
       localPort: deployment.localPort,
       label: `Orca on ${environment.name}`,
       ...checks,
-      stillCurrent: async () => {
-        const owned = await stillOwned()
-        return () => owned() && connection.getConnectGeneration() === transportGeneration
-      }
+      stillCurrent: () => stillOwned() && connection.getConnectGeneration() === transportGeneration
     })
     if (!forward) {
       throw supersededTunnelError()
@@ -308,7 +301,7 @@ export class OrcadManagedTunnelManager {
     })
     const recorded = this.active.get(environment.id)
     const serving = await this.checkServing(environment)
-    if (!(await stillOwned())() || connection.getConnectGeneration() !== transportGeneration) {
+    if (!stillOwned() || connection.getConnectGeneration() !== transportGeneration) {
       if (recorded) {
         await dropActiveOrcadTunnel(this.active, this.forwards, environment.id, recorded)
       }

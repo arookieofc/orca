@@ -1,9 +1,9 @@
 import {
   createManagedCommandMatcher,
   hookDefinitionHasManagedCommand,
-  removeManagedCommands
-} from '../agent-hooks/installation/commands/managed-hook-command-matching'
-import type { HooksConfig } from '../agent-hooks/installation/configuration/hook-config-schema'
+  removeManagedCommands,
+  type HooksConfig
+} from '../agent-hooks/installer-utils'
 
 export type GrokHookConfigCleanup = {
   config: HooksConfig

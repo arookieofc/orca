@@ -1,10 +1,7 @@
-import type {
-  RemoteLayoutSnapshot,
-  RemoteLayoutSnapshotWorkspace
-} from '../../shared/remote-runtime/session-graph/remote-layout-snapshot'
+import type { RemoteLayoutSnapshot } from '../../shared/remote-layout-snapshot'
 import type { StoreRuntimeState } from '../persistence/loading-store/store-runtime-state'
-import type { WriteSchedulingOperations } from '../persistence/loading-store/profile-writing/write-scheduling'
-import { scheduleSave } from '../persistence/loading-store/profile-writing/write-scheduling'
+import type { WriteSchedulingOperations } from '../persistence/loading-store/write-scheduling'
+import { scheduleSave } from '../persistence/loading-store/write-scheduling'
 
 type RemoteLayoutSnapshotRuntime = Pick<StoreRuntimeState, 'state' | 'dirtyProfileStateDomains'>
 
@@ -14,28 +11,6 @@ type RemoteLayoutSnapshotPersistenceContext = {
   scheduling: WriteSchedulingOperations
 }
 
-function writeSnapshotEntry<T>(entries: Record<string, T>, id: string, value: T): void {
-  // Admitted string identities must remain own keys even when named __proto__.
-  Object.defineProperty(entries, id, {
-    value,
-    configurable: true,
-    enumerable: true,
-    writable: true
-  })
-}
-
-function saveRemoteLayoutSnapshots(
-  { runtime, scheduling }: RemoteLayoutSnapshotPersistenceContext,
-  save: 'now' | 'later'
-): void {
-  if (save === 'later') {
-    runtime.dirtyProfileStateDomains?.add('remoteLayoutSnapshots')
-    return
-  }
-  // Save only this domain without waking workspace-session listeners.
-  scheduleSave(scheduling, ['remoteLayoutSnapshots'])
-}
-
 export class RemoteLayoutSnapshotPersistence {
   readonly [remoteLayoutSnapshotPersistenceContext]: RemoteLayoutSnapshotPersistenceContext
 
@@ -43,18 +18,10 @@ export class RemoteLayoutSnapshotPersistence {
     this[remoteLayoutSnapshotPersistenceContext] = { runtime, scheduling }
   }
 
-  /** Recorder-only lookup; workspace values are replaced, never mutated. */
-  getRemoteLayoutSnapshotWorkspace(
-    environmentId: string,
-    worktreeId: string
-  ): RemoteLayoutSnapshotWorkspace | undefined {
-    const snapshots =
-      this[remoteLayoutSnapshotPersistenceContext].runtime.state.remoteLayoutSnapshots
-    const snapshot =
-      snapshots && Object.hasOwn(snapshots, environmentId) ? snapshots[environmentId] : undefined
-    return snapshot && Object.hasOwn(snapshot.workspaces, worktreeId)
-      ? snapshot.workspaces[worktreeId]
-      : undefined
+  getRemoteLayoutSnapshot(environmentId: string): RemoteLayoutSnapshot | undefined {
+    return this[remoteLayoutSnapshotPersistenceContext].runtime.state.remoteLayoutSnapshots?.[
+      environmentId
+    ]
   }
 
   getRemoteLayoutSnapshots(): Record<string, RemoteLayoutSnapshot> {
@@ -64,7 +31,7 @@ export class RemoteLayoutSnapshotPersistence {
     return Object.fromEntries(
       Object.entries(stored).map(([environmentId, { workspaces }]) => [
         environmentId,
-        { workspaces: structuredClone(workspaces) }
+        { workspaces }
       ])
     )
   }
@@ -75,36 +42,19 @@ export class RemoteLayoutSnapshotPersistence {
     snapshot: RemoteLayoutSnapshot | null,
     save: 'now' | 'later'
   ): void {
-    const context = this[remoteLayoutSnapshotPersistenceContext]
-    const snapshots = (context.runtime.state.remoteLayoutSnapshots ??= {})
-    if (snapshot === null && !Object.hasOwn(snapshots, environmentId)) {
+    const { runtime, scheduling } = this[remoteLayoutSnapshotPersistenceContext]
+    const { [environmentId]: previous, ...others } = runtime.state.remoteLayoutSnapshots ?? {}
+    if (snapshot === null && previous === undefined) {
       return
     }
-    if (snapshot) {
-      writeSnapshotEntry(snapshots, environmentId, snapshot)
-    } else {
-      delete snapshots[environmentId]
+    runtime.state.remoteLayoutSnapshots = snapshot
+      ? { ...others, [environmentId]: snapshot }
+      : others
+    if (save === 'later') {
+      runtime.dirtyProfileStateDomains?.add('remoteLayoutSnapshots')
+      return
     }
-    saveRemoteLayoutSnapshots(context, save)
-  }
-
-  setRemoteLayoutSnapshotWorkspace(
-    environmentId: string,
-    worktreeId: string,
-    workspace: RemoteLayoutSnapshotWorkspace | null,
-    save: 'now' | 'later'
-  ): void {
-    const context = this[remoteLayoutSnapshotPersistenceContext]
-    const snapshots = (context.runtime.state.remoteLayoutSnapshots ??= {})
-    const workspaces = Object.hasOwn(snapshots, environmentId)
-      ? snapshots[environmentId].workspaces
-      : {}
-    if (workspace) {
-      writeSnapshotEntry(workspaces, worktreeId, workspace)
-    } else {
-      delete workspaces[worktreeId]
-    }
-    writeSnapshotEntry(snapshots, environmentId, { workspaces })
-    saveRemoteLayoutSnapshots(context, save)
+    // Save only this domain without waking workspace-session listeners.
+    scheduleSave(scheduling, ['remoteLayoutSnapshots'])
   }
 }

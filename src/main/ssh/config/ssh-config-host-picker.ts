@@ -3,9 +3,9 @@ import type {
   SshConfigHostResolution,
   SshConfigHostSummary,
   SshTarget
-} from '../../../shared/remote-runtime/ssh/ssh-types'
-import { SSH_CONFIG_HOST_RESULT_LIMIT } from '../../../shared/remote-runtime/ssh/ssh-types'
-import { normalizeSshConfigAlias } from '../../../shared/remote-runtime/ssh/ssh-config-alias'
+} from '../../../shared/ssh-types'
+import { SSH_CONFIG_HOST_RESULT_LIMIT } from '../../../shared/ssh-types'
+import { normalizeSshConfigAlias } from '../../../shared/ssh-config-alias'
 import { loadUserSshConfig, type SshConfigHost } from './ssh-config-parser'
 import { resolveWithSshG, type SshResolvedConfig } from './ssh-g-config-resolution'
 
@@ -27,9 +27,7 @@ export function searchSshConfigHosts(
   hosts: SshConfigHost[],
   existingTargets: readonly Pick<SshTarget, 'configHost' | 'label'>[],
   query = '',
-  suppressedAliases: readonly string[] = [],
-  // Aliases the import skips because an existing target already has their route.
-  routeDuplicateAliases: ReadonlySet<string> = new Set()
+  suppressedAliases: readonly string[] = []
 ): SshConfigHostListResult {
   const existingAliases = new Set(
     existingTargets.flatMap((target) =>
@@ -50,14 +48,12 @@ export function searchSshConfigHosts(
       continue
     }
     seenAliases.add(normalizedAlias)
-    const aliasInOrca = existingAliases.has(normalizedAlias)
-    const alreadyInOrca = aliasInOrca || routeDuplicateAliases.has(normalizedAlias)
+    const alreadyInOrca = existingAliases.has(normalizedAlias)
     // Tombstones suppress bulk import, not picker visibility, so deleting a target cannot make config look empty.
-    // Alias-only, because Restore re-adopts by alias.
-    const previouslyRemoved = !aliasInOrca && suppressedAliasSet.has(normalizedAlias)
+    const previouslyRemoved = !alreadyInOrca && suppressedAliasSet.has(normalizedAlias)
     totalHostCount += 1
     // Match passive import: Add all preserves tombstones.
-    newHostCount += alreadyInOrca || suppressedAliasSet.has(normalizedAlias) ? 0 : 1
+    newHostCount += alreadyInOrca || previouslyRemoved ? 0 : 1
     if (!matchesQuery(entry, normalizedQuery)) {
       continue
     }
@@ -80,14 +76,13 @@ export function listUserSshConfigHostSummaries(
   existingTargets: readonly Pick<SshTarget, 'configHost' | 'label'>[],
   query?: string,
   suppressedAliases?: readonly string[],
-  options?: { refresh?: boolean; routeDuplicateAliases?: ReadonlySet<string> }
+  options?: { refresh?: boolean }
 ): SshConfigHostListResult {
   return searchSshConfigHosts(
     getUserSshConfigHosts(options?.refresh === true),
     existingTargets,
     query,
-    suppressedAliases,
-    options?.routeDuplicateAliases
+    suppressedAliases
   )
 }
 

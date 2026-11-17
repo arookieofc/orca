@@ -2,7 +2,7 @@ import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import {
   attachMutationReplayNudge,
   type MutationReplayNudge
-} from '../../../orchestration/mutations/orchestration-mutation-receipt'
+} from '../../../orchestration-mutation-receipt'
 
 /** Persists the receipt (with its replay nudge) before waking recipients, for mutations whose effect is already durable. */
 export function recordReceiptBeforeNudge<T>(

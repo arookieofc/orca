@@ -2,33 +2,22 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
-import { codexProviderHandle } from '../../../src/shared/agent-session/lifecycle/provider-handles/agent-session-provider-handle-encoding'
+import { codexProviderHandle } from '../../../src/shared/agent-session-provider-handle-encoding'
 import {
   endedRunningAgentJournalToolCall,
   interruptedAgentJournalToolCall
-} from '../../../src/shared/agent-session/journal/agent-journal-tool-call-lifecycle'
-import type { AgentJournalItemIdentity } from '../../../src/shared/agent-session/journal/agent-session-journal-identity'
-import { createTrackedJournalOpener } from '../../../src/main/native-chat/agent-session-journal/store-lifecycle/journal-host-database-test-support'
-import { readTestJournalItems } from '../../../src/main/native-chat/agent-session-journal/journal-observation.test-support'
+} from '../../../src/shared/agent-journal-tool-call-lifecycle'
+import type { AgentJournalItemIdentity } from '../../../src/shared/agent-session-journal-types'
+import { createTrackedJournalOpener } from '../../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
+import type { JournalRow } from '../../../src/main/native-chat/agent-session-journal/journal-row-schema'
 import {
   importReleaseCheckoutModule,
   materializeReleaseCheckout,
   releaseModuleExport
 } from './release-checkout'
-import { prepareReleaseFixtures } from './release-fixture-setup'
 
 // Pin a release predating endedAs to prove cut-short tool calls still read as failed.
 const BASELINE_REF = 'v1.4.218'
-const releaseToolModules = prepareReleaseFixtures([BASELINE_REF], async (ref) => {
-  const checkout = await materializeReleaseCheckout(ref)
-  return Promise.all(
-    [
-      'src/shared/agent-session-journal-schemas.ts',
-      'src/shared/structured-agent-session-projection.ts',
-      'src/shared/native-chat-tool-run-outcome.ts'
-    ].map((path) => importReleaseCheckoutModule(checkout, path))
-  )
-})
 
 const SESSION = 'session-interrupted-tool'
 
@@ -44,7 +33,7 @@ type OldRunOutcome = (
 ) => { failedCallCount: number; succeeded: boolean }
 
 // Loads a real old build, including cold extraction and transforms.
-test('an older client reads a call a stop cut short as the failure they always showed', async () => {
+test('an older host and client read a call a stop cut short as the failure they always showed', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'orca-interrupted-tool-downgrade-'))
   const journals = createTrackedJournalOpener()
   try {
@@ -74,13 +63,38 @@ test('an older client reads a call a stop cut short as the failure they always s
       'unverifiable'
     )
     await journal.appendItem(call(1), unverified, { fence: 1, turnScope: { kind: 'thread' } })
-    const current = await readTestJournalItems(journal)
+    const since = journal.readSince({ epoch: journal.epoch, sequence: 0 })
+    if (!since.ok) {
+      throw new Error(`expected rows, got reset ${since.reset}`)
+    }
+    const rows: JournalRow[] = since.rows
+    const current = journal.snapshot().items
     expect(current.map((item) => item.body)).toMatchObject([
       { state: 'failed', endedAs: 'interrupted' },
       { state: 'failed', endedAs: 'unverifiable' }
     ])
 
-    const [schemas, projection, outcome] = releaseToolModules(BASELINE_REF)
+    const checkout = await materializeReleaseCheckout(BASELINE_REF)
+    const [reducer, schemas, projection, outcome] = await Promise.all(
+      [
+        'src/main/native-chat/agent-session-journal/journal-reducer.ts',
+        'src/shared/agent-session-journal-schemas.ts',
+        'src/shared/structured-agent-session-projection.ts',
+        'src/shared/native-chat-tool-run-outcome.ts'
+      ].map((path) => importReleaseCheckoutModule(checkout, path))
+    )
+    const createState = releaseModuleExport<(sessionId: string, epoch: string) => unknown>(
+      reducer,
+      'createJournalReducerState'
+    )
+    const applyRow = releaseModuleExport<(state: unknown, row: JournalRow) => void>(
+      reducer,
+      'applyJournalRow'
+    )
+    const render = releaseModuleExport<(state: unknown) => { items: OldRenderItem[] }>(
+      reducer,
+      'renderJournalState'
+    )
     const renderItemSchema = releaseModuleExport<{ parse: (value: unknown) => OldRenderItem }>(
       schemas,
       'AgentJournalRenderItemSchema'
@@ -95,8 +109,23 @@ test('an older client reads a call a stop cut short as the failure they always s
     const blocksOf = (items: OldRenderItem[]) =>
       items.flatMap((item) => project(item)?.blocks ?? [])
 
-    // The older client reads this host's render items, as sent on the wire, as failed calls.
-    const read = current.map((item) => renderItemSchema.parse(JSON.parse(JSON.stringify(item))))
+    // The older host, after a downgrade, folds the rows it never wrote as failed calls.
+    const state = createState(SESSION, journal.epoch)
+    for (const row of rows) {
+      applyRow(state, row)
+    }
+    const folded = render(state).items
+    expect(folded.map((item) => item.body)).toMatchObject([
+      { kind: 'tool-call', state: 'failed' },
+      { kind: 'tool-call', state: 'failed' }
+    ])
+    expect(runOutcome(blocksOf(folded), settled)).toEqual({
+      failedCallCount: 2,
+      succeeded: false
+    })
+
+    // The older client reads this host's render items the same way.
+    const read = current.map((item) => renderItemSchema.parse(item))
     expect(runOutcome(blocksOf(read), settled)).toEqual({
       failedCallCount: 2,
       succeeded: false

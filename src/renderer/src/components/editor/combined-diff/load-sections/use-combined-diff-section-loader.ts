@@ -1,31 +1,25 @@
 import { useCallback, useEffect } from 'react'
 import type React from 'react'
-import type { OpenFile } from '@/store/slices/editor/types/open-file'
+import type { OpenFile } from '@/store/slices/editor'
 import type {
   GitBranchChangeEntry,
   GitDiffResult
-} from '../../../../../../shared/git/diff/git-diff-compare-types'
-import type { GitStatusEntry } from '../../../../../../shared/git/status/git-status-types'
-import type { DiffSection } from '../../diff/sections/diff-section-types'
-import { getLargeDiffRenderLimit } from '../../../../../../shared/source-control/diff/large-diff-render-limit'
-import {
-  getStoredTextDiffContent,
-  getStoredTextDiffResult
-} from '../../diff/large-files/large-diff-section-content'
-import { removeDiffSectionMeasuredHeight } from '../../diff/sections/diff-section-height-cache'
+} from '../../../../../../shared/git-diff-compare-types'
+import type { GitStatusEntry } from '../../../../../../shared/git-status-types'
+import type { DiffSection } from '../../diff-section-types'
+import { getLargeDiffRenderLimit } from '../../large-diff-render-limit'
+import { getStoredTextDiffContent, getStoredTextDiffResult } from '../../large-diff-section-content'
+import { removeDiffSectionMeasuredHeight } from '../../diff-section-height-cache'
 import type { CombinedDiffEntrySet } from '../resolve-changes/use-combined-diff-entry-set'
 import { fetchCombinedDiffSection } from './fetch-combined-diff-section'
 import { getDiffSectionLoadErrorMessage } from './combined-diff-section-load-timeout'
 import { getInitialCombinedDiffSectionLoadIndices } from './combined-diff-initial-section-load'
 import { isUnchangedDiffSectionReload } from './combined-diff-section-load-state'
 import type { CombinedDiffSectionLoadRegistry } from './combined-diff-section-load-registry'
-import { acquireCombinedDiffSectionOperation } from './combined-diff-section-connection'
-import type { CombinedDiffLoadRequest } from './combined-diff-load-scheduler'
 
 export function useCombinedDiffSectionLoader({
   entrySet,
   file,
-  generation,
   registry,
   sectionCount,
   setSectionHeights,
@@ -33,7 +27,6 @@ export function useCombinedDiffSectionLoader({
 }: {
   entrySet: CombinedDiffEntrySet
   file: OpenFile
-  generation: number
   registry: CombinedDiffSectionLoadRegistry
   sectionCount: number
   setSectionHeights: React.Dispatch<React.SetStateAction<Record<number, number>>>
@@ -94,22 +87,17 @@ export function useCombinedDiffSectionLoader({
       }
 
       let result: GitDiffResult
-      let operation: ReturnType<typeof acquireCombinedDiffSectionOperation> | undefined
       let error: string | undefined
       try {
-        operation = acquireCombinedDiffSectionOperation(file, entry.path)
-        const loaded = await fetchCombinedDiffSection({
+        result = await fetchCombinedDiffSection({
           branchCompare,
           commitCompare,
           entry,
           file,
           isAllMode,
           isBranchMode,
-          isCommitMode,
-          operation
+          isCommitMode
         })
-        result = loaded.result
-        operation = loaded.operation
       } catch (err) {
         error = getDiffSectionLoadErrorMessage(err)
         result = {
@@ -126,11 +114,6 @@ export function useCombinedDiffSectionLoader({
         return
       }
       loadingIndicesRef.current.delete(index)
-      try {
-        operation?.assertCurrent()
-      } catch {
-        return
-      }
       const invalidatedMidFlight = (sectionLoadTokensRef.current.get(index) ?? 0) !== loadToken
       if (invalidatedMidFlight && !supersededLoadIndicesRef.current.has(index)) {
         // Refetch once at settlement after mid-flight invalidation rather than racing a duplicate load.
@@ -172,38 +155,17 @@ export function useCombinedDiffSectionLoader({
           modifiedContent: storedContent.modifiedContent
         })
       ) {
-        const provenanceChanged =
-          JSON.stringify(current.operation?.provenance) !== JSON.stringify(operation?.provenance)
-        // Persist the loaded index while retaining unchanged bodies and their models.
-        setSections((prev) => {
-          try {
-            operation?.assertCurrent()
-          } catch {
-            return prev
-          }
-          return provenanceChanged
-            ? prev.map((section, i) =>
-                i === index && !section.dirty ? { ...section, operation } : section
-              )
-            : [...prev]
-        })
         return
       }
       if (wasShowingContent) {
         setSectionHeights((prev) => removeDiffSectionMeasuredHeight(prev, index))
       }
       setSections((prev) => {
-        try {
-          operation?.assertCurrent()
-        } catch {
-          return prev
-        }
         return prev.map((s, i) =>
           i === index && !s.dirty
             ? {
                 ...s,
                 diffResult: storedResult,
-                operation,
                 originalContent: storedContent.originalContent,
                 modifiedContent: storedContent.modifiedContent,
                 loading: false,
@@ -229,7 +191,6 @@ export function useCombinedDiffSectionLoader({
       commitEntries,
       file.filePath,
       file.runtimeEnvironmentId,
-      file.worktreeId,
       isAllMode,
       isBranchMode,
       isCommitMode,
@@ -240,11 +201,11 @@ export function useCombinedDiffSectionLoader({
   loadSectionRef.current = loadSectionNow
 
   const loadSection = useCallback(
-    (index: number, options: CombinedDiffLoadRequest = { viewportOnly: true }) => {
+    (index: number) => {
       if (sectionsRef.current[index]?.collapsed || sectionsRef.current[index]?.loadOnDemand) {
         return
       }
-      loadSchedulerRef.current.request(index, options)
+      loadSchedulerRef.current.request(index)
     },
     [loadSchedulerRef, sectionsRef]
   )
@@ -282,10 +243,10 @@ export function useCombinedDiffSectionLoader({
 
     for (const index of initialIndices) {
       if (!currentSections[index]?.collapsed) {
-        loadSection(index, { viewportOnly: false })
+        loadSection(index)
       }
     }
-  }, [entrySignature, generation, loadSection, loadedIndicesRef, sectionCount, sectionsRef])
+  }, [entrySignature, loadSection, loadedIndicesRef, sectionCount, sectionsRef])
 
   return { loadSection, loadDeferredSection }
 }

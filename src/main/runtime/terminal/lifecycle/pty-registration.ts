@@ -1,29 +1,21 @@
-import {
-  classifyTerminalCreationFailure,
-  terminalExitError
-} from '../../../../shared/terminal/pty/lifecycle/terminal-start-failure'
-import type { PtySpawnResult } from '../../../providers/pty/spawn-result'
-import type { PtyIncarnationId } from '../../../../shared/terminal/pty/lifecycle/pty-incarnation'
-import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
-import type { SleepingAgentLaunchConfig } from '../../../../shared/agent-session/lifecycle/agent-session-resume'
-import { recordFreshLaunch, retireLaunch } from '../launch/launch-evidence'
-import type { DaemonLaunchNote } from '../../../daemon/protocol/daemon-launch-note-protocol'
-import { OrcaRuntimeWithDaemonLaunchNote } from './daemon-launch-note'
-import { isValidTerminalTabId } from '../../../../shared/workspace-layout/terminal-surfaces/terminal-tab-id'
-import { isTerminalLeafId, makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
-import { isTuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent-config'
-import { spawnSurfaceClaimSequence } from '../surface/pty-recorded-surface-topology'
+import { OrcaRuntimeWithInvalidateAllHandlesForPty } from './pty-handle-invalidation'
+import type { PtyIncarnationId } from '../../../../shared/pty-incarnation'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'
+import { isTerminalLeafId, makePaneKey } from '../../../../shared/stable-pane-id'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
+import { spawnSurfaceClaimSequence } from '../../pty-recorded-surface-topology'
 import type {
   PtyRegistrationClaim,
   RuntimePtyWorktreeRecord
-} from '../records/runtime-terminal-state-records'
-import type { OrchestrationCompatibilityTerminalAuthority } from '../../orchestration/terminal-authority/orchestration-compatibility-authority'
-import type { RuntimeMobileSessionCreateTerminalResult } from '../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/workspace-layout/layout-owner-switch'
+} from '../../runtime-terminal-state-records'
+import type { OrchestrationCompatibilityTerminalAuthority } from '../../runtime-terminal-contracts'
+import type { RuntimeMobileSessionCreateTerminalResult } from '../../../../shared/runtime-session-contracts'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 import { mainTerminalRegistered } from '../surface/main-terminal-surfaces'
 import { assertPaneBoundAtRegistration, isRuntimeHostedWorkspace } from './bind-first-registration'
 
-export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithDaemonLaunchNote {
+export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithInvalidateAllHandlesForPty {
   protected abstract ensurePtyBackedMobileSurfaceForRendererTab(
     worktreeId: string,
     tabId: string
@@ -32,8 +24,6 @@ export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithDaemonLa
   protected abstract getOrchestrationCompatibilityHostScope(
     pty: RuntimePtyWorktreeRecord
   ): OrchestrationCompatibilityTerminalAuthority['hostScope'] | null
-
-  protected abstract watchLaunchComposer(ptyId: string, agent: TuiAgent | null): void
 
   registerPty(
     ptyId: string,
@@ -45,21 +35,11 @@ export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithDaemonLa
       incarnationId?: PtyIncarnationId
       /** Handle allocated for the replacement incarnation, when one is known. */
       terminalHandle?: string
-      agentLaunchAuthority?: {
-        launchToken: string
-        launchAgent: TuiAgent
-        launchConfig?: SleepingAgentLaunchConfig
-      }
-      /** The agent a fresh spawn's launch command starts, whose submits wait for its composer. */
-      launchedAgent?: TuiAgent
+      agentLaunchAuthority?: { launchToken: string; launchAgent: TuiAgent }
       providerReattachLaunchIdentity?: {
         incarnationId: PtyIncarnationId
         launchAgent: TuiAgent
       }
-      /** A newly started process, which runs no launch but an admitted one. */
-      freshSpawn?: true
-      /** A reattach, with its host's launch note; none when the host keeps no notes (an older daemon, SSH). */
-      reattach?: { launchNote?: DaemonLaunchNote | null }
     },
     isWsl?: boolean
   ): void {
@@ -109,7 +89,7 @@ export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithDaemonLa
       }
     }
     this.ptyLivenessVerdictByPtyId.delete(ptyId)
-    this.mainDaemonAttachments.markSpawnPublished(ptyId)
+    this.terminalViewSubscribers.markSpawnPublished(ptyId)
     // Record spawn-time pane identity so stalled graph sync cannot hide the live PTY backing a pending mobile create.
     const paneKey =
       binding && isValidTerminalTabId(binding.tabId) && isTerminalLeafId(binding.leafId)
@@ -164,18 +144,8 @@ export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithDaemonLa
       pty.launchToken = agentLaunchAuthority.launchToken
       pty.launchIncarnationId = binding.incarnationId
       pty.launchAgent = agentLaunchAuthority.launchAgent
-      recordFreshLaunch(pty, {
-        agent: agentLaunchAuthority.launchAgent,
-        token: agentLaunchAuthority.launchToken,
-        config: agentLaunchAuthority.launchConfig
-      })
-      this.armDaemonLaunchNote(pty)
-    } else if (binding?.freshSpawn && pty.incarnationId === (binding.incarnationId ?? null)) {
-      retireLaunch(pty)
     }
-    this.watchLaunchComposer(ptyId, binding?.launchedAgent ?? null)
     const providerReattachLaunchIdentity = binding?.providerReattachLaunchIdentity
-    let reattachedAgent: TuiAgent | undefined
     if (
       providerReattachLaunchIdentity &&
       paneKey &&
@@ -185,12 +155,7 @@ export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithDaemonLa
       isTuiAgent(providerReattachLaunchIdentity.launchAgent)
     ) {
       // Why: daemon metadata owns the surviving process; its incarnation fence restores identity without minting renderer launch authority.
-      pty.launchAgent = reattachedAgent = providerReattachLaunchIdentity.launchAgent
-    }
-    // An older relay reports no incarnation; that still can't prove the launch gone.
-    if (binding?.reattach && (pty.incarnationId ?? undefined) === binding.incarnationId) {
-      const { launchNote } = binding.reattach
-      this.recordReattachedLaunch(pty, binding.incarnationId, launchNote, reattachedAgent)
+      pty.launchAgent = providerReattachLaunchIdentity.launchAgent
     }
     const pendingIncarnation = this.pendingPtyRegistrationIncarnations.get(ptyId)?.incarnationId
     if (
@@ -230,15 +195,17 @@ export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithDaemonLa
     this.assertPtyDidNotExitBeforeRegistration(ptyId, incarnationId)
   }
 
-  protected assertCreatedPtyRegistrationAllowed(result: PtySpawnResult): void {
-    const { id: ptyId, incarnationId } = result
+  protected assertCreatedPtyRegistrationAllowed(
+    ptyId: string,
+    incarnationId?: PtyIncarnationId
+  ): void {
     try {
       this.assertPtyDidNotExitBeforeRegistration(ptyId, incarnationId)
     } catch (error) {
       if (error instanceof Error && error.message === 'agent_session_exited_during_start') {
         this.releaseRejectedPtyRegistrationFence(ptyId, incarnationId)
       }
-      throw classifyTerminalCreationFailure(error, result)
+      throw error
     }
   }
 
@@ -277,7 +244,7 @@ export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithDaemonLa
     const pty = this.ptysById.get(ptyId)
     if (pty) {
       // Why: a reconnect attach reply can prove the exit generation after stale local proof was cleared.
-      this.terminalIdentity.setPtyIncarnationId(pty, incarnationId)
+      pty.incarnationId = incarnationId
     }
   }
 
@@ -308,14 +275,7 @@ export abstract class OrcaRuntimeWithRegisterPty extends OrcaRuntimeWithDaemonLa
       exits?.size &&
       (candidateIncarnation === undefined || exits.has(null) || exits.has(candidateIncarnation))
     ) {
-      const verdict = this.ptyLivenessVerdictByPtyId.get(ptyId)?.verdict
-      const cause =
-        candidateIncarnation !== undefined &&
-        verdict?.status === 'exited' &&
-        verdict.incarnationId === candidateIncarnation
-          ? verdict.cause
-          : undefined
-      throw terminalExitError('agent_session_exited_during_start', cause, candidateIncarnation)
+      throw new Error('agent_session_exited_during_start')
     }
   }
 }

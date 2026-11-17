@@ -1,5 +1,11 @@
 import { existsSync } from 'node:fs'
-import type { backup, BackupOptions, DatabaseSync, SQLInputValue } from 'node:sqlite'
+import type {
+  backup,
+  BackupOptions,
+  DatabaseSync,
+  FunctionOptions,
+  SQLInputValue
+} from 'node:sqlite'
 import { hasNodeSqliteReaderApi } from './node-sqlite-reader-api'
 import { NodeSqliteStatement } from './node-sqlite-statement'
 import type { SqliteStatement } from './sqlite-statement'
@@ -91,8 +97,12 @@ class SyncDatabase {
     this.db.exec(sql)
   }
 
-  function(name: string, callback: Parameters<DatabaseSync['function']>[1]): void {
-    this.db.function(name, callback)
+  function(
+    name: string,
+    options: FunctionOptions,
+    fn: Parameters<DatabaseSync['function']>[1]
+  ): void {
+    this.db.function(name, options, fn)
   }
 
   prepare(sql: string): SqliteStatement {
@@ -102,7 +112,7 @@ class SyncDatabase {
       this.statementCache.set(sql, cached)
       return cached
     }
-    const statement = new NodeSqliteStatement(() => this.db.prepare(sql))
+    const statement = new NodeSqliteStatement(this.db.prepare(sql))
     if (isStatementCacheable(sql)) {
       if (this.statementCache.size >= STATEMENT_CACHE_LIMIT) {
         const oldest = this.statementCache.keys().next().value

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,15 +10,14 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { useTranslate } from '@/i18n/use-translate'
-import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
-import { readSourceControlLaunchRecipeAgentId } from '../../../../../../shared/source-control/ai/source-control-launch-agent-selection'
+import { translate } from '@/i18n/i18n'
+import { readSourceControlLaunchRecipeAgentId } from '../../../../../../shared/source-control-launch-agent-selection'
 import type {
   SourceControlActionRecipe,
   SourceControlLaunchActionId
-} from '../../../../../../shared/source-control/ai/recipes/source-control-ai-actions'
-import type { SourceControlAiWriteTarget } from '../../../../../../shared/source-control/ai/settings/source-control-ai-recipe-save'
-import { SourceControlFixSplitButton } from '../panel/source-control-fix-split-button'
+} from '../../../../../../shared/source-control-ai-actions'
+import type { SourceControlAiWriteTarget } from '../../../../../../shared/source-control-ai-recipe-save'
+import { SourceControlFixSplitButton } from '../../source-control-fix-split-button'
 
 export type SourceControlRecoveryKind = 'commit' | 'push'
 
@@ -61,6 +60,17 @@ function getRecoveryDialogKey(
   return `${recoveryKind}:${worktreeId ?? 'no-worktree'}`
 }
 
+function syncRecoveryDialogState(
+  state: RecoveryDialogState,
+  worktreeKey: string,
+  hasDetails: boolean
+): RecoveryDialogState {
+  if (state.worktreeKey === worktreeKey && hasDetails) {
+    return state
+  }
+  return { worktreeKey, open: false }
+}
+
 function shouldShowRecoveryDialog(
   state: RecoveryDialogState,
   worktreeKey: string,
@@ -84,44 +94,42 @@ function useRecoveryCopy(recoveryKind: SourceControlRecoveryKind): {
   launchDialogTitle: string
   dialogDescription: string
 } {
-  const t = useTranslate()
-  const languageRevision = useUiLanguageRevision()
   return useMemo(() => {
     if (recoveryKind === 'push') {
       return {
-        inlineFixLabel: t(
+        inlineFixLabel: translate(
           'auto.components.right.sidebar.SourceControl.pushRecovery.60bd988f0b',
           'AI Fix'
         ),
-        dialogFixLabel: t(
+        dialogFixLabel: translate(
           'auto.components.right.sidebar.SourceControl.pushRecovery.834cb3f23d',
           'Fix with AI'
         ),
-        defaultAgentTitle: t(
+        defaultAgentTitle: translate(
           'auto.components.right.sidebar.SourceControl.pushRecovery.4b37ae99b0',
           'Start the default AI agent to fix this push failure'
         ),
-        fixAriaLabel: t(
+        fixAriaLabel: translate(
           'auto.components.right.sidebar.SourceControl.pushRecovery.30b8d4f181',
           'Fix push failure with AI'
         ),
-        chooseAgentTitle: t(
+        chooseAgentTitle: translate(
           'auto.components.right.sidebar.SourceControl.pushRecovery.dd43c47089',
           'Choose an agent for this push failure'
         ),
-        chooseAgentAriaLabel: t(
+        chooseAgentAriaLabel: translate(
           'auto.components.right.sidebar.SourceControl.pushRecovery.ec7bfced55',
           'Choose agent to fix push failure'
         ),
-        contextUnavailable: t(
+        contextUnavailable: translate(
           'auto.components.right.sidebar.SourceControl.pushRecovery.9e5ccd00aa',
           'Push failure context unavailable'
         ),
-        launchDialogTitle: t(
+        launchDialogTitle: translate(
           'auto.components.right.sidebar.SourceControl.pushRecovery.054ead86b1',
           'Fix Push Failure With AI'
         ),
-        dialogDescription: t(
+        dialogDescription: translate(
           'auto.components.right.sidebar.SourceControl.pushRecovery.15b7f210d7',
           'Choose the agent and edit the full command input before launch.'
         )
@@ -129,39 +137,41 @@ function useRecoveryCopy(recoveryKind: SourceControlRecoveryKind): {
     }
 
     return {
-      inlineFixLabel: t('auto.components.right.sidebar.SourceControl.60bd988f0b', 'AI Fix'),
-      dialogFixLabel: t('auto.components.right.sidebar.SourceControl.834cb3f23d', 'Fix with AI'),
-      defaultAgentTitle: t(
+      inlineFixLabel: translate('auto.components.right.sidebar.SourceControl.60bd988f0b', 'AI Fix'),
+      dialogFixLabel: translate(
+        'auto.components.right.sidebar.SourceControl.834cb3f23d',
+        'Fix with AI'
+      ),
+      defaultAgentTitle: translate(
         'auto.components.right.sidebar.SourceControl.4b37ae99b0',
         'Start the default AI agent to fix this commit failure'
       ),
-      fixAriaLabel: t(
+      fixAriaLabel: translate(
         'auto.components.right.sidebar.SourceControl.30b8d4f181',
         'Fix commit failure with AI'
       ),
-      chooseAgentTitle: t(
+      chooseAgentTitle: translate(
         'auto.components.right.sidebar.SourceControl.dd43c47089',
         'Choose an agent for this commit failure'
       ),
-      chooseAgentAriaLabel: t(
+      chooseAgentAriaLabel: translate(
         'auto.components.right.sidebar.SourceControl.ec7bfced55',
         'Choose agent to fix commit failure'
       ),
-      contextUnavailable: t(
+      contextUnavailable: translate(
         'auto.components.right.sidebar.SourceControl.9e5ccd00aa',
         'Commit failure context unavailable'
       ),
-      launchDialogTitle: t(
+      launchDialogTitle: translate(
         'auto.components.right.sidebar.SourceControl.054ead86b1',
         'Fix Commit Failure With AI'
       ),
-      dialogDescription: t(
+      dialogDescription: translate(
         'auto.components.right.sidebar.SourceControl.15b7f210d7',
         'Choose the agent and edit the full command input before launch.'
       )
     }
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- translate() reads the UI language implicitly.
-  }, [recoveryKind, languageRevision, t])
+  }, [recoveryKind])
 }
 
 export function SourceControlRecoveryNotice({
@@ -186,16 +196,11 @@ export function SourceControlRecoveryNotice({
   onOpenSourceControlAiSettings,
   onFixWithAI
 }: SourceControlRecoveryNoticeProps): React.JSX.Element {
-  const t = useTranslate()
   const worktreeKey = getRecoveryDialogKey(recoveryKind, worktreeId)
   const [dialogState, setDialogState] = useState<RecoveryDialogState>({
     worktreeKey,
     open: false
   })
-  // Close on switch or lost details during render so returning cannot reopen a stale dialog.
-  if (dialogState.worktreeKey !== worktreeKey || (!hasDetails && dialogState.open)) {
-    setDialogState({ worktreeKey, open: false })
-  }
   const dialogOpen = shouldShowRecoveryDialog(dialogState, worktreeKey, hasDetails)
   const setDialogOpen = useCallback(
     (open: boolean) => {
@@ -218,6 +223,10 @@ export function SourceControlRecoveryNotice({
   const handlePromptDelivered = useCallback(() => {
     setDialogOpen(false)
   }, [setDialogOpen])
+
+  useEffect(() => {
+    setDialogState((current) => syncRecoveryDialogState(current, worktreeKey, hasDetails))
+  }, [hasDetails, worktreeKey])
 
   const splitButtonProps = {
     actionId,
@@ -291,7 +300,7 @@ export function SourceControlRecoveryNotice({
                 className="h-6 shrink-0 border-foreground/25 px-2 text-[11px] font-semibold"
                 onClick={() => setDialogOpen(true)}
               >
-                {t(
+                {translate(
                   'auto.components.right.sidebar.SourceControl.pushRecovery.03d238218c',
                   'Details'
                 )}
@@ -324,7 +333,7 @@ export function SourceControlRecoveryNotice({
               ) : null}
               <DialogClose asChild>
                 <Button type="button" variant="outline" size="sm">
-                  {t(
+                  {translate(
                     'auto.components.right.sidebar.SourceControl.pushRecovery.783a808870',
                     'Close'
                   )}

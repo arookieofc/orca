@@ -1,12 +1,11 @@
 import React from 'react'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import { getStateLabel } from '@/components/github/work-item-state-presentation'
 import {
   getReviewStateTone,
   OPEN_REVIEW_STATE_TONE
 } from '@/components/github/review-state-presentation'
-import type { GitHubWorkItem } from '../../../../shared/github/work-items/work-item-types'
-import { useTranslate } from '@/i18n/use-translate'
+import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 
 /** Surfaces may treat closed issues as destructive or neutral; PR state tones stay fixed. */
 export type ClosedIssueTone = 'destructive' | 'neutral'
@@ -32,7 +31,6 @@ export function WorkItemStateBadge({
   className?: string
   closedIssue: ClosedIssueTone
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <span
       className={cn(
@@ -41,7 +39,7 @@ export function WorkItemStateBadge({
         className
       )}
     >
-      {getStateLabel(item, t)}
+      {getStateLabel(item)}
     </span>
   )
 }

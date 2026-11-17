@@ -1,20 +1,20 @@
-import { selectFreshExplicitAgentStatus } from '../../workspaces/process-listing/runtime-hook-agent-row-selection'
-import { OrcaRuntimeWithPluginHookedTerminalInput } from './terminal-plugin-hooked-input'
-import type { RuntimeTerminalAgentStatus } from '../../../../shared/terminal/runtime/runtime-terminal-contracts'
-import type { RuntimeTerminalAgentStatusSnapshot } from '../query/runtime-terminal-agent-status-query'
-import { getDisplayPromptLifecycle } from '../../workspaces/process-listing/runtime-worktree-status-projection'
-import type { RuntimePtyWorktreeRecord } from '../records/runtime-terminal-state-records'
-import { hasCompatibleAgentTitleIdentity } from '../../../../shared/agent-status/title/agent-title-owner'
-import type { PtyForegroundProcessRead } from '../lifecycle/pty-foreground-observation-state'
-import { recognizeAgentProcess } from '../../../../shared/agent-status/process/agent-process-recognition'
+import { selectFreshExplicitAgentStatus } from '../../runtime-hook-agent-row-selection'
+import { OrcaRuntimeWithControllerKnowsPtyIsLive } from './terminal-input-dispatch'
+import type { RuntimeTerminalAgentStatus } from '../../../../shared/runtime-types'
+import type { RuntimeTerminalAgentStatusSnapshot } from '../../runtime-terminal-agent-status-query'
+import { getDisplayPromptLifecycle } from '../../runtime-worktree-status-projection'
+import type { RuntimePtyWorktreeRecord } from '../../runtime-terminal-state-records'
+import { hasCompatibleAgentTitleIdentity } from '../../../../shared/agent-title-owner'
+import type { PtyForegroundProcessRead } from '../../runtime-terminal-contracts'
+import { recognizeAgentProcess } from '../../../../shared/agent-process-recognition'
 import type {
   AgentPromptActivity,
   AgentPromptWaitTextCache
-} from './agent-prompt-submission-verification'
-import { readAgentPromptWaitText } from './agent-prompt-submission-verification'
-import type { AgentStatus } from '../../../../shared/agent-status/title/agent-title-core'
+} from '../../agent-prompt-submission-verification'
+import { readAgentPromptWaitText } from '../../agent-prompt-submission-verification'
+import type { AgentStatus } from '../../../../shared/agent-detection'
 
-export abstract class OrcaRuntimeWithSerializeAgentPromptSubmission extends OrcaRuntimeWithPluginHookedTerminalInput {
+export abstract class OrcaRuntimeWithSerializeAgentPromptSubmission extends OrcaRuntimeWithControllerKnowsPtyIsLive {
   protected abstract getPaneKeyForTerminalHandle(handle: string): string | null
 
   protected async serializeAgentPromptSubmission<T>(
@@ -39,9 +39,7 @@ export abstract class OrcaRuntimeWithSerializeAgentPromptSubmission extends Orca
     }
   }
 
-  async getTerminalAgentStatus(handle: string): Promise<RuntimeTerminalAgentStatus> {
-    // A restored permission wait reads its screen first, so a dialog answered after the restart lifts it (#35962).
-    await this.refreshRestoredWait(handle, this.getTerminalAgentStatusPtyId(handle))
+  getTerminalAgentStatus(handle: string): Promise<RuntimeTerminalAgentStatus> {
     return this.terminalAgentStatus.getStatus(handle)
   }
 
@@ -129,13 +127,20 @@ export abstract class OrcaRuntimeWithSerializeAgentPromptSubmission extends Orca
     current.lastAgentStatus = restoredStatus
     if (restoredStatus === 'idle') {
       this.resolvePtyTuiIdleWaiters(current, ptyId)
-      // Restored idle from a name-only title still needs settlement evidence before delivery.
-      this.deliverPendingMessagesForPty(ptyId)
     }
     for (const leaf of this.getLeavesForPty(ptyId)) {
       // A stale-working clear retains native status rather than neutral status.
-      if (leaf.lastAgentStatus === null || current.titleDisplayClear) {
-        leaf.lastAgentStatus = restoredStatus
+      if (leaf.lastAgentStatus !== null && !current.titleDisplayClear) {
+        continue
+      }
+      // Live-agent evidence disproved the neutral title's exit signal; align delivery state with the tracker.
+      leaf.lastAgentStatus = restoredStatus
+      if (restoredStatus === 'idle') {
+        this.resolveTuiIdleWaiters(leaf)
+        // Restored idle from a name-only title still needs settlement evidence before delivery.
+        if (this.checkDeliverySettledAndArmRecheck(leaf)) {
+          this.deliverPendingMessagesForLeaf(leaf)
+        }
       }
     }
   }
@@ -238,13 +243,16 @@ export abstract class OrcaRuntimeWithSerializeAgentPromptSubmission extends Orca
 
   protected getFreshExplicitAgentStatusForHandle(
     handle: string,
-    ptyId: string
-  ): ReturnType<typeof selectFreshExplicitAgentStatus> {
+    paneKeyOverride?: string | null
+  ): {
+    status: NonNullable<RuntimeTerminalAgentStatus['status']>
+    updatedAt: number
+    stateStartedAt: number
+  } | null {
     return selectFreshExplicitAgentStatus({
       handle,
-      paneKey: this.getPaneKeyForTerminalHandle(handle),
-      hookRows: this.publicPaneStatusFn?.(this.getPaneKeyForTerminalHandle(handle) ?? '') ?? [],
-      screenMayHoldDialog: () => this.screenMayHoldAgentDialog(ptyId)
+      paneKey: paneKeyOverride ?? this.getPaneKeyForTerminalHandle(handle),
+      hookRows: this.getAgentStatusSnapshotFn?.() ?? []
     })
   }
 
@@ -293,9 +301,7 @@ export abstract class OrcaRuntimeWithSerializeAgentPromptSubmission extends Orca
       generation: this.getPtyLifecycleGeneration(ptyId),
       permissionSequence: this.agentPromptPermissionSequenceByPtyId.get(ptyId) ?? 0,
       workingSequence: nativeLifecycle?.workingSequence ?? 0,
-      // A prompt starts the main agent's turn; child work can hold the row working across it.
-      explicitWorkingStartedAt:
-        explicit?.status === 'working' ? explicit.mainAgentWorkingStartedAt : null,
+      explicitWorkingStartedAt: explicit?.status === 'working' ? explicit.stateStartedAt : null,
       outputSequence,
       status
     }
@@ -312,7 +318,7 @@ export abstract class OrcaRuntimeWithSerializeAgentPromptSubmission extends Orca
   }
 
   protected getFreshExplicitAgentStatusForPty(handle: string, ptyId: string) {
-    const explicit = this.getFreshExplicitAgentStatusForHandle(handle, ptyId)
+    const explicit = this.getFreshExplicitAgentStatusForHandle(handle)
     const floor = this.agentPromptExplicitStatusFloorByPtyId.get(ptyId)
     return explicit && (floor === undefined || explicit.updatedAt > floor) ? explicit : null
   }

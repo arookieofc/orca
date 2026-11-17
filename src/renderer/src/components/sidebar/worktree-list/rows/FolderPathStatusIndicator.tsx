@@ -1,24 +1,22 @@
 import React from 'react'
 import { FolderX } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import {
   getFolderWorkspacePathStatusDescription,
   getFolderWorkspacePathStatusTitle
-} from '@/lib/workspace/paths/folder-workspace-path-status'
+} from '@/lib/folder-workspace-path-status'
 import {
   isConfirmedStaleFolderPathStatus,
   type FolderWorkspacePathStatus
-} from '../../../../../../shared/folder-workspaces/folder-workspace-path-status'
-import { useTranslate } from '@/i18n/use-translate'
+} from '../../../../../../shared/folder-workspace-path-status'
 
 export function FolderPathStatusIndicator({
   status
 }: {
   status: FolderWorkspacePathStatus | null | undefined
 }): React.JSX.Element | null {
-  const t = useTranslate()
-  const title = getFolderWorkspacePathStatusTitle(status, t)
+  const title = getFolderWorkspacePathStatusTitle(status)
   if (!status || status.exists || !title) {
     return null
   }
@@ -40,17 +38,10 @@ export function FolderPathStatusIndicator({
         <div className="space-y-1">
           <div className="font-medium">{title}</div>
           <div className="text-muted-foreground">
-            {getFolderWorkspacePathStatusDescription(status, t)}
+            {getFolderWorkspacePathStatusDescription(status)}
           </div>
         </div>
       </TooltipContent>
     </Tooltip>
-  )
-}
-
-export function isFolderWorkspaceCreateDisabled(status: FolderWorkspacePathStatus | null): boolean {
-  return (
-    status?.exists === false &&
-    (isConfirmedStaleFolderPathStatus(status) || status.reason === 'ambiguous-connection')
   )
 }

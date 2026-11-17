@@ -1,5 +1,5 @@
 import React from 'react'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 
 export type AgentProgressRingTone = 'working' | 'attention'
 

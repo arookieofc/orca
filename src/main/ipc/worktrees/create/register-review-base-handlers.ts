@@ -1,13 +1,12 @@
 import { ipcMain } from 'electron'
 import type { GitHubPrStartPoint, GitPushTarget } from '../../../../shared/worktree/types'
-import { isFolderRepo } from '../../../../shared/repository/repo-kind'
-import { getRepoRoutingConnectionId } from '../../../../shared/execution-host/execution-host'
-import { gitExecFileAsync } from '../../../git/command-runner/git-exec-file'
+import { isFolderRepo } from '../../../../shared/repo-kind'
+import { getRepoRoutingConnectionId } from '../../../../shared/execution-host'
+import { gitExecFileAsync } from '../../../git/runner'
 import {
-  getLocalProjectGhExecOptions,
   getLocalProjectGitExecOptions,
-  getWorktreeCreatePrefetchGitOptions
-} from '../../../workspaces/execution-host/project-runtime-git-options'
+  getLocalProjectGhExecOptions
+} from '../../../project-runtime-git-options'
 import {
   SSH_GIT_RECONNECT_MESSAGE,
   SshHostNotServedError
@@ -15,12 +14,10 @@ import {
 import {
   fetchPrHeadTrackingRef,
   fetchGitHubPullRequestHeadRef
-} from '../../../github/pull-requests/start-points/pr-head-tracking-ref'
-import { resolveGitHubPrStartPoint } from '../../../github/pull-requests/start-points/pr-start-point'
-import { resolvePrStartPointUnlessWslStopped } from '../../../github/pull-requests/start-points/pr-start-point-wsl-gate'
-import { resolveGitHubReviewHeadRemote } from '../../../github/pull-requests/start-points/review-head-remote'
+} from '../../../github/pr-head-tracking-ref'
+import { resolveGitHubPrStartPoint } from '../../../github/pr-start-point'
+import { resolveGitHubReviewHeadRemote } from '../../../github/review-head-remote'
 import type { WorktreeIpcContext } from '../worktree-ipc-context'
-import { reviewStartPointFailure } from '../../../../shared/worktree/hosted-review/review-start-point-failure-copy'
 
 export function registerReviewBaseHandlers(context: WorktreeIpcContext): void {
   const { store, runtime } = context
@@ -35,16 +32,14 @@ export function registerReviewBaseHandlers(context: WorktreeIpcContext): void {
         headRefName?: string
         baseRefName?: string
         isCrossRepository?: boolean
-        /** The user creating or launching from the PR: it may start a stopped WSL distro. */
-        wakeWslDistro?: boolean
       }
     ): Promise<GitHubPrStartPoint | { error: string }> => {
       const repo = store.getRepo(args.repoId)
       if (!repo) {
-        return reviewStartPointFailure('repoNotFound')
+        return { error: 'Repo not found' }
       }
       if (isFolderRepo(repo)) {
-        return reviewStartPointFailure('folderUnsupported')
+        return { error: 'Folder mode does not support creating worktrees.' }
       }
       // SSH ownership may exist only in executionHostId.
       const connectionId = getRepoRoutingConnectionId(repo)
@@ -68,35 +63,28 @@ export function registerReviewBaseHandlers(context: WorktreeIpcContext): void {
           localGitExecOptions: getLocalProjectGitExecOptions(store, repo)
         })
 
-      // Source Control's push-target ensure asks unprompted; it must not start a stopped distro (E9).
-      const { wslDistro } = connectionId ? {} : getWorktreeCreatePrefetchGitOptions(store, repo)
-      return resolvePrStartPointUnlessWslStopped(
-        { path: repo.path, wslDistro },
-        { wakeWslDistro: args.wakeWslDistro },
-        () =>
-          resolveGitHubPrStartPoint({
+      return resolveGitHubPrStartPoint({
+        repoPath: repo.path,
+        prNumber: args.prNumber,
+        headRefName: args.headRefName,
+        baseRefName: args.baseRefName,
+        isCrossRepository: args.isCrossRepository,
+        issueSourcePreference: repo.issueSourcePreference,
+        connectionId,
+        localGitOptions: localGhOptions,
+        gitExec,
+        fetchRemoteTrackingRef,
+        fetchPullRequestHeadRef,
+        // Share source preference and hosting identity across local, WSL and SSH creation.
+        resolveRemote: () =>
+          resolveGitHubReviewHeadRemote({
             repoPath: repo.path,
-            prNumber: args.prNumber,
-            headRefName: args.headRefName,
-            baseRefName: args.baseRefName,
-            isCrossRepository: args.isCrossRepository,
             issueSourcePreference: repo.issueSourcePreference,
             connectionId,
             localGitOptions: localGhOptions,
-            gitExec,
-            fetchRemoteTrackingRef,
-            fetchPullRequestHeadRef,
-            // Share source preference and hosting identity across local, WSL and SSH creation.
-            resolveRemote: () =>
-              resolveGitHubReviewHeadRemote({
-                repoPath: repo.path,
-                issueSourcePreference: repo.issueSourcePreference,
-                connectionId,
-                localGitOptions: localGhOptions,
-                gitExec
-              })
+            gitExec
           })
-      )
+      })
     }
   )
 
@@ -110,8 +98,6 @@ export function registerReviewBaseHandlers(context: WorktreeIpcContext): void {
         sourceBranch?: string
         targetBranch?: string
         isCrossRepository?: boolean
-        /** The user creating from the MR: it may start a stopped WSL distro. */
-        wakeWslDistro?: boolean
       }
     ): Promise<
       | { baseBranch: string; compareBaseRef?: string; pushTarget?: GitPushTarget }
@@ -122,8 +108,7 @@ export function registerReviewBaseHandlers(context: WorktreeIpcContext): void {
         mrIid: args.mrIid,
         sourceBranch: args.sourceBranch,
         targetBranch: args.targetBranch,
-        isCrossRepository: args.isCrossRepository,
-        wakeWslDistro: args.wakeWslDistro
+        isCrossRepository: args.isCrossRepository
       })
     }
   )

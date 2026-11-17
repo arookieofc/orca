@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
-import { abortSignalReason } from '../../concurrency/abort-signal-reason'
-import type { PairedRuntimeConnection } from '../pairing/paired-runtime-connection'
+import { abortSignalReason } from '../../abort-signal-reason'
+import type { PairedRuntimeConnection } from '../../paired-runtime-connection'
 import { scheduleOrphanedRemoteRuntimeSocketClose } from '../remote-runtime-abort-orphaned-socket'
 import { serializeRemoteRuntimeRpcRequest } from '../remote-runtime-memory-limits'
-import type { PairedE2EEClientHandshake } from '../e2ee/paired-e2ee-client-handshake'
+import type { PairedE2EEClientHandshake } from '../../paired-e2ee-client-handshake'
 import {
   prepareRemoteRuntimeRequest,
   releaseRemoteRuntimePreparedRequest,
@@ -21,7 +21,7 @@ import {
   remoteRuntimeUnavailableError
 } from './remote-runtime-request-frames'
 import { settleRemoteRuntimeRequestRpcFrame } from './remote-runtime-request-rpc-frame'
-import type { RuntimeRpcResponse } from '../rpc/runtime-rpc-envelope'
+import type { RuntimeRpcResponse } from '../../runtime-rpc-envelope'
 import {
   rejectRemoteRuntimeRequestReadyWaiters,
   resolveRemoteRuntimeRequestReadyWaiters,
@@ -29,10 +29,9 @@ import {
   type RemoteRuntimeRequestReadyWaiter
 } from './remote-runtime-request-ready-waiters'
 import { openRemoteRuntimeWebSocket } from './remote-runtime-request-websocket'
-import * as sealedFrame from '../remote-runtime-sealed-frame'
 import { sendRemoteRuntimeTokenAuth } from '../remote-runtime-client-handshake'
 import { remoteRuntimeClientCapabilities } from '../remote-runtime-client-capabilities'
-import type { RuntimeCapability } from '../protocol/protocol-version'
+import type { RuntimeCapability } from '../../protocol-version'
 type ConnectionState = 'closed' | 'awaiting_ready' | 'awaiting_authenticated' | 'ready'
 const IDLE_CLOSE_MS = 60_000
 
@@ -179,9 +178,9 @@ export class RemoteRuntimeRequestConnection {
           this.close(error)
         }
       },
-      onFrame: (ws, frame) => {
+      onTextFrame: (ws, frame) => {
         if (this.ws === ws) {
-          this.handleFrame(frame)
+          this.handleTextFrame(frame)
         }
       }
     })
@@ -195,21 +194,23 @@ export class RemoteRuntimeRequestConnection {
     this.state = 'awaiting_ready'
   }
 
-  private handleFrame(frame: sealedFrame.RemoteRuntimeSealedFrame): void {
+  private handleTextFrame(frame: string): void {
+    if (this.state === 'awaiting_ready') {
+      this.handleReadyFrame(frame)
+      return
+    }
+
     const handshake = this.handshake
     if (!handshake) {
       return
     }
-    if (this.state === 'awaiting_ready') {
-      this.handleReadyFrame(handshake, frame)
+    const plaintext = handshake.channel.openText(frame)
+    if (plaintext === null) {
+      this.close(
+        invalidRemoteRuntimeResponseError('Remote Orca runtime returned an undecryptable frame.')
+      )
       return
     }
-    const opened = sealedFrame.openSealedText(handshake, frame)
-    if (opened.kind === 'failed') {
-      this.close(invalidRemoteRuntimeResponseError(opened.message))
-      return
-    }
-    const plaintext = opened.text
 
     if (this.state === 'awaiting_authenticated') {
       this.handleAuthenticatedFrame(handshake, plaintext)
@@ -219,11 +220,12 @@ export class RemoteRuntimeRequestConnection {
     this.handleRpcFrame(plaintext)
   }
 
-  private handleReadyFrame(
-    handshake: PairedE2EEClientHandshake,
-    frame: sealedFrame.RemoteRuntimeSealedFrame
-  ): void {
-    const error = remoteRuntimeReadyError(sealedFrame.acceptSealedReady(handshake, frame))
+  private handleReadyFrame(frame: string): void {
+    const handshake = this.handshake
+    if (!handshake) {
+      return
+    }
+    const error = remoteRuntimeReadyError(handshake.acceptReadyText(frame))
     if (error) {
       this.close(error)
       return

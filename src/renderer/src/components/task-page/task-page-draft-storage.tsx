@@ -1,12 +1,12 @@
 import type { TaskPageRepoSourceState } from '@/components/task-page/task-page-cache-selectors'
-import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../shared/github/repositories/repository-identity'
+import type { GitHubOwnerRepo } from '../../../../shared/github/pull-request-types'
 import { sameGitHubOwnerRepo } from '@/components/github/IssueSourceIndicator'
 import {
   type NewLinearProjectDraft,
   isTaskCreationDraftContentful,
   type NewLinearIssueDraft,
   type NewJiraIssueDraft
-} from '@/store/slices/task-creation/task-creation-drafts'
+} from '@/store/slices/task-creation-drafts'
 import { useAppStore } from '@/store/index'
 export const hasDivergentSources = (
   s: TaskPageRepoSourceState
@@ -37,14 +37,8 @@ export function writeNewLinearProjectDraft(draft: NewLinearProjectDraft | null):
     state.clearNewLinearProjectDraft()
   }
 }
-export function writeNewLinearIssueDraft(
-  draft: NewLinearIssueDraft | null,
-  expected?: NewLinearIssueDraft
-): void {
+export function writeNewLinearIssueDraft(draft: NewLinearIssueDraft | null): void {
   const state = useAppStore.getState()
-  if (expected && state.newLinearIssueDraft !== expected) {
-    return
-  }
   if (draft && isTaskCreationDraftContentful(draft)) {
     state.setNewLinearIssueDraft(draft)
   } else {

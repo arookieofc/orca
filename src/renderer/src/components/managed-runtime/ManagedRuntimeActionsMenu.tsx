@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
-import { useTranslate } from '@/i18n/use-translate'
-import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import { translate } from '@/i18n/i18n'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { Button } from '../ui/button'
 import {
   DropdownMenu,
@@ -19,7 +19,6 @@ export function ManagedRuntimeActionsMenu(props: {
   onRemove: (() => void) | null
   disabled: boolean
 }): React.JSX.Element {
-  const t = useTranslate()
   const { agentLabel, install, onRemove, disabled } = props
   const [confirming, setConfirming] = useState(false)
   return (
@@ -29,9 +28,11 @@ export function ManagedRuntimeActionsMenu(props: {
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={t('components.managed-runtime.moreActions', 'More actions for {{agent}}', {
-              agent: agentLabel
-            })}
+            aria-label={translate(
+              'components.managed-runtime.moreActions',
+              'More actions for {{agent}}',
+              { agent: agentLabel }
+            )}
           >
             <MoreHorizontal />
           </Button>
@@ -48,7 +49,7 @@ export function ManagedRuntimeActionsMenu(props: {
               disabled={disabled}
               onSelect={() => setConfirming(true)}
             >
-              {t('components.managed-runtime.remove', 'Remove downloaded runtime')}
+              {translate('components.managed-runtime.remove', 'Remove downloaded runtime')}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

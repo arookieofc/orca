@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { cn } from '../../lib/class-names'
+import { cn } from '../../lib/utils'
 import { HomeSlide } from './slides/HomeSlide'
 import { WorktreeListSlide } from './slides/WorktreeListSlide'
 import { TerminalSlide } from './slides/TerminalSlide'
-import { useTranslate } from '@/i18n/use-translate'
-import { forceLayoutReflow } from '@/lib/overlay-interaction/force-layout-reflow'
+import { translate } from '@/i18n/i18n'
 
 const DWELL_MS = 4500
 const TAP_BEFORE_PUSH_MS = 240
@@ -12,7 +11,6 @@ const TAP_BEFORE_PUSH_MS = 240
 type Phase = 'normal' | 'reset'
 
 export function PhoneCarousel(): React.JSX.Element {
-  const t = useTranslate()
   const [activeIdx, setActiveIdx] = useState(0)
   const [phase, setPhase] = useState<Phase>('normal')
   const [tappingSlide, setTappingSlide] = useState<number | null>(null)
@@ -94,7 +92,7 @@ export function PhoneCarousel(): React.JSX.Element {
       return
     }
     const id = requestAnimationFrame(() => {
-      forceLayoutReflow(containerRef.current)
+      void containerRef.current?.offsetHeight
     })
     return () => cancelAnimationFrame(id)
   }, [phase])
@@ -113,7 +111,7 @@ export function PhoneCarousel(): React.JSX.Element {
         <div
           className={slideClass(0)}
           role="img"
-          aria-label={t(
+          aria-label={translate(
             'auto.components.mobile.PhoneCarousel.89c7713645',
             'Orca Mobile home screen'
           )}
@@ -123,14 +121,17 @@ export function PhoneCarousel(): React.JSX.Element {
         <div
           className={slideClass(1)}
           role="img"
-          aria-label={t('auto.components.mobile.PhoneCarousel.93217b41c1', 'Worktree list')}
+          aria-label={translate('auto.components.mobile.PhoneCarousel.93217b41c1', 'Worktree list')}
         >
           <WorktreeListSlide tapping={tappingSlide === 1} />
         </div>
         <div
           className={slideClass(2)}
           role="img"
-          aria-label={t('auto.components.mobile.PhoneCarousel.96d651cb87', 'Terminal session')}
+          aria-label={translate(
+            'auto.components.mobile.PhoneCarousel.96d651cb87',
+            'Terminal session'
+          )}
         >
           <TerminalSlide />
         </div>

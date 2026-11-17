@@ -24,8 +24,6 @@ export type ComposerRuntimeTargetSelectionInput = Pick<
 
 export type DerivedComposerStateInput = Pick<
   ComposerModel,
-  | 'selectedProjectGroup'
-  | 'isProjectGroupTarget'
   | 'agentPrompt'
   | 'checkedHooksContextKey'
   | 'enableIssueAutomation'

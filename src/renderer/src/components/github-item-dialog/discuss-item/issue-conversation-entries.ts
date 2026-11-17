@@ -2,9 +2,8 @@ import type {
   GitHubIssueTimelineItem,
   GitHubIssueTimelineTarget,
   PRComment
-} from '../../../../../shared/github/comments/comment-types'
+} from '../../../../../shared/github/comment-types'
 import { translate } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
 
 export type IssueConversationEntry =
   | { kind: 'comment'; id: string; createdAt: string; comment: PRComment; index: number }
@@ -48,17 +47,18 @@ export function getIssueConversationEntries(
   })
 }
 
-export function getTimelineTargetLabel(
-  target: GitHubIssueTimelineTarget,
-  t: Translate = translate
-): string {
-  const reference =
-    target.type === 'pr'
-      ? t('auto.components.GitHubItemDialog.timeline.pullRequestReference', 'PR #{{number}}', {
-          number: target.number
-        })
-      : t('auto.components.GitHubItemDialog.timeline.issueReference', 'issue #{{number}}', {
-          number: target.number
-        })
-  return target.title ? `${reference} ${target.title}` : reference
+export function getTimelineTargetLabel(target: GitHubIssueTimelineTarget): string {
+  const prefix = target.type === 'pr' ? 'PR' : 'issue'
+  const title = target.title ? ` ${target.title}` : ''
+  return `${prefix} #${target.number}${title}`
+}
+
+export function getTimelineStateReasonLabel(reason: string | null | undefined): string | null {
+  if (reason === 'completed') {
+    return translate('auto.components.GitHubItemDialog.timeline.completed', 'as completed')
+  }
+  if (reason === 'not_planned') {
+    return translate('auto.components.GitHubItemDialog.timeline.notPlanned', 'as not planned')
+  }
+  return null
 }

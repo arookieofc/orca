@@ -1,11 +1,10 @@
 import type { Page } from '@stablyai/playwright-test'
-import type { RuntimeTerminalRead } from '../../../src/shared/terminal/runtime/runtime-terminal-contracts'
-import '../../../src/shared/remote-runtime/protocol/protocol-version'
-import { TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY } from '../../../src/shared/terminal/runtime-policy/terminal-runtime-capabilities'
+import type { RuntimeTerminalRead } from '../../../src/shared/runtime-types'
+import { TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY } from '../../../src/shared/protocol-version'
 import {
   toHostSessionTabId,
   toWebTerminalSurfaceTabId
-} from '../../../src/shared/workspace-layout/terminal-surface-id'
+} from '../../../src/shared/terminal-surface-id'
 import {
   readPairedRetentionSample,
   startRendererLagProbe

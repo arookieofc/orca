@@ -1,10 +1,9 @@
 import { useCallback, useRef, useState, type RefObject } from 'react'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { DocPreviewFileFailure } from '../../../../../shared/document-preview/doc-preview-scheme'
+import type { DocPreviewFileFailure } from '../../../../../shared/doc-preview-scheme'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
 
 function requestedDirectory(relativePath: string): string {
   const separator = relativePath.lastIndexOf('/')
@@ -103,9 +102,9 @@ export function useDocPreviewDirectoryAccess({
 
 const MAX_NAMED_FOLDERS = 3
 
-function requestedFolderSentence(labels: string[], t: Translate = translate): string {
+function requestedFolderSentence(labels: string[]): string {
   if (labels.length === 1) {
-    return t(
+    return translate(
       'auto.components.editor.HtmlDocPreview.directoryAccessRequest',
       'This preview wants to read files in {{path}}.',
       { path: labels[0] }
@@ -115,13 +114,13 @@ function requestedFolderSentence(labels: string[], t: Translate = translate): st
   const remainder = labels.length - named.length
   const folders =
     remainder > 0
-      ? t(
+      ? translate(
           'auto.components.editor.HtmlDocPreview.directoryAccessRequestOverflow',
           '{{folders}}, and {{count}} more',
           { folders: named.join(', '), count: remainder }
         )
       : `${named.slice(0, -1).join(', ')} and ${named.at(-1)}`
-  return t(
+  return translate(
     'auto.components.editor.HtmlDocPreview.directoryAccessRequestMultiple',
     'This preview wants to read files in {{folders}}.',
     { folders }
@@ -141,7 +140,6 @@ export function DocPreviewDirectoryAccessBanner({
   onDismiss: () => void
   onAllow: () => Promise<void>
 }): React.JSX.Element {
-  const t = useTranslate()
   const labels = requests.map((request) =>
     requestedDirectoryLabel(request.relativePath, worktreeRoot)
   )
@@ -150,18 +148,20 @@ export function DocPreviewDirectoryAccessBanner({
       <AlertCircle className="size-3.5 shrink-0 text-muted-foreground" />
       {/* The title carries every folder in full, for when the sentence truncates past three. */}
       <span className="min-w-0 flex-1 text-muted-foreground" title={labels.join('\n')}>
-        {requestedFolderSentence(labels, t)}
+        {requestedFolderSentence(labels)}
       </span>
       <Button type="button" variant="ghost" size="xs" disabled={busy} onClick={onDismiss}>
-        {t('auto.components.editor.HtmlDocPreview.dismissAccessRequest', 'Dismiss')}
+        {translate('auto.components.editor.HtmlDocPreview.dismissAccessRequest', 'Dismiss')}
       </Button>
       <Button type="button" size="xs" disabled={busy} onClick={() => void onAllow()}>
         {busy ? <Loader2 className="size-3 animate-spin" /> : null}
         {labels.length === 1
-          ? t('auto.components.editor.HtmlDocPreview.allowDirectory', 'Allow folder')
-          : t('auto.components.editor.HtmlDocPreview.allowDirectories', 'Allow {{count}} folders', {
-              count: labels.length
-            })}
+          ? translate('auto.components.editor.HtmlDocPreview.allowDirectory', 'Allow folder')
+          : translate(
+              'auto.components.editor.HtmlDocPreview.allowDirectories',
+              'Allow {{count}} folders',
+              { count: labels.length }
+            )}
       </Button>
     </div>
   )

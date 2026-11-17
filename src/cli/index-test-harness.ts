@@ -18,13 +18,10 @@ export type WorktreeAwarenessMocks = {
 
 export async function createRuntimeClientModuleMock(mocks: RuntimeClientModuleMocks) {
   // Error formatting uses instanceof, so the mock must preserve the production classes.
-  const { RuntimeClientError, RuntimeRpcFailureError } =
-    await import('./runtime/connection/types.js')
+  const { RuntimeClientError, RuntimeRpcFailureError } = await import('./runtime/types.js')
 
   class RuntimeClient {
     readonly isRemote: boolean
-    readonly environmentSelector: string | null
-    readonly userDataPath = '/tmp/orca-user-data'
     call = mocks.callMock
     getCliStatus = vi.fn()
     openOrca = vi.fn()
@@ -49,7 +46,6 @@ export async function createRuntimeClientModuleMock(mocks: RuntimeClientModuleMo
         )
       }
       this.isRemote = Boolean(effectivePairingCode || effectiveEnvironment)
-      this.environmentSelector = effectiveEnvironment || null
     }
   }
 

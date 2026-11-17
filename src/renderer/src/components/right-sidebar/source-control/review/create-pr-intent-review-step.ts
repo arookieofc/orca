@@ -1,12 +1,12 @@
 import { translate } from '@/i18n/i18n'
-import { resolveBlockedCreateReviewNoticeMessage } from './source-control-create-review-blocked-action'
-import { resolveCreatePrIntentRemoteStep } from '../../../../../../shared/source-control/decisions/source-control-create-review-intent'
+import { resolveBlockedCreateReviewNoticeMessage } from '../../source-control-create-review-blocked-action'
+import { resolveCreatePrIntentRemoteStep } from '../../../../../../shared/source-control-create-review-intent'
 import {
   shouldAttemptCreateHostedReviewForIntent,
   type CreatePrIntentRunToken
 } from './create-pr-intent-flow'
 import type { SourceControlOperationTarget } from '../listing/operation-target'
-import type { CreatePrIntentNotice } from '../commit/commit-area-types'
+import type { SourceControlWorktreeOperationState } from '../panel/use-worktree-operation-state'
 import type { SourceControlRemoteActionRunner } from '../sync/use-remote-action-runner'
 import type { CreatePrIntentRunSnapshot } from './create-pr-intent-run-snapshot'
 import type { SourceControlCreatePrIntentProbes } from './use-create-pr-intent-probes'
@@ -19,7 +19,7 @@ export async function runCreatePrIntentReviewStep({
   readHostedReviewCreationEligibilityForIntent,
   refreshBranchCompareForCreatePrIntent,
   runRemoteAction,
-  setCreatePrIntentNotice,
+  setCreatePrIntentNoticeForWorktree,
   snapshot,
   token
 }: {
@@ -28,7 +28,7 @@ export async function runCreatePrIntentReviewStep({
   readHostedReviewCreationEligibilityForIntent: SourceControlCreatePrIntentProbes['readHostedReviewCreationEligibilityForIntent']
   refreshBranchCompareForCreatePrIntent: SourceControlCreatePrIntentProbes['refreshBranchCompareForCreatePrIntent']
   runRemoteAction: SourceControlRemoteActionRunner['runRemoteAction']
-  setCreatePrIntentNotice: (notice: CreatePrIntentNotice | null) => void
+  setCreatePrIntentNoticeForWorktree: SourceControlWorktreeOperationState['setCreatePrIntentNoticeForWorktree']
   snapshot: CreatePrIntentRunSnapshot
   token: CreatePrIntentRunToken
 }): Promise<void> {
@@ -43,7 +43,7 @@ export async function runCreatePrIntentReviewStep({
     return
   }
   if (!eligibility) {
-    setCreatePrIntentNotice({
+    setCreatePrIntentNoticeForWorktree(token.worktreeId, {
       tone: 'destructive',
       message: translate(
         'auto.components.right.sidebar.SourceControl.d7492cafce',
@@ -60,7 +60,7 @@ export async function runCreatePrIntentReviewStep({
     return
   }
   if (eligibility.blockedReason === 'existing_review') {
-    setCreatePrIntentNotice(null)
+    setCreatePrIntentNoticeForWorktree(token.worktreeId, null)
     return
   }
 
@@ -78,7 +78,7 @@ export async function runCreatePrIntentReviewStep({
     hasCurrentBranch: Boolean(token.branch)
   })
   if (remoteStep === 'blocked' || remoteStep === 'none') {
-    setCreatePrIntentNotice({
+    setCreatePrIntentNoticeForWorktree(token.worktreeId, {
       tone: 'muted',
       // Diverged branches require explicit sync; automatic preparation would merge without consent.
       message:
@@ -95,7 +95,7 @@ export async function runCreatePrIntentReviewStep({
     return
   }
 
-  setCreatePrIntentNotice({
+  setCreatePrIntentNoticeForWorktree(token.worktreeId, {
     tone: 'muted',
     // Keep translation keys literal so catalog verification can find them statically.
     message:
@@ -130,7 +130,7 @@ export async function runCreatePrIntentReviewStep({
     return
   }
   if (remoteResult.status !== 'ok') {
-    setCreatePrIntentNotice({
+    setCreatePrIntentNoticeForWorktree(token.worktreeId, {
       tone: 'destructive',
       message: translate(
         'auto.components.right.sidebar.SourceControl.createPrIntentRemoteFailed',
@@ -163,7 +163,7 @@ export async function runCreatePrIntentReviewStep({
   }
   // Prefer actionable blocked-reason guidance over a generic stop, including unavailable lookups.
   const blockedNotice = resolveBlockedCreateReviewNoticeMessage(eligibility)
-  setCreatePrIntentNotice({
+  setCreatePrIntentNoticeForWorktree(token.worktreeId, {
     tone: blockedNotice ? 'destructive' : 'muted',
     message:
       blockedNotice ??

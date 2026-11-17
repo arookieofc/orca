@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
-import { runtimeEnvironmentIdOrLocalUnlessTwin } from '@/lib/workspace/ownership/worktree-runtime-owner'
+import { runtimeEnvironmentIdOrLocalUnlessTwin } from '@/lib/worktree-runtime-owner'
 import { RemoteBrowserStreamLifecycle } from './remote-browser-stream-lifecycle'
 import type {
   RemoteBrowserOperationToken,
   RemoteBrowserViewportSize
 } from './remote-browser-stream-tokens'
-import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
-import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
-import { toRuntimeWorktreeSelector } from '@/runtime/rpc/targets/runtime-worktree-selector'
-import type { BrowserScreencastFrameMetadata } from '../../../../../shared/browser/screencast/browser-screencast-protocol'
-import type { BrowserPage as BrowserPageState } from '../../../../../shared/browser/workspaces/browser-workspace-types'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
+import type { BrowserScreencastFrameMetadata } from '../../../../../shared/browser-screencast-protocol'
+import type { BrowserPage as BrowserPageState } from '../../../../../shared/browser-workspace-types'
+import { browserPageExists } from '../describe-page/browser-page-load-error'
 import {
   REMOTE_BROWSER_STREAM_IDLE,
   type RemoteBrowserStreamStatus
@@ -21,13 +22,7 @@ import {
   type RemoteBrowserPaneNotice,
   type RemoteBrowserStreamBridge
 } from './remote-browser-page-input-model'
-import { subscribeRuntimeEnvironment } from '@/runtime/rpc/environment-revisions/runtime-environment-pairing-refresh'
-import {
-  readRemoteBrowserPage,
-  readRemoteBrowserPageObservation
-} from './remote-browser-page-observation'
-import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
-import { javaScriptDialogPrompt } from '../page-prompts/browser-javascript-dialog-prompt'
+import { subscribeRuntimeEnvironment } from '@/runtime/runtime-environment-pairing-refresh'
 
 export function useRemoteBrowserPageLifecycle({
   browserTab,
@@ -63,7 +58,6 @@ export function useRemoteBrowserPageLifecycle({
   const pendingFrameDecodeRef = useRef(0)
   const mountedRef = useRef(true)
   const isActiveRef = useRef(isActive)
-  const currentWorkspaceIdRef = useRef(browserTab.workspaceId)
   const currentBrowserTabIdRef = useRef(browserTab.id)
   const currentBrowserTabUrlRef = useRef(browserTab.url)
   const runtimeWorktree = useMemo(() => toRuntimeWorktreeSelector(worktreeId), [worktreeId])
@@ -74,24 +68,14 @@ export function useRemoteBrowserPageLifecycle({
   const lifecycleRef = useRef<RemoteBrowserStreamLifecycle | null>(null)
   const closeBrowserPage = useAppStore((s) => s.closeBrowserPage)
   const closeBrowserTab = useAppStore((s) => s.closeBrowserTab)
-  // Stable for the provider's life, so the once-built lifecycle may hold it.
-  const confirm = useConfirmationDialog()
 
   useLayoutEffect(() => {
-    currentWorkspaceIdRef.current = browserTab.workspaceId
     currentBrowserTabIdRef.current = browserTab.id
     currentBrowserTabUrlRef.current = browserTab.url
     activeRuntimeEnvironmentIdRef.current = activeRuntimeEnvironmentId
     isActiveRef.current = isActive
     runtimeWorktreeRef.current = runtimeWorktree
-  }, [
-    activeRuntimeEnvironmentId,
-    browserTab.id,
-    browserTab.workspaceId,
-    browserTab.url,
-    isActive,
-    runtimeWorktree
-  ])
+  }, [activeRuntimeEnvironmentId, browserTab.id, browserTab.url, isActive, runtimeWorktree])
 
   if (!lifecycleRef.current) {
     lifecycleRef.current = new RemoteBrowserStreamLifecycle({
@@ -100,21 +84,12 @@ export function useRemoteBrowserPageLifecycle({
         isActive: () => isActiveRef.current,
         getTabId: () => currentBrowserTabIdRef.current,
         getEnvironmentId: () => activeRuntimeEnvironmentIdRef.current,
-        browserPageExists: (pageId) =>
-          Boolean(
-            readRemoteBrowserPage(useAppStore.getState(), currentWorkspaceIdRef.current, pageId)
-          )
+        browserPageExists
       },
       callRpc: callRuntimeRpc,
       subscribeScreencast: (args, callbacks) => subscribeRuntimeEnvironment(args, callbacks),
       getWorktreeSelector: () => runtimeWorktreeRef.current,
       getCurrentUrl: () => currentBrowserTabUrlRef.current,
-      readCurrentObservation: () =>
-        readRemoteBrowserPageObservation(
-          useAppStore.getState(),
-          currentWorkspaceIdRef.current,
-          currentBrowserTabIdRef.current
-        ),
       readStoredHandle: () =>
         useAppStore.getState().remoteBrowserPageHandlesByPageId[currentBrowserTabIdRef.current] ??
         null,
@@ -138,8 +113,7 @@ export function useRemoteBrowserPageLifecycle({
         streamBridgeRef.current.closeMissingRemotePage(remotePageId),
       waitForViewportSize: () => streamBridgeRef.current.waitForViewportSize(),
       readViewportSize: () => remoteViewportSizeRef.current,
-      syncViewport: (pageId) => streamBridgeRef.current.syncViewport(pageId),
-      askJavaScriptDialog: (dialog, signal) => javaScriptDialogPrompt.ask(confirm, dialog, signal)
+      syncViewport: (pageId) => streamBridgeRef.current.syncViewport(pageId)
     })
   }
   const lifecycle = lifecycleRef.current
@@ -256,12 +230,7 @@ export function useRemoteBrowserPageLifecycle({
       }
       const state = useAppStore.getState()
       const currentEnvironmentId = runtimeEnvironmentIdOrLocalUnlessTwin(state, worktreeId)
-      const pageStillExists =
-        useAppStore
-          .getState()
-          .browserPagesByWorkspace[browserTab.workspaceId]?.some(
-            (page) => page.id === browserTab.id
-          ) ?? false
+      const pageStillExists = browserPageExists(browserTab.id)
       if (currentEnvironmentId === activeRuntimeEnvironmentId && pageStillExists) {
         return
       }
@@ -278,14 +247,7 @@ export function useRemoteBrowserPageLifecycle({
         { timeoutMs: 15_000, suppressFeatureInteraction: true }
       ).catch(() => {})
     }
-  }, [
-    activeRuntimeEnvironmentId,
-    browserTab.id,
-    browserTab.workspaceId,
-    lifecycle,
-    runtimeWorktree,
-    worktreeId
-  ])
+  }, [activeRuntimeEnvironmentId, browserTab.id, lifecycle, runtimeWorktree, worktreeId])
 
   return {
     lifecycle,

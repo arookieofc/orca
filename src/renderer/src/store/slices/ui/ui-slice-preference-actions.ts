@@ -1,52 +1,45 @@
-import {
-  DEFAULT_STATUS_BAR_USAGE_FORMAT,
-  normalizeStatusBarUsageFormat
-} from '../../../../../shared/status-bar/status-bar-usage-format'
 import type { UISlice, UISliceGet, UISliceSet } from './ui-slice-contract'
 import { syncTauriAppearanceMenuAfterSettingsSaved } from '../../../web/tauri-native-menu-appearance'
 import { workspaceHostScopeForVisibleHosts } from '../../../../../shared/workspace-view/workspace-host-visibility'
 import { createAgentsViewPreferenceActions } from './ui-slice-agents-view-preference-actions'
 import {
   DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE,
-  normalizeAgentActivityDisplayMode
-} from '../../../../../shared/agent-status/presentation/agent-activity-display-mode'
-import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../../shared/workspace-view/sleeping-workspace-visibility'
-import { DEFAULT_STATUS_BAR_ITEMS } from '../../../../../shared/status-bar/status-bar-defaults'
-import {
+  DEFAULT_SHOW_SLEEPING_WORKSPACES,
+  DEFAULT_STATUS_BAR_ITEMS,
   DEFAULT_WORKTREE_CARD_PROPERTIES,
   getWorktreeCardModeUpdates,
+  normalizeAgentActivityDisplayMode,
   normalizeWorktreeCardProperties
-} from '../../../../../shared/worktree/row-display/card-properties'
+} from '../../../../../shared/constants'
 import {
   DEFAULT_USAGE_PERCENTAGE_DISPLAY,
   normalizeUsagePercentageDisplay
-} from '../../../../../shared/agent-usage/display/usage-percentage-display'
+} from '../../../../../shared/usage-percentage-display'
 import {
   DEFAULT_STATUS_BAR_USAGE_MODE,
   normalizeStatusBarUsageMode
-} from '../../../../../shared/status-bar/status-bar-usage-mode'
+} from '../../../../../shared/status-bar-usage-mode'
 import {
   normalizeExecutionHostOrder,
   normalizeExecutionHostScope,
   normalizeVisibleExecutionHostIds
-} from '../../../../../shared/execution-host/execution-host'
+} from '../../../../../shared/execution-host'
 import {
   ALL_AUTOMATION_HOSTS_FILTER,
   toPersistedAutomationHostFilter
-} from '../../../../../shared/automations/ownership/automation-host-filter'
+} from '../../../../../shared/automation-host-filter'
 import {
   clampWorkspaceBoardColumnWidth,
   clampWorkspaceBoardOpacity,
   cloneDefaultWorkspaceStatuses,
   normalizeWorkspaceStatuses,
   WORKSPACE_BOARD_COLUMN_WIDTH_DEFAULT
-} from '../../../../../shared/workspace/status/workspace-statuses'
+} from '../../../../../shared/workspace-statuses'
 import { createHostWorkspaceStatusActions } from './ui-slice-host-workspace-statuses'
 
 /** Builds preference defaults and setters for the UI slice, leaving durable writes to the persistence layer. */
 export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Partial<UISlice> {
   return {
-    gitGraphFiltersByWorktree: {},
     sidebarBody: 'workspaces',
     setSidebarBody: (body) => set({ sidebarBody: body }),
 
@@ -160,23 +153,6 @@ export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Par
         return { showDotfilesByWorktree: next }
       }),
 
-    notificationsMutedByWorktree: {},
-    toggleWorktreeNotificationsMuted: (worktreeId) =>
-      set((s) => {
-        if (!worktreeId) {
-          return s
-        }
-        const nextMuted = s.notificationsMutedByWorktree[worktreeId] !== true
-        const next = { ...s.notificationsMutedByWorktree }
-        // Why: not muted is the default; only persist worktree-level opt-ins.
-        if (nextMuted) {
-          next[worktreeId] = true
-        } else {
-          delete next[worktreeId]
-        }
-        return { notificationsMutedByWorktree: next }
-      }),
-
     filterRepoIds: [],
     setFilterRepoIds: (ids) => set({ filterRepoIds: ids }),
 
@@ -194,10 +170,6 @@ export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Par
         window.api.ui.set({ collapsedGroups: [...next] }).catch(console.error)
         return { collapsedGroups: next }
       }),
-    setCollapsedGroups: (keys) => {
-      set({ collapsedGroups: keys })
-      window.api.ui.set({ collapsedGroups: [...keys] }).catch(console.error)
-    },
 
     worktreeCardProperties: [...DEFAULT_WORKTREE_CARD_PROPERTIES],
     _worktreeCardModeDefaulted: true,
@@ -223,11 +195,6 @@ export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Par
       window.api.ui
         .set({ worktreeCardProperties: normalized, _worktreeCardModeDefaulted: false })
         .catch(console.error)
-    },
-    showAgentModels: true,
-    setShowAgentModels: (show) => {
-      set({ showAgentModels: show })
-      window.api.ui.set({ showAgentModels: show }).catch(console.error)
     },
     agentActivityDisplayMode: DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE,
     setAgentActivityDisplayMode: (mode) => {
@@ -298,12 +265,6 @@ export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Par
         usagePercentageDisplay: normalized,
         usagePercentageDisplayChangeNoticeDismissed: true
       })
-    },
-    statusBarUsageFormat: { ...DEFAULT_STATUS_BAR_USAGE_FORMAT },
-    setStatusBarUsageFormat: (format) => {
-      const normalized = normalizeStatusBarUsageFormat(format)
-      window.api.ui.set({ statusBarUsageFormat: normalized }).catch(console.error)
-      set({ statusBarUsageFormat: normalized })
     },
     statusBarUsageMode: DEFAULT_STATUS_BAR_USAGE_MODE,
     setStatusBarUsageMode: (mode) => {

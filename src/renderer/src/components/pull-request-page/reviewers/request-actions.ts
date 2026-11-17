@@ -1,19 +1,20 @@
 import { toast } from 'sonner'
-import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import {
   normalizeGitHubReviewerLogins,
   parseGitHubReviewerInputLogins
-} from '../../../../../shared/github/pull-requests/pr-reviewer-display'
+} from '../../../../../shared/github/pr-reviewer-display'
 import { notifyWorkItemDetailsMutation } from '@/components/github/github-work-item-comment-mutations'
 import { buildRequestedReviewUsers } from '@/components/github/work-item-state-presentation'
-import { getGitHubRuntimeRepoId } from '@/lib/work-items/github/github-source-runtime-context'
+import { getGitHubRuntimeRepoId } from '@/lib/github-source-runtime-context'
 import { translate } from '@/i18n/i18n'
-import type { GitHubAssignableUser } from '../../../../../shared/github/pull-requests/pull-request-types'
-import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../../shared/github/repositories/repository-identity'
-import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
-import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
-import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
-import { codeHostErrorText } from '@/lib/source-control/remote/code-host-error-copy'
+import type {
+  GitHubAssignableUser,
+  GitHubOwnerRepo
+} from '../../../../../shared/github/pull-request-types'
+import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
+import type { TaskSourceContext } from '../../../../../shared/task-source-context'
+import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
 
 const MAX_REQUESTED_REVIEWERS = 15
 
@@ -40,7 +41,6 @@ type ReviewerRequestActionsArgs = {
     options?: { sourceContext?: TaskSourceContext | null }
   ) => void
   onReviewersRequested: (reviewRequests: GitHubAssignableUser[]) => void
-  onMutated: () => void
   scheduleReviewerInputFocus: () => void
 }
 
@@ -110,7 +110,7 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
       }
       if (!result.ok) {
         toast.error(
-          codeHostErrorText(result) ??
+          result.error ??
             translate('auto.components.PullRequestPage.2560588245', 'Failed to request reviewer')
         )
         return
@@ -155,8 +155,6 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
       if (args.reviewerPanelMountedRef.current) {
         args.setSubmitting(false)
       }
-      // Why: a failed response doesn't prove the host kept the old reviewers; reread on every attempted write.
-      args.onMutated()
     }
   }
 
@@ -213,7 +211,7 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
       }
       if (!result.ok) {
         toast.error(
-          codeHostErrorText(result) ??
+          result.error ??
             translate('auto.components.PullRequestPage.c798fa0ec7', 'Failed to remove reviewer')
         )
         return
@@ -257,7 +255,6 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
       if (args.reviewerPanelMountedRef.current) {
         args.setSubmitting(false)
       }
-      args.onMutated()
     }
   }
 

@@ -1,12 +1,9 @@
 import { readFileSync } from 'node:fs'
-import { browserCookieImportFailure } from '../../../../shared/browser/cookies/browser-cookie-import-failure-copy'
-import type { BrowserCookieImportResult } from '../../../../shared/browser/workspaces/browser-workspace-types'
+import type { BrowserCookieImportResult } from '../../../../shared/browser-workspace-types'
 import { decodeSafariBinaryCookies } from './browser-cookie-safari-parser'
-import { importValidatedCookies } from '../imports/import-validated-cookies'
-import { cookieImportTarget } from '../storage/browser-cookie-session-target'
-import type { DetectedBrowser } from './browser-cookie-source-profiles'
+import { importValidatedCookies, cookieImportTarget } from '../browser-cookie-import-pipeline'
+import type { DetectedBrowser } from './browser-cookie-detection-types'
 import { diag } from '../browser-cookie-import-diagnostics'
-import { isMacPrivacyDenial } from './browser-cookie-macos-privacy-denial'
 
 export async function importCookiesFromSafari(
   browser: DetectedBrowser,
@@ -19,10 +16,17 @@ export async function importCookiesFromSafari(
     data = readFileSync(browser.cookiesPath)
   } catch (err) {
     diag(`  Safari read failed: ${String(err)}`)
-    if (isMacPrivacyDenial(err)) {
-      return browserCookieImportFailure('safariFullDiskAccess')
+    // Safari’s sandboxed cookie file requires Full Disk Access.
+    const isPermError =
+      err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EPERM'
+    if (isPermError) {
+      return {
+        ok: false,
+        reason:
+          'macOS denied access to Safari cookies. Grant Full Disk Access to Orca in System Settings → Privacy & Security → Full Disk Access.'
+      }
     }
-    return browserCookieImportFailure('readFailed', { browser: 'Safari' })
+    return { ok: false, reason: 'Could not read Safari cookies.' }
   }
 
   try {
@@ -30,19 +34,19 @@ export async function importCookiesFromSafari(
     diag(`  Safari source has ${cookies.length} cookies`)
 
     if (cookies.length === 0) {
-      return browserCookieImportFailure('noCookies', { browser: 'Safari' })
+      return { ok: false, reason: 'No cookies found in Safari.' }
     }
 
     const now = Math.floor(Date.now() / 1000)
     const valid = cookies.filter((c) => !c.expirationDate || c.expirationDate > now)
 
     if (valid.length === 0) {
-      return browserCookieImportFailure('allCookiesExpired', { browser: 'Safari' })
+      return { ok: false, reason: 'All Safari cookies are expired.' }
     }
 
-    return await importValidatedCookies(valid, cookies.length, cookieImportTarget(targetPartition))
+    return importValidatedCookies(valid, cookies.length, cookieImportTarget(targetPartition))
   } catch (err) {
     diag(`  Safari import failed: ${String(err)}`)
-    return browserCookieImportFailure('importFailed', { browser: 'Safari' })
+    return { ok: false, reason: 'Could not import cookies from Safari.' }
   }
 }

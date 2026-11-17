@@ -3,10 +3,6 @@ import { RemoteBrowserStreamLifecycle } from './remote-browser-stream-lifecycle'
 import type { RemoteBrowserPageHandle, RemoteBrowserRpcCall } from './remote-browser-page-session'
 import type { RemoteBrowserScreencastSubscribe } from './remote-browser-screencast-subscription'
 import type { RemoteBrowserViewportSize } from './remote-browser-stream-tokens'
-import type {
-  BrowserJavaScriptDialogAnswer,
-  BrowserJavaScriptDialogPrompt
-} from '../../../../../shared/browser/prompts/browser-javascript-dialog'
 import {
   canReconnectRemoteBrowserStream,
   isRemoteBrowserStreamBusy,
@@ -44,14 +40,6 @@ export type FakeScreencastStream = {
   emitResponseFailure: (code: string, message: string) => void
   emitTransportError: (code: string, message: string) => void
   emitClose: () => void
-  emitDialog: (dialogType: string, message: string) => void
-  emitDialogClosed: () => void
-}
-
-export type DialogAsk = {
-  dialog: BrowserJavaScriptDialogPrompt
-  signal: AbortSignal
-  answer: (answer: BrowserJavaScriptDialogAnswer | null) => void
 }
 
 export function rpcError(code: string, message: string): Error {
@@ -71,8 +59,6 @@ export function createHarness() {
   const closedPages: (string | null)[] = []
   const streams: FakeScreencastStream[] = []
   const rpcLog: string[] = []
-  const rpcParams = new Map<string, unknown>()
-  const dialogAsks: DialogAsk[] = []
 
   let capabilities: string[] = ['browser.screencast.v1']
   let storedHandle: RemoteBrowserPageHandle | null = null
@@ -89,7 +75,6 @@ export function createHarness() {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fake answers each method with the reply shape its caller reads.
   const callRpc = (async (_target: unknown, method: string, params?: { page?: string }) => {
     rpcLog.push(method)
-    rpcParams.set(method, params)
     if (method === 'status.get') {
       if (statusGate) {
         const gate = statusGate
@@ -167,9 +152,7 @@ export function createHarness() {
           _meta: { runtimeId: 'runtime-1' }
         }),
       emitTransportError: (code, message) => callbacks.onError?.({ code, message }),
-      emitClose: () => callbacks.onClose?.(),
-      emitDialog: (dialogType, message) => respond({ type: 'dialog', dialogType, message }),
-      emitDialogClosed: () => respond({ type: 'dialogClosed' })
+      emitClose: () => callbacks.onClose?.()
     }
     streams.push(stream)
     return {
@@ -190,7 +173,6 @@ export function createHarness() {
     callRpc,
     subscribeScreencast,
     getWorktreeSelector: () => 'worktree:wt-1',
-    readCurrentObservation: () => [],
     getCurrentUrl: () => 'https://example.test/',
     readStoredHandle: () => storedHandle,
     writeStoredHandle: (handle) => {
@@ -211,8 +193,6 @@ export function createHarness() {
     },
     readViewportSize: () => viewportSize,
     syncViewport: async () => {},
-    askJavaScriptDialog: (dialog, signal) =>
-      new Promise((answer) => dialogAsks.push({ dialog, signal, answer })),
     getDeviceScaleFactor: () => 1,
     setStatus: (status) => statusLog.push(status),
     clearFrame: () => {},
@@ -227,8 +207,6 @@ export function createHarness() {
     closedPages,
     streams,
     rpcLog,
-    dialogAsks,
-    rpcParams: (method: string): unknown => rpcParams.get(method),
     get subscribeAttempts(): number {
       return subscribeAttempts
     },

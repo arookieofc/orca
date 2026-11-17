@@ -3,10 +3,10 @@ import { Github, Gitlab, Plus } from 'lucide-react'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { CommandItem } from '@/components/ui/command'
-import { CREATE_WORKTREE_ITEM_ID } from '@/lib/workspace/search/worktrees/worktree-palette-create-action'
-import type { CmdJTaskUrlCreatePreview } from '@/lib/workspace/search/worktrees/worktree-palette-task-url-match'
+import { CREATE_WORKTREE_ITEM_ID } from '@/lib/worktree-palette-create-action'
+import type { CmdJTaskUrlCreatePreview } from '@/lib/worktree-palette-task-url-match'
 import type { LinearIssue } from '../../../../shared/linear/issue-types'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 function TaskUrlProviderIcon({
   provider
@@ -41,20 +41,21 @@ export function PaletteCreateWorktreeRow({
   taskUrlPreview: CmdJTaskUrlCreatePreview | null
   onSelect: () => void
 }): React.JSX.Element {
-  const t = useTranslate()
   const showLinearPreview = linearPending || linearIssue !== null
   const linearPreviewLabel = linearIssue
-    ? t(
+    ? translate(
         'worktreeJumpPalette.linearIssue.createLabel',
         'Create worktree from Linear issue {{value0}}: {{value1}}',
         { value0: linearIssue.identifier, value1: linearIssue.title }
       )
     : linearPending && showLinearLoadingFeedback
-      ? t('worktreeJumpPalette.linearIssue.loadingLabel', 'Loading Linear issue {{value0}}', {
-          value0: linearIdentifier ?? ''
-        })
+      ? translate(
+          'worktreeJumpPalette.linearIssue.loadingLabel',
+          'Loading Linear issue {{value0}}',
+          { value0: linearIdentifier ?? '' }
+        )
       : linearPending
-        ? t(
+        ? translate(
             'worktreeJumpPalette.linearIssue.pendingLabel',
             'Create worktree from Linear issue {{value0}}',
             { value0: linearIdentifier ?? '' }
@@ -115,11 +116,11 @@ export function PaletteCreateWorktreeRow({
             </div>
             <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
               {linearIssue || !showLinearLoadingFeedback
-                ? t(
+                ? translate(
                     'worktreeJumpPalette.linearIssue.createHint',
                     'Create worktree from Linear issue'
                   )
-                : t('worktreeJumpPalette.linearIssue.loadingHint', 'Loading Linear issue…')}
+                : translate('worktreeJumpPalette.linearIssue.loadingHint', 'Loading Linear issue…')}
             </div>
           </div>
         </>
@@ -139,12 +140,14 @@ export function PaletteCreateWorktreeRow({
             </div>
             <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
               {taskUrlPreview.loading && showTaskUrlLoadingFeedback
-                ? t('worktreeJumpPalette.taskUrl.loadingHint', 'Loading {{value0}}…', {
+                ? translate('worktreeJumpPalette.taskUrl.loadingHint', 'Loading {{value0}}…', {
                     value0: taskUrlPreview.kindLabel
                   })
-                : t('worktreeJumpPalette.taskUrl.createHint', 'Create worktree from {{value0}}', {
-                    value0: taskUrlPreview.kindLabel
-                  })}
+                : translate(
+                    'worktreeJumpPalette.taskUrl.createHint',
+                    'Create worktree from {{value0}}',
+                    { value0: taskUrlPreview.kindLabel }
+                  )}
             </div>
           </div>
         </>
@@ -155,9 +158,11 @@ export function PaletteCreateWorktreeRow({
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-semibold tracking-[-0.01em] text-foreground">
-              {t('auto.components.WorktreeJumpPalette.95be6587d3', 'Create worktree "{{value0}}"', {
-                value0: createWorktreeName
-              })}
+              {translate(
+                'auto.components.WorktreeJumpPalette.95be6587d3',
+                'Create worktree "{{value0}}"',
+                { value0: createWorktreeName }
+              )}
             </div>
           </div>
         </>

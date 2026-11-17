@@ -38,7 +38,7 @@ export async function seedAccumulatedWorkspaceFixture(
   const config = normalizeAccumulatedWorkspaceFixtureOptions(options)
   const seed = buildAccumulatedWorkspaceSeed(config)
   return page.evaluate(
-    ({ config, seed, fullAgentRows }) => {
+    ({ config, seed }) => {
       const store = window.__store
       if (!store) {
         throw new Error('store unavailable')
@@ -51,12 +51,6 @@ export async function seedAccumulatedWorkspaceFixture(
       }
       const worktreesByRepo = { ...before.worktreesByRepo, ...seed.worktreesByRepo }
       store.setState((current) => ({
-        ...(fullAgentRows
-          ? {
-              worktreeCardProperties: ['status', 'inline-agents'],
-              agentActivityDisplayMode: 'full' as const
-            }
-          : {}),
         repos: [...current.repos, ...seed.repos],
         worktreesByRepo,
         tabsByWorktree: { ...current.tabsByWorktree, ...seed.tabsByWorktree },
@@ -111,7 +105,7 @@ export async function seedAccumulatedWorkspaceFixture(
         }
       }
       const syntheticStatuses = Object.fromEntries(
-        Array.from(store.getState().agentStatusByPaneKey.entries()).filter(([paneKey]) =>
+        Object.entries(store.getState().agentStatusByPaneKey).filter(([paneKey]) =>
           paneKey.startsWith('synthetic-tab-')
         )
       )
@@ -132,8 +126,6 @@ export async function seedAccumulatedWorkspaceFixture(
       serializedBytes.total = byteLength(serializedSlices)
       target.__accumulatedFixtureCleanup = () => {
         store.setState({
-          worktreeCardProperties: before.worktreeCardProperties,
-          agentActivityDisplayMode: before.agentActivityDisplayMode,
           repos: before.repos,
           worktreesByRepo: before.worktreesByRepo,
           tabsByWorktree: before.tabsByWorktree,
@@ -173,7 +165,7 @@ export async function seedAccumulatedWorkspaceFixture(
         serializedBytes
       }
     },
-    { config, seed, fullAgentRows: process.env.ORCA_TYPING_BENCH_AGENT_ROWS === 'full' }
+    { config, seed }
   )
 }
 

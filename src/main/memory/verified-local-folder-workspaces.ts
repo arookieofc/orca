@@ -1,13 +1,10 @@
-import {
-  getRepoExecutionHostId,
-  parseExecutionHostId
-} from '../../shared/execution-host/execution-host'
+import { getRepoExecutionHostId, parseExecutionHostId } from '../../shared/execution-host'
 import {
   findFolderWorkspaceCandidateRepos,
   resolveFolderWorkspaceHost,
   type FolderWorkspaceHostState
-} from '../../shared/folder-workspaces/folder-workspace-execution-host'
-import { folderWorkspaceKey } from '../../shared/workspace/identity/workspace-scope'
+} from '../../shared/folder-workspace-execution-host'
+import { folderWorkspaceKey } from '../../shared/workspace-scope'
 
 export function getVerifiedLocalFolderWorkspaceKeys(state: FolderWorkspaceHostState): Set<string> {
   const counts = new Map<string, number>()

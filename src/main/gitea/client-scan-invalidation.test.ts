@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../git/command-runner/git-exec-file', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock('../git/runner', () => ({
   gitExecFileAsync: vi.fn(async () => ({
     stdout: 'https://git.example.com/team/repo.git\n',
     stderr: ''

@@ -1,12 +1,9 @@
-import {
-  compareAppVersions,
-  isValidAppVersion
-} from '../../../shared/app-lifecycle/identity/app-version'
+import { compareAppVersions, isValidAppVersion } from '../../../shared/app-version'
 import type { OrcadActivationRecord } from '../activation/orcad-activation-record'
 import {
   refuseOrcadHostDowngrade,
   type OrcadHostVersionRefusal
-} from '../activation/orcad-host-version-admission'
+} from '../../ssh/orcad-host-version-admission'
 
 export type ManagedOrcadAutoUpdateSkip =
   | 'current'

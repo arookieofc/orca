@@ -1,5 +1,5 @@
-import type { CreateHostedReviewResult } from '../../../../shared/source-control/hosted-review/hosted-review-contracts'
-import { extractExecError } from '../../../git/command-runner/process-capture/exec-error'
+import type { CreateHostedReviewResult } from '../../../../shared/hosted-review'
+import { extractExecError } from '../../../git/exec-error'
 export function classifyCreatePRError(error: unknown): CreateHostedReviewResult {
   const { stderr, stdout } = extractExecError(error)
   const message = `${stderr}\n${stdout}`.trim()
@@ -18,24 +18,21 @@ export function classifyCreatePRError(error: unknown): CreateHostedReviewResult 
       ok: false,
       code: 'auth_required',
       error:
-        'Create PR failed: GitHub is not authenticated. Next step: run gh auth login in this environment.',
-      reason: 'auth_required'
+        'Create PR failed: GitHub is not authenticated. Next step: run gh auth login in this environment.'
     }
   }
   if (lower.includes('already exists') || lower.includes('a pull request already exists')) {
     return {
       ok: false,
       code: 'already_exists',
-      error: 'A pull request already exists for this branch.',
-      reason: 'existing_review'
+      error: 'A pull request already exists for this branch.'
     }
   }
   if (lower.includes('timed out') || lower.includes('timeout')) {
     return {
       ok: false,
       code: 'unknown_completion',
-      error: 'PR creation may have completed. Refreshing branch review state...',
-      reason: 'creation_unconfirmed'
+      error: 'PR creation may have completed. Refreshing branch review state...'
     }
   }
   if (lower.includes('validation failed') || lower.includes('http 422')) {
@@ -43,15 +40,13 @@ export function classifyCreatePRError(error: unknown): CreateHostedReviewResult 
       ok: false,
       code: 'validation',
       error:
-        'Create PR failed: GitHub rejected the pull request. Check the base branch and branch state, then try again.',
-      reason: 'rejected'
+        'Create PR failed: GitHub rejected the pull request. Check the base branch and branch state, then try again.'
     }
   }
   return {
     ok: false,
     code: 'unknown',
-    error: 'Create PR failed: GitHub could not create the pull request. Try again in a moment.',
-    reason: 'create_failed'
+    error: 'Create PR failed: GitHub could not create the pull request. Try again in a moment.'
   }
 }
 

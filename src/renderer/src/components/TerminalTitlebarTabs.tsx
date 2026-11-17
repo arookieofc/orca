@@ -1,7 +1,6 @@
 import { createPortal } from 'react-dom'
-import type { TerminalTab } from '../../../shared/workspace-layout/terminal-tab-types'
+import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import { useAppStore } from '../store'
-import { selectActiveTabForWorktree } from '../store/slices/tabs/active-tab-selection'
 import TabBar from './tab-bar/TabBar'
 import type { TerminalController } from './use-terminal-controller'
 
@@ -58,11 +57,6 @@ export function TerminalTitlebarTabs({
     worktreeClientHostedBrowserRows,
     worktreeFiles
   } = controller
-  const activeSimulatorTabId = useAppStore((state) =>
-    activeTabType === 'simulator' && renderedActiveWorktreeId
-      ? (selectActiveTabForWorktree(state, renderedActiveWorktreeId)?.id ?? null)
-      : null
-  )
   if (!renderedActiveWorktreeId || effectiveActiveLayout || !titlebarTabsTarget) {
     return null
   }
@@ -71,7 +65,7 @@ export function TerminalTitlebarTabs({
       activeTabId={activeTabId}
       worktreeId={renderedActiveWorktreeId}
       onActivate={handleActivateTab}
-      onClose={(tabId) => handleCloseTab(tabId, 'user')}
+      onClose={handleCloseTab}
       onCloseOthers={handleCloseOthers}
       onCloseToRight={handleCloseTabsToRight}
       onCloseToLeft={handleCloseTabsToLeft}
@@ -90,7 +84,11 @@ export function TerminalTitlebarTabs({
       clientHostedBrowserRows={worktreeClientHostedBrowserRows}
       activeFileId={activeFileId}
       activeBrowserTabId={activeBrowserTabId}
-      activeSimulatorTabId={activeSimulatorTabId}
+      activeSimulatorTabId={
+        activeTabType === 'simulator' && renderedActiveWorktreeId
+          ? (useAppStore.getState().getActiveTab(renderedActiveWorktreeId)?.id ?? null)
+          : null
+      }
       activeTabType={activeTabType}
       onActivateFile={(fileId) => {
         const unifiedTabs =

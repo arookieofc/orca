@@ -1,10 +1,6 @@
-import { usageFailureMessage } from './usage-failure-message'
-import { useUsageObservation } from '../../store/slices/usage/use-usage-observation'
+import { useEffect } from 'react'
 import { Activity, Brain, Coins, DatabaseZap, FolderKanban, Sparkles } from 'lucide-react'
-import type {
-  CodexUsageRange,
-  CodexUsageScope
-} from '../../../../shared/agent-usage/analytics/codex-usage-types'
+import type { CodexUsageRange, CodexUsageScope } from '../../../../shared/codex-usage-types'
 import { useAppStore } from '../../store'
 import { ClaudeUsageLoadingState } from './ClaudeUsageLoadingState'
 import { CodexUsageDetails } from './CodexUsageDetails'
@@ -14,7 +10,6 @@ import { UsageFilterRadioGroup, UsageTrackingPaneShell } from './UsageTrackingPa
 import { formatCost, formatTokens, formatUpdatedAt } from './usage-formatters'
 import { unpricedCostLabel } from './unpriced-cost-label'
 import { translate } from '@/i18n/i18n'
-import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 
 const RANGE_OPTIONS: CodexUsageRange[] = ['7d', '30d', '90d', 'all']
 const SCOPE_OPTIONS: { value: CodexUsageScope; label: string }[] = [
@@ -47,11 +42,7 @@ const RANGE_LABELS: Record<CodexUsageRange, string> = {
 }
 
 export function CodexUsagePane(): React.JSX.Element {
-  const t = useTranslate()
-  const intlLocale = useIntlLocale()
   const scanState = useAppStore((state) => state.codexUsageScanState)
-  const failure = useAppStore((state) => state.codexUsageFailure)
-  const failureMessage = usageFailureMessage(failure, t)
   const summary = useAppStore((state) => state.codexUsageSummary)
   const daily = useAppStore((state) => state.codexUsageDaily)
   const modelBreakdown = useAppStore((state) => state.codexUsageModelBreakdown)
@@ -59,22 +50,24 @@ export function CodexUsagePane(): React.JSX.Element {
   const recentSessions = useAppStore((state) => state.codexUsageRecentSessions)
   const scope = useAppStore((state) => state.codexUsageScope)
   const range = useAppStore((state) => state.codexUsageRange)
-  const observeCodexUsage = useAppStore((state) => state.observeCodexUsage)
+  const fetchCodexUsage = useAppStore((state) => state.fetchCodexUsage)
   const setCodexUsageEnabled = useAppStore((state) => state.setCodexUsageEnabled)
   const refreshCodexUsage = useAppStore((state) => state.refreshCodexUsage)
   const setCodexUsageScope = useAppStore((state) => state.setCodexUsageScope)
   const setCodexUsageRange = useAppStore((state) => state.setCodexUsageRange)
   const recordFeatureInteraction = useAppStore((state) => state.recordFeatureInteraction)
 
-  useUsageObservation(observeCodexUsage)
+  useEffect(() => {
+    void fetchCodexUsage()
+  }, [fetchCodexUsage])
 
   const handleSetEnabled = (enabled: boolean): void => {
     recordFeatureInteraction('usage-tracking')
     void setCodexUsageEnabled(enabled)
   }
 
-  const title = t('auto.components.stats.CodexUsagePane.408210470c', 'Codex Usage Tracking')
-  const enableLabel = t(
+  const title = translate('auto.components.stats.CodexUsagePane.408210470c', 'Codex Usage Tracking')
+  const enableLabel = translate(
     'auto.components.stats.CodexUsagePane.f7c1affbd5',
     'Enable Codex usage analytics'
   )
@@ -83,11 +76,8 @@ export function CodexUsagePane(): React.JSX.Element {
     return (
       <UsageTrackingPaneShell
         enabled={false}
-        failure={failureMessage}
-        stateKnown={scanState !== null}
-        retry={{ label: t('usage.failure.retry', 'Refresh'), onRefresh: refreshCodexUsage }}
         title={title}
-        disabledDescription={t(
+        disabledDescription={translate(
           'auto.components.stats.CodexUsagePane.13badcd8f2',
           'Reads local Codex usage logs to show token, model, and session stats.'
         )}
@@ -97,11 +87,7 @@ export function CodexUsagePane(): React.JSX.Element {
     )
   }
 
-  if (
-    !failureMessage &&
-    !summary &&
-    (scanState.isScanning || scanState.lastScanCompletedAt === null)
-  ) {
+  if (!summary && (scanState.isScanning || scanState.lastScanCompletedAt === null)) {
     return (
       <ClaudeUsageLoadingState
         title={title}
@@ -113,21 +99,19 @@ export function CodexUsagePane(): React.JSX.Element {
 
   const hasAnyData = summary?.hasAnyCodexData ?? scanState.hasAnyCodexData
   const costCardLabel = unpricedCostLabel(
-    t('auto.components.stats.CodexUsagePane.1a18fbd56b', 'Est. API-equivalent cost'),
-    summary,
-    t
+    translate('auto.components.stats.CodexUsagePane.1a18fbd56b', 'Est. API-equivalent cost'),
+    summary
   )
 
   return (
     <UsageTrackingPaneShell
       enabled
-      failure={failureMessage}
       title={title}
       status={
         <>
-          {formatUpdatedAt(scanState.lastScanCompletedAt, t, intlLocale)}
+          {formatUpdatedAt(scanState.lastScanCompletedAt)}
           {scanState.lastScanError
-            ? t(
+            ? translate(
                 'auto.components.stats.CodexUsagePane.8a6655f7a2',
                 ' • Last scan error: {{value0}}',
                 { value0: scanState.lastScanError }
@@ -138,21 +122,27 @@ export function CodexUsagePane(): React.JSX.Element {
       isRefreshing={scanState.isScanning}
       hasData={hasAnyData}
       enableLabel={enableLabel}
-      optionsLabel={t('auto.components.stats.CodexUsagePane.70b5b8581f', 'Codex usage options')}
-      filtersLabel={t('auto.components.stats.CodexUsagePane.1af1a39b2f', 'Filters')}
-      refreshAriaLabel={t('auto.components.stats.CodexUsagePane.ec4d270e2c', 'Refresh Codex usage')}
-      refreshLabel={t('auto.components.stats.CodexUsagePane.3022cda443', 'Refresh')}
+      optionsLabel={translate(
+        'auto.components.stats.CodexUsagePane.70b5b8581f',
+        'Codex usage options'
+      )}
+      filtersLabel={translate('auto.components.stats.CodexUsagePane.1af1a39b2f', 'Filters')}
+      refreshAriaLabel={translate(
+        'auto.components.stats.CodexUsagePane.ec4d270e2c',
+        'Refresh Codex usage'
+      )}
+      refreshLabel={translate('auto.components.stats.CodexUsagePane.3022cda443', 'Refresh')}
       filterSections={[
         <UsageFilterRadioGroup
           key="scope"
-          label={t('auto.components.stats.CodexUsagePane.6d68e8399a', 'Scope')}
+          label={translate('auto.components.stats.CodexUsagePane.6d68e8399a', 'Scope')}
           value={scope}
           options={SCOPE_OPTIONS}
           onValueChange={(value) => void setCodexUsageScope(value)}
         />,
         <UsageFilterRadioGroup
           key="range"
-          label={t('auto.components.stats.CodexUsagePane.89162e019b', 'Range')}
+          label={translate('auto.components.stats.CodexUsagePane.89162e019b', 'Range')}
           value={range}
           options={RANGE_OPTIONS.map((value) => ({ value, label: RANGE_LABELS[value] }))}
           onValueChange={(value) => void setCodexUsageRange(value)}
@@ -163,7 +153,7 @@ export function CodexUsagePane(): React.JSX.Element {
           {SCOPE_OPTIONS.find((option) => option.value === scope)?.label} • {RANGE_LABELS[range]}
         </>
       }
-      emptyMessage={t(
+      emptyMessage={translate(
         'auto.components.stats.CodexUsagePane.4c865393b4',
         'No local Codex usage found yet for this scope.'
       )}
@@ -178,28 +168,31 @@ export function CodexUsagePane(): React.JSX.Element {
       <>
         <div className="grid gap-3 md:grid-cols-3">
           <StatCard
-            label={t('auto.components.stats.CodexUsagePane.e365eaa6fd', 'Input tokens')}
-            value={formatTokens(summary?.inputTokens ?? 0, intlLocale)}
+            label={translate('auto.components.stats.CodexUsagePane.e365eaa6fd', 'Input tokens')}
+            value={formatTokens(summary?.inputTokens ?? 0)}
             icon={<Sparkles className="size-4" />}
           />
           <StatCard
-            label={t('auto.components.stats.CodexUsagePane.5d8eba87bd', 'Output tokens')}
-            value={formatTokens(summary?.outputTokens ?? 0, intlLocale)}
+            label={translate('auto.components.stats.CodexUsagePane.5d8eba87bd', 'Output tokens')}
+            value={formatTokens(summary?.outputTokens ?? 0)}
             icon={<Activity className="size-4" />}
           />
           <StatCard
-            label={t('auto.components.stats.CodexUsagePane.a9ac0f423a', 'Cached input')}
-            value={formatTokens(summary?.cachedInputTokens ?? 0, intlLocale)}
+            label={translate('auto.components.stats.CodexUsagePane.a9ac0f423a', 'Cached input')}
+            value={formatTokens(summary?.cachedInputTokens ?? 0)}
             icon={<DatabaseZap className="size-4" />}
           />
           <StatCard
-            label={t('auto.components.stats.CodexUsagePane.6e18146e9b', 'Reasoning output')}
-            value={formatTokens(summary?.reasoningOutputTokens ?? 0, intlLocale)}
+            label={translate('auto.components.stats.CodexUsagePane.6e18146e9b', 'Reasoning output')}
+            value={formatTokens(summary?.reasoningOutputTokens ?? 0)}
             icon={<Brain className="size-4" />}
           />
           <StatCard
-            label={t('auto.components.stats.CodexUsagePane.907b31865f', 'Sessions / Events')}
-            value={`${(summary?.sessions ?? 0).toLocaleString(intlLocale)} / ${(summary?.events ?? 0).toLocaleString(intlLocale)}`}
+            label={translate(
+              'auto.components.stats.CodexUsagePane.907b31865f',
+              'Sessions / Events'
+            )}
+            value={`${(summary?.sessions ?? 0).toLocaleString()} / ${(summary?.events ?? 0).toLocaleString()}`}
             icon={<FolderKanban className="size-4" />}
           />
           <StatCard
@@ -209,7 +202,7 @@ export function CodexUsagePane(): React.JSX.Element {
           />
         </div>
         <p className="px-1 text-xs text-muted-foreground">
-          {t(
+          {translate(
             'auto.components.stats.CodexUsagePane.94ac1f1ee7',
             'Reasoning tokens are shown for visibility, but cost is calculated from uncached input, cached input, and output only.'
           )}

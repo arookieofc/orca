@@ -2,81 +2,76 @@ import { copyChatMathSelection } from '../sidebar/chat-markdown-math-selection'
 import {
   nativeChatTranscriptOuterClass,
   NATIVE_CHAT_TRANSCRIPT_COLUMN_CLASS
-} from './appearance/native-chat-appearance-style'
-import { NativeChatJumpToLatest } from './viewport/scroll/NativeChatJumpToLatest'
-import { NativeChatNewRowsAnnouncement } from './viewport/new-rows/NativeChatNewRowsMarker'
-import { useNativeChatNewRowsMarker } from './viewport/new-rows/native-chat-new-rows-marker'
-import { withoutPullRequestEventRows } from '../../../../shared/native-chat/transcript/notices/native-chat-pull-request-event'
-import { useNativeChatRowTypography } from './viewport/virtualization/use-native-chat-row-typography'
+} from './native-chat-appearance-style'
+import { NativeChatJumpToLatest } from './NativeChatJumpToLatest'
+import { NativeChatNewRowsAnnouncement } from './NativeChatNewRowsMarker'
+import { useNativeChatRowTypography } from './use-native-chat-row-typography'
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { useAppStore } from '@/store'
-import {
-  nativeChatShowsCiResultLines,
-  nativeChatShowsTurnDiffSummary
-} from '../../../../shared/native-chat/settings/native-chat-appearance-settings'
-import type { NativeChatLiveSession } from './session/terminal/read/native-chat-live-session-contract'
-import { useNativeChatTranscriptProjection } from './conversation/projection/use-native-chat-transcript-projection'
-import { useNativeChatQuestionReceipts } from './conversation/projection/use-native-chat-question-receipts'
-import { nativeChatTaskListPredecessors } from '../../../../shared/native-chat/input/task-lists/native-chat-task-list-history'
-import { NativeChatDockedTaskList } from './tools/tasks/NativeChatDockedTaskList'
-import { useNativeChatTurnStatus } from './conversation/turns/use-native-chat-turn-status'
-import { NativeChatAwaitingInputRow } from './prompts/NativeChatAwaitingInputRow'
-import type { RuntimeFileOperationArgs } from '@/runtime/files/runtime-file-client-types'
-import type { NativeChatTurnActivity } from '../../../../shared/native-chat/transcript/turns/native-chat-turn-activity'
-import { NativeChatTurnActivityLine } from './messages/reasoning/NativeChatTurnActivityLine'
+import type { CommentMarkdownLinkClickHandler } from '@/components/sidebar/CommentMarkdown'
+import { translate } from '@/i18n/i18n'
+import type { NativeChatLiveSession } from './use-native-chat-live-session'
+import { useNativeChatTranscriptProjection } from './use-native-chat-transcript-projection'
+import { structuredQuestionTranscript } from '../../../../shared/structured-agent-question-projection'
+import { nativeChatTaskListPredecessors } from '../../../../shared/native-chat/input/native-chat-task-list-history'
+import { NativeChatDockedTaskList } from './NativeChatDockedTaskList'
+import { useNativeChatTurnStatus } from './use-native-chat-turn-status'
+import { NativeChatAwaitingInputRow } from './NativeChatAwaitingInputRow'
+import type { RuntimeFileOperationArgs } from '@/runtime/runtime-file-client-types'
+import type { NativeChatTurnActivity } from '../../../../shared/native-chat-turn-activity'
+import { NativeChatTurnActivityLine } from './NativeChatTurnActivityLine'
 import {
   NativeChatDisclosureContext,
   useNativeChatDisclosures
-} from './messages/disclosure/native-chat-disclosure-store'
+} from './native-chat-disclosure-store'
 import {
   NativeChatTranscriptItems,
   NativeChatWaitingTranscriptItems
-} from './viewport/virtualization/NativeChatTranscriptItems'
-import { useNativeChatTranscriptRowContext } from './conversation/slots/use-native-chat-transcript-row-context'
-import type { StructuredAgentSessionHostWork } from './session/structured/use-structured-agent-session-transport-state'
-import type { NativeChatDeliveryNotice } from './messages/rows/NativeChatMessageRow'
-import { splitNativeChatSlotsWaitingBehindLiveTurn } from './conversation/slots/native-chat-transcript-slot-selection'
-import { useNativeChatTranscriptSlots } from './conversation/slots/use-native-chat-transcript-slots'
-import type { NativeChatTimedRow } from './conversation/slots/native-chat-timed-rows'
-import { useNativeChatTranscriptWindow } from './viewport/virtualization/use-native-chat-transcript-window'
-import { useNativeChatHistoryRetention } from './viewport/history/use-native-chat-history-retention'
-import { useNativeChatSubagentScope } from './subagents/use-native-chat-subagent-scope'
-import type { NativeChatSubagentView } from './subagents/native-chat-open-subagent'
-import type { StructuredAgentSubagentRoster } from '../../../../shared/agent-session/view/structured-agent-session-subagent-roster'
-import type { NativeChatTranscriptSlot } from './conversation/slots/native-chat-transcript-slots'
-import { toggleNativeChatExpandedKey } from './messages/disclosure/native-chat-expanded-keys'
+} from './NativeChatTranscriptItems'
+import { useNativeChatTranscriptRowContext } from './use-native-chat-transcript-row-context'
+import type { StructuredAgentSessionHostWork } from './use-structured-agent-session-transport-state'
+import type { NativeChatDeliveryNotice } from './NativeChatMessageRow'
 import {
-  useNativeChatSideChatForkOffer,
-  useNativeChatSideChatForkPointReport
-} from './messages/actions/use-native-chat-side-chat'
-import { useNativeChatTranscriptScroll } from './viewport/scroll/use-native-chat-transcript-scroll'
-import { useNativeChatOlderHistoryAutoload } from './viewport/history/use-native-chat-older-history-autoload'
-import { NativeChatOlderHistoryRow } from './viewport/history/NativeChatOlderHistoryRow'
-import { useNativeChatMessageRail } from './viewport/rail/use-native-chat-message-rail'
-import { NativeChatMessageRail } from './viewport/rail/NativeChatMessageRail'
-import { useNativeChatRailWake } from './viewport/rail/use-native-chat-rail-wake'
-import type { NativeChatRailOutlineEntry } from './viewport/rail/native-chat-message-rail-items'
-import {
-  useNativeChatNavigation,
-  useNativeChatNavigationRequest
-} from './viewport/navigation/use-native-chat-transcript-navigation'
-import { useNativeChatReaderScrollInput } from './viewport/scroll/native-chat-reader-scroll-input'
-import { useNativeChatMessageListHandle } from './messages/actions/use-native-chat-reveal-latest'
+  splitNativeChatSlotsWaitingBehindLiveTurn,
+  nativeChatSlotIndexOf
+} from './native-chat-transcript-slots'
+import { useNativeChatTranscriptSlots } from './use-native-chat-transcript-slots'
+import { useNativeChatTranscriptWindow } from './use-native-chat-transcript-window'
+import { useNativeChatSubagentSections } from './use-native-chat-subagent-sections'
+import { toggleNativeChatExpandedKey } from './native-chat-expanded-keys'
+import { useNativeChatTurnMembership } from './use-native-chat-turn-membership'
+import { useNativeChatTranscriptScroll } from './use-native-chat-transcript-scroll'
+import { useNativeChatNewRowsMarker } from './native-chat-new-rows-marker'
+import { useNativeChatOlderHistoryAutoload } from './use-native-chat-older-history-autoload'
+import { NativeChatOlderHistoryRow } from './NativeChatOlderHistoryRow'
+import { useNativeChatMessageRail } from './use-native-chat-message-rail'
+import { NativeChatMessageRail } from './NativeChatMessageRail'
+import type {
+  NativeChatRailItem,
+  NativeChatRailOutlineEntry
+} from './native-chat-message-rail-items'
+import { useNativeChatRailHistoryJump } from './use-native-chat-rail-history-jump'
+import { useNativeChatRailJumpLanding } from './use-native-chat-rail-jump-landing'
+import { useNativeChatReaderScrollInput } from './native-chat-reader-scroll-input'
+import { useNativeChatMessageListHandle } from './use-native-chat-reveal-latest'
 
 import type {
   AgentJournalRenderItem,
   AgentJournalSubmission
-} from '../../../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentSessionLatestTurn } from '../../../../shared/agent-session/agent-session-wire'
-import { isStructuredAgentSessionThinking } from '../../../../shared/agent-session/view/structured-agent-session-live-turn'
-import type { NativeChatSettledTurns } from '../../../../shared/native-chat/transcript/turns/native-chat-turn-status'
-import { useNativeChatTurnDiffs } from './tools/diffs/use-native-chat-turn-diffs'
-import { useNativeChatTurnOpenedPullRequests } from './tools/pull-requests/use-native-chat-turn-opened-pull-requests'
-import { NativeChatPullRequestChangeContext } from './tools/pull-requests/NativeChatOpenedPullRequestCard'
-import { transcriptTailRow } from './conversation/slots/native-chat-transcript-tail-row'
-import type { NativeChatAwaitingInput } from '../../../../shared/native-chat/transcript/turns/native-chat-terminal-turn'
+} from '../../../../shared/agent-session-journal-types'
+import type { AgentSessionLatestTurn } from '../../../../shared/agent-session-wire'
+import { isStructuredAgentSessionThinking } from '../../../../shared/structured-agent-session-live-turn'
+import type { NativeChatSettledTurns } from '../../../../shared/native-chat-turn-status'
+import type { NativeChatDiffReveal, NativeChatDiffTarget } from './native-chat-turn-diffs'
+import { useMergedNativeChatTurnDiffs, useNativeChatTurnDiffs } from './use-native-chat-turn-diffs'
+import { useNativeChatWatchedTurnDiffs } from './use-native-chat-watched-turn-diffs'
+import { transcriptTailRow } from './native-chat-transcript-tail-row'
 
-const NO_SLOTS: readonly NativeChatTranscriptSlot[] = []
+/** shown prompts have a card in this pane; unshown prompts require input in the agent’s terminal. */
+export type NativeChatAwaitingInput = 'shown' | 'unshown'
+
+type NavigationRequest =
+  | { kind: 'diff'; target: NativeChatDiffReveal }
+  | { kind: 'rail'; messageId: string; requestId: number }
 
 export function NativeChatMessageList({
   ref,
@@ -86,24 +81,22 @@ export function NativeChatMessageList({
   journalLatestTurn: latestTurn,
   journalHostWork: hostWork,
   subagentRoster,
-  subagentView,
   railOutline = null,
   isVisible = true,
   isWorking,
   expandSignal,
+  onLinkClick,
+  allowFileUriLinks = false,
   workingStartedAt,
   settledTurns,
   deliveryNotices,
-  timedRows,
   awaitingInput = null,
   turnActivity,
   stopping = false,
-  runtimeContext,
-  structuredAttachments = false
+  runtimeContext
 }: {
   ref?: Parameters<typeof useNativeChatMessageListHandle>[0]
   session: NativeChatLiveSession
-  structuredAttachments?: boolean
   journalItems?: readonly AgentJournalRenderItem[]
   /** With the items, what places each row in its turn (structured lane). */
   journalSubmissions?: readonly AgentJournalSubmission[]
@@ -112,9 +105,7 @@ export function NativeChatMessageList({
   /** The host's prompts still waiting on the person and its working answer (an older host: none). */
   journalHostWork?: StructuredAgentSessionHostWork
   /** Every subagent the session's rosters named, whether or not its roster row is loaded. */
-  subagentRoster?: StructuredAgentSubagentRoster
-  /** The subagent shown in place of the conversation (its own rows, no turns), and how to open one. */
-  subagentView?: NativeChatSubagentView
+  subagentRoster?: Parameters<typeof useNativeChatSubagentSections>[2]
   /** User messages older than the loaded window, from the host's outline. */
   railOutline?: readonly NativeChatRailOutlineEntry[] | null
   isVisible?: boolean
@@ -124,9 +115,9 @@ export function NativeChatMessageList({
   workingStartedAt?: number | null
   /** Host durations by prompt id; otherwise fall back to a duration observed locally. */
   settledTurns?: NativeChatSettledTurns
+  onLinkClick?: CommentMarkdownLinkClickHandler
+  allowFileUriLinks?: boolean
   deliveryNotices?: ReadonlyMap<string, NativeChatDeliveryNotice>
-  /** Rows that are not part of the conversation but happened during it, such as workers' approvals. */
-  timedRows?: readonly NativeChatTimedRow[]
   /** Set while the turn waits on the reader; the live activity line yields to it. */
   awaitingInput?: NativeChatAwaitingInput | null
   turnActivity?: NativeChatTurnActivity | null
@@ -134,7 +125,14 @@ export function NativeChatMessageList({
   stopping?: boolean
   runtimeContext?: RuntimeFileOperationArgs | null
 }): React.JSX.Element {
-  const receipts = useNativeChatQuestionReceipts(journalItems)
+  const [navigationRequest, setNavigationRequest] = useState<NavigationRequest | null>(null)
+  const navigationSequence = useRef(0)
+  const revealedDiff = navigationRequest?.kind === 'diff' ? navigationRequest.target : null
+  const railJump = navigationRequest?.kind === 'rail' ? navigationRequest : null
+  const receipts = useMemo(
+    () => (journalItems ? structuredQuestionTranscript(journalItems).receipts : new Map()),
+    [journalItems]
+  )
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<string>>(new Set())
@@ -144,70 +142,66 @@ export function NativeChatMessageList({
   }, [])
 
   const { hasMore, loadingEarlier, loadEarlier } = session
-  const historyRetention = useNativeChatHistoryRetention({
-    ...session,
-    isVisible,
-    root: contentRef,
-    sourceKey: `${session.agent}:${session.sessionId}`
-  })
+  // Pending/failed reads cannot page; recovery remounts the sentinel to recheck its range.
+  const showOlderHistory = hasMore && session.readPhase === 'ready'
 
-  const { messages: conversation, subagentRows } = useNativeChatTranscriptProjection(
+  const { messages, subagentRows } = useNativeChatTranscriptProjection(
     session,
     journalItems,
     journalSubmissions,
     latestTurn
   )
-  const scope = useNativeChatSubagentScope({
-    view: subagentView,
-    conversation,
-    subagentRows,
-    roster: subagentRoster,
+  const {
+    sections: subagentSections,
+    subagentRowsInOrder,
+    subagentChoices,
+    subagentDisclosure,
+    openSubagentSections
+  } = useNativeChatSubagentSections(messages, subagentRows, subagentRoster)
+  // Folded subagent rows stay loaded, so a reopened reply keeps its reveal.
+  const loadedMessageIds = useMemo(
+    () => new Set([...messages.map(({ id }) => id), ...subagentSections.pathOf.keys()]),
+    [messages, subagentSections]
+  )
+  const taskListPredecessors = useMemo(() => nativeChatTaskListPredecessors(messages), [messages])
+  const turnRows = useNativeChatTurnMembership(
+    messages,
     journalItems,
     journalSubmissions,
-    latestTurn,
-    isWorking
-  })
-  const { agentId: subagentId, messages, turnRows, working, rowsInOrder } = scope
-  // Pending/failed reads cannot page; recovery remounts the sentinel to recheck its range.
-  const showOlderHistory = hasMore && session.readPhase === 'ready' && scope.pagesHistory
-  const loadedMessageIds = useMemo(() => new Set(messages.map(({ id }) => id)), [messages])
-  const taskListPredecessors = useMemo(() => nativeChatTaskListPredecessors(messages), [messages])
-  const { liveTurnKey } = turnRows
-  const showCiResultLines = useAppStore((state) => nativeChatShowsCiResultLines(state.settings))
-  // Hidden lines leave the transcript entirely, so they reserve no row or gap.
-  const { messages: rows, turnKeys } = useMemo(
-    () => (showCiResultLines ? turnRows : withoutPullRequestEventRows(turnRows)),
-    [showCiResultLines, turnRows]
+    latestTurn
   )
-  const latestTurnKey = turnKeys.findLast((key) => key !== undefined)
-  const showTurnDiffs = useAppStore((state) => nativeChatShowsTurnDiffSummary(state.settings))
-  const turns = scope.conversationTurns
-  const turnDiffs = useNativeChatTurnDiffs(showTurnDiffs ? turns : null, rowsInOrder)
-  const openedPullRequests = useNativeChatTurnOpenedPullRequests(turns, rowsInOrder)
+  const { messages: rows, turnKeys, liveTurnKey } = turnRows
+  const turnDiffs = useNativeChatTurnDiffs(
+    journalItems ? turnRows : null,
+    subagentRowsInOrder,
+    subagentSections.pathOf
+  )
+  const watchedTurnDiffs = useNativeChatWatchedTurnDiffs({
+    runtimeContext,
+    liveTurnKey,
+    settledTurns,
+    isWorking,
+    isVisible
+  })
+  const mergedTurnDiffs = useMergedNativeChatTurnDiffs(turnDiffs, watchedTurnDiffs)
   // Only real tail reasoning counts as thinking; an in-flight request with no output does not.
   const thinking = useMemo(
-    () =>
-      subagentId === null &&
-      isStructuredAgentSessionThinking({ items: journalItems ?? [], latestTurn }),
-    [journalItems, latestTurn, subagentId]
+    () => isStructuredAgentSessionThinking({ items: journalItems ?? [], latestTurn }),
+    [journalItems, latestTurn]
   )
-  // The clock starts once the opening message lands, not while it still says "Sending…".
-  const turnWorking =
-    working && (liveTurnKey === undefined || deliveryNotices?.get(liveTurnKey)?.sending !== true)
   const turnStatuses = useNativeChatTurnStatus({
     turnKeys,
     liveTurnKey,
-    isWorking: turnWorking,
+    isWorking,
     workingStartedAt,
     settledTurns,
     thinking
   })
   // Only unshown prompts need a waiting tail row; prompt cards explain their own wait.
-  const tailRow = transcriptTailRow(turnWorking, awaitingInput)
-  const lifecycleWorking = subagentId === null && session.transcriptLifecycle?.state === 'working'
+  const tailRow = transcriptTailRow(isWorking, awaitingInput)
+  const lifecycleWorking = session.transcriptLifecycle?.state === 'working'
   const { measureContent, typography } = useNativeChatRowTypography(contentRef)
-  const forkOffer = useNativeChatSideChatForkOffer(latestTurnKey)
-  const transcript = useNativeChatTranscriptSlots({
+  const { slots: allSlots, liveLine } = useNativeChatTranscriptSlots({
     typography,
     messages: rows,
     unresolvedRowIds: turnRows.unresolvedRowIds,
@@ -215,22 +209,19 @@ export function NativeChatMessageList({
     liveTurnKey,
     receipts,
     turnStatuses,
-    turnDiffs,
-    openedPullRequests: openedPullRequests.byTurn,
+    turnDiffs: mergedTurnDiffs,
     expandedTurnKeys: expandedTurnIds,
-    isWorking: working,
+    isWorking,
     lifecycleWorking,
-    subagentHeads: scope.heads,
-    forkOffer,
+    subagentSections,
+    subagentChoices,
     line: {
-      tailRow,
+      draws: tailRow === 'activity',
       thinking: turnStatuses.active?.thinking === true,
       stopping,
       activityText: turnActivity?.text
     }
   })
-  const { slots: allSlots, liveLine } = transcript
-  useNativeChatSideChatForkPointReport(transcript.forkPoint)
   // A message waiting behind the live turn draws after that turn's live activity, not inside it.
   const { slots, waitingSlots } = useMemo(
     () =>
@@ -243,8 +234,7 @@ export function NativeChatMessageList({
       ),
     [allSlots, journalItems, stopping, journalSubmissions, latestTurn, hostWork]
   )
-  const navigationRequest = useNativeChatNavigationRequest(slots)
-  const newRows = useNativeChatNewRowsMarker(
+  const { marker: newRowsMarker, dismiss } = useNativeChatNewRowsMarker(
     slots,
     waitingSlots,
     isVisible && session.readCurrent === true
@@ -253,16 +243,16 @@ export function NativeChatMessageList({
     scrollRef,
     slots,
     isVisible,
-    // Rail jumps, diff reveals and subagent reveals share one mutually exclusive pin.
-    revealIndex: navigationRequest.revealIndex,
-    newRowsMarkerIndex: newRows.index,
+    // Rail jumps and diff reveals share one mutually exclusive pin.
+    revealIndex: nativeChatSlotIndexOf(slots, railJump?.messageId ?? revealedDiff?.messageId),
+    newRowsMarkerIndex: nativeChatSlotIndexOf(slots, newRowsMarker?.key),
     typography
   })
   const transcriptScroll = useNativeChatTranscriptScroll({
     scrollRef,
     contentRef,
     itemCount: slots.length,
-    isWorking: working,
+    isWorking,
     showsTailRow: tailRow !== null,
     isVisible,
     alignToViewportTop: transcriptWindow.alignToViewportTop,
@@ -270,159 +260,162 @@ export function NativeChatMessageList({
     scrollToEnd: transcriptWindow.scrollToEnd,
     restoreScrollOffset: transcriptWindow.restoreScrollOffset,
     consumeProgrammaticScroll: transcriptWindow.consumeProgrammaticScroll,
-    reconcileReaderScroll: transcriptWindow.reconcileReaderScroll,
-    onLeaveEnd: historyRetention.leaveEnd,
-    onReturnToEnd: historyRetention.returnToEnd
+    reconcileReaderScroll: transcriptWindow.reconcileReaderScroll
   })
-  const { showJump, onScroll, scrollToBottom, readerAtEnd, scrollMessageToTop, readerLeavesEnd } =
+  const { showJump, onScroll, scrollToBottom, scrollMessageToTop, readerLeavesEnd } =
     transcriptScroll
-  const { recordReaderScroll } = transcriptScroll
   const olderHistory = useNativeChatOlderHistoryAutoload({
     scrollRef,
     historyKey: `${session.agent}:${session.sessionId ?? ''}:${session.olderHistoryGeneration}`,
     isVisible,
     hasMore: showOlderHistory,
-    autoLoad: historyRetention.autoLoadHistory,
-    onManualLoad: readerLeavesEnd,
     loadingEarlier,
     loadEarlier
   })
   const rail = useNativeChatMessageRail({
     scrollRef,
-    // The rail outlines the conversation's prompts; a subagent's view has none.
-    slots: subagentId === null ? slots : NO_SLOTS,
+    slots,
     turnRows,
     virtualItems: transcriptWindow.virtualItems,
     outline: railOutline
   })
-  const navigation = useNativeChatNavigation({
-    request: navigationRequest,
-    rail,
-    slots,
-    conversation,
-    subagentRows,
-    roster: subagentRoster,
-    journalItems,
-    subagentId,
+  const requestRailJump = useCallback((item: NativeChatRailItem) => {
+    navigationSequence.current += 1
+    const requestId = navigationSequence.current
+    setNavigationRequest({ kind: 'rail', messageId: item.id, requestId })
+  }, [])
+  const railHistoryJump = useNativeChatRailHistoryJump({
+    items: rail.items,
     sessionKey: `${session.agent}:${session.sessionId}`,
     isVisible,
     loadEarlier,
-    holdHistory: historyRetention.leaveEnd,
-    scrollRef,
-    scrollMessageToTop,
-    readerLeavesEnd,
-    scrollToBottom
+    jumpToLoaded: requestRailJump
   })
-  const { beginNavigation, jumpToLatest } = navigation
-  const { railRef, wake: wakeRail, sustain: sustainRail } = useNativeChatRailWake()
-  const onTranscriptScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      onScroll(event)
-      sustainRail()
+  const { start: startHistoryJump, abort: beginNavigation } = railHistoryJump
+  // Abort paging navigation before any new jump so late history cannot pull the reader back.
+  const selectRailItem = useCallback(
+    (item: NativeChatRailItem) => {
+      beginNavigation()
+      readerLeavesEnd()
+      if (item.slotIndex === null) {
+        startHistoryJump(item)
+        return
+      }
+      requestRailJump(item)
     },
-    [onScroll, sustainRail]
+    [beginNavigation, readerLeavesEnd, requestRailJump, startHistoryJump]
   )
-  const onReaderScroll = useCallback(() => {
+  const revealDiff = useCallback(
+    (target: NativeChatDiffTarget) => {
+      beginNavigation()
+      readerLeavesEnd()
+      if (target.subagentSections) {
+        openSubagentSections(target.subagentSections)
+      }
+      navigationSequence.current += 1
+      const requestId = navigationSequence.current
+      setNavigationRequest({ kind: 'diff', target: { ...target, requestId } })
+    },
+    [beginNavigation, readerLeavesEnd, openSubagentSections]
+  )
+  const jumpToLatest = useCallback(() => {
     beginNavigation()
-    recordReaderScroll()
-    wakeRail()
-  }, [beginNavigation, recordReaderScroll, wakeRail])
+    scrollToBottom()
+  }, [beginNavigation, scrollToBottom])
   const readerInput = useNativeChatReaderScrollInput(scrollRef, {
-    onReaderScroll,
+    onReaderScroll: beginNavigation,
     onTakeScroll: transcriptWindow.cancelAlign,
-    onReaderAct: transcriptWindow.releaseEndPin,
     onLeaveEnd: readerLeavesEnd,
     onScrollGesture: transcriptScroll.forwardedGesture
   })
-  useNativeChatMessageListHandle(ref, {
-    readerAtEnd,
-    beginNavigation,
-    scrollToBottom,
-    onSent: newRows.dismiss,
-    revealFindMatch: readerInput.revealFindMatch,
-    slots: allSlots
+  useNativeChatMessageListHandle(ref, jumpToLatest, readerInput.revealFindMatch, dismiss, allSlots)
+  useNativeChatRailJumpLanding({
+    railJump,
+    slots,
+    scrollRef,
+    scrollMessageToTop,
+    onActivate: rail.onActivate,
+    release: setNavigationRequest
   })
 
   const rowContext = useNativeChatTranscriptRowContext({
     agent: session.agent,
     hostWork,
-    structuredAttachments,
     expandSignal,
-    revealedDiff: navigationRequest.revealedDiff,
+    revealedDiff,
     taskListPredecessors,
     expandedTurnIds,
-    latestTurnKey,
     deliveryNotices,
+    allowFileUriLinks,
     runtimeContext,
+    onLinkClick,
     onToggleExpandedTurn: toggleExpandedTurn,
-    onOpenSubagent: scope.open,
+    subagentDisclosure,
     onScrollMessageToTop: scrollMessageToTop,
-    onRevealDiff: navigation.revealDiff
+    onRevealDiff: revealDiff
   })
 
   return (
     <NativeChatDisclosureContext.Provider value={disclosures}>
-      <NativeChatPullRequestChangeContext.Provider value={openedPullRequests.latestChangeKey}>
-        <div className="relative flex min-h-0 flex-1 flex-col bg-chat-pane">
-          {scope.bar}
-          <div className="relative min-h-0 flex-1">
-            <div
-              ref={scrollRef}
-              onScroll={onTranscriptScroll}
-              onCopy={copyChatMathSelection}
-              {...readerInput.scrollerProps}
-              // Measurement finds this named scroll root independently of utility classes.
-              data-native-chat-scroll
-              aria-label={scope.regionLabel}
-              // Browser anchoring would add unattributed movement beside the virtualizer's anchor.
-              className="scrollbar-sleek relative h-full overflow-y-auto [overflow-anchor:none] [scrollbar-gutter:stable_both-edges] focus-visible:outline-none"
-            >
-              {showOlderHistory ? (
-                <NativeChatOlderHistoryRow
-                  olderHistory={olderHistory}
-                  loadingEarlier={loadingEarlier}
+      <div className="relative flex min-h-0 flex-1 flex-col bg-chat-canvas">
+        <div className="relative min-h-0 flex-1">
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            onCopy={copyChatMathSelection}
+            {...readerInput.scrollerProps}
+            // Measurement finds this named scroll root independently of utility classes.
+            data-native-chat-scroll
+            aria-label={translate('components.native-chat.transcriptLabel', 'Conversation')}
+            // Browser anchoring would add unattributed movement beside the virtualizer's anchor.
+            className="scrollbar-sleek relative h-full overflow-y-auto [overflow-anchor:none] [scrollbar-gutter:stable_both-edges] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+          >
+            {showOlderHistory ? (
+              <NativeChatOlderHistoryRow
+                olderHistory={olderHistory}
+                loadingEarlier={loadingEarlier}
+              />
+            ) : null}
+            <div className={nativeChatTranscriptOuterClass(rail.visible)}>
+              <div
+                ref={measureContent}
+                data-native-chat-transcript-column
+                // Shares the composer's maximum width; rail clearance and the 5px inner inset narrow constrained panes.
+                className={NATIVE_CHAT_TRANSCRIPT_COLUMN_CLASS}
+              >
+                <NativeChatTranscriptItems
+                  slots={slots}
+                  loadedMessageIds={loadedMessageIds}
+                  context={rowContext}
+                  window={transcriptWindow}
+                  newRowsMarker={newRowsMarker}
+                  forwardGesture={readerInput.forwardedGesture}
                 />
-              ) : null}
-              <div className={nativeChatTranscriptOuterClass(rail.visible)}>
-                <div
-                  ref={measureContent}
-                  data-native-chat-transcript-column
-                  // Shares the composer's maximum width; rail clearance and the 5px inner inset narrow constrained panes.
-                  className={NATIVE_CHAT_TRANSCRIPT_COLUMN_CLASS}
-                >
-                  {scope.lead}
-                  <NativeChatTranscriptItems
-                    slots={slots}
-                    timedRows={timedRows}
-                    loadedMessageIds={loadedMessageIds}
-                    context={rowContext}
-                    window={transcriptWindow}
-                    newRowsMarker={newRows.marker}
-                    forwardGesture={readerInput.forwardedGesture}
+                {liveLine ? (
+                  <NativeChatTurnActivityLine
+                    line={liveLine}
+                    onLinkClick={onLinkClick}
+                    allowFileUriLinks={allowFileUriLinks}
                   />
-                  {liveLine ? (
-                    <NativeChatTurnActivityLine line={liveLine} />
-                  ) : tailRow === 'awaiting-input' ? (
-                    <NativeChatAwaitingInputRow subject={null} pending />
-                  ) : null}
-                  <NativeChatWaitingTranscriptItems slots={waitingSlots} context={rowContext} />
-                </div>
+                ) : tailRow === 'awaiting-input' ? (
+                  <NativeChatAwaitingInputRow subject={null} pending />
+                ) : null}
+                <NativeChatWaitingTranscriptItems slots={waitingSlots} context={rowContext} />
               </div>
             </div>
-            <NativeChatMessageRail
-              rail={rail}
-              railRef={railRef}
-              scrollRef={scrollRef}
-              onSelect={navigation.selectRailItem}
-              onReaderScroll={readerInput.railWheel}
-              pendingId={navigation.pendingRailId}
-            />
-            <NativeChatJumpToLatest visible={showJump} onJump={jumpToLatest} />
-            <NativeChatNewRowsAnnouncement marked={newRows.marker !== undefined} />
           </div>
-          <NativeChatDockedTaskList key={session.sessionId} messages={messages} />
+          <NativeChatMessageRail
+            rail={rail}
+            scrollRef={scrollRef}
+            onSelect={selectRailItem}
+            onReaderScroll={readerInput.railWheel}
+            pendingId={railHistoryJump.pendingId}
+          />
+          <NativeChatJumpToLatest visible={showJump} onJump={jumpToLatest} />
+          <NativeChatNewRowsAnnouncement marked={newRowsMarker !== undefined} />
         </div>
-      </NativeChatPullRequestChangeContext.Provider>
+        <NativeChatDockedTaskList key={session.sessionId} messages={messages} />
+      </div>
     </NativeChatDisclosureContext.Provider>
   )
 }

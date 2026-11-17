@@ -1,19 +1,16 @@
-import { linearIssueReadError } from '@/lib/work-items/linear/linear-read-error'
-import { taskProviderErrorText } from '@/lib/work-items/task-provider-error-copy'
 import React from 'react'
 import { ArrowLeft, ArrowRight, ExternalLink, Layers3, LoaderCircle, RefreshCw } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import type {
   LinearProjectDetail,
   LinearProjectSummary
 } from '../../../shared/linear/project-types'
 import type { LinearWorkspaceError } from '../../../shared/linear/workspace-types'
-import { isIntegrationCredentialDecryptionError } from '../../../shared/secure-storage/integration-credential-errors'
+import { isIntegrationCredentialDecryptionError } from '../../../shared/integration-credential-errors'
 import {
   LinearCustomViewTableContent,
   type LinearCustomViewTableContentProps
@@ -34,72 +31,11 @@ type LinearProjectOverviewProps = {
   onOpenIssues?: () => void
 }
 
-type LinearCollectionKind = 'views' | 'projects' | 'projectIssues' | 'viewIssues' | 'issues'
-
-function linearCollectionTruncatedText(
-  kind: LinearCollectionKind,
-  count: number,
-  t: Translate = translate
-): string {
-  switch (kind) {
-    case 'views':
-      return t(
-        'taskProviders.linear.truncated.views',
-        'Showing the first {{count}} views. Search or open Linear for the full set.',
-        {
-          count,
-          defaultValue_one:
-            'Showing the first {{count}} view. Search or open Linear for the full set.'
-        }
-      )
-    case 'projects':
-      return t(
-        'taskProviders.linear.truncated.projects',
-        'Showing the first {{count}} projects. Search or open Linear for the full set.',
-        {
-          count,
-          defaultValue_one:
-            'Showing the first {{count}} project. Search or open Linear for the full set.'
-        }
-      )
-    case 'projectIssues':
-      return t(
-        'taskProviders.linear.truncated.projectIssues',
-        'Showing the first {{count}} project issues. Search or open Linear for the full set.',
-        {
-          count,
-          defaultValue_one:
-            'Showing the first {{count}} project issue. Search or open Linear for the full set.'
-        }
-      )
-    case 'viewIssues':
-      return t(
-        'taskProviders.linear.truncated.viewIssues',
-        'Showing the first {{count}} view issues. Search or open Linear for the full set.',
-        {
-          count,
-          defaultValue_one:
-            'Showing the first {{count}} view issue. Search or open Linear for the full set.'
-        }
-      )
-    case 'issues':
-      return t(
-        'taskProviders.linear.truncated.issues',
-        'Showing the first {{count}} issues. Search or open Linear for the full set.',
-        {
-          count,
-          defaultValue_one:
-            'Showing the first {{count}} issue. Search or open Linear for the full set.'
-        }
-      )
-  }
-}
-
 type LinearCollectionNoticeProps = {
   errors?: LinearWorkspaceError[]
   hasMore?: boolean
   count: number
-  kind: LinearCollectionKind
+  label: string
   onLoadMore?: () => void
   loading?: boolean
   loadMoreLabel?: string
@@ -109,12 +45,11 @@ export function LinearCollectionNotice({
   errors,
   hasMore,
   count,
-  kind,
+  label,
   onLoadMore,
   loading = false,
   loadMoreLabel = 'Load more'
 }: LinearCollectionNoticeProps): React.JSX.Element | null {
-  const t = useTranslate()
   if (!hasMore && (!errors || errors.length === 0)) {
     return null
   }
@@ -126,21 +61,31 @@ export function LinearCollectionNotice({
           {errors.map((error) => (
             <Badge key={`${error.workspaceId}-${error.type}`} variant="outline">
               {error.workspaceName ?? error.workspaceId}:{' '}
-              {isIntegrationCredentialDecryptionError(
-                taskProviderErrorText(error.message, undefined, t)
-              )
-                ? t(
+              {isIntegrationCredentialDecryptionError(error.message)
+                ? translate(
                     'auto.components.linear.project.view.surfaces.linearLoginUnreadable',
                     'Unable to read saved Linear login. Reconnect it in Settings.'
                   )
-                : taskProviderErrorText(linearIssueReadError(error.message, t), undefined, t)}
+                : error.message}
             </Badge>
           ))}
         </div>
       ) : null}
       {hasMore ? (
         <div className="flex flex-wrap items-center justify-center gap-2 px-4 py-3">
-          {onLoadMore ? null : <span>{linearCollectionTruncatedText(kind, count, t)}</span>}
+          {onLoadMore ? null : (
+            <span>
+              {translate(
+                'auto.components.linear.project.view.surfaces.06b887d622',
+                'Showing first'
+              )}{' '}
+              {count} {label}
+              {translate(
+                'auto.components.linear.project.view.surfaces.98730088a6',
+                '. Search or open Linear for the full set.'
+              )}
+            </span>
+          )}
           {onLoadMore ? (
             <Button
               type="button"
@@ -153,7 +98,7 @@ export function LinearCollectionNotice({
               {loading ? (
                 <>
                   <LoaderCircle className="size-3.5 animate-spin" />
-                  {t('auto.components.linear.project.view.surfaces.93e1f6bfca', 'Loading')}
+                  {translate('auto.components.linear.project.view.surfaces.93e1f6bfca', 'Loading')}
                 </>
               ) : (
                 <>
@@ -186,7 +131,6 @@ export function LinearProjectOverview({
   onRefresh,
   onOpenIssues
 }: LinearProjectOverviewProps): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-10 flex-none items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3">
@@ -195,7 +139,7 @@ export function LinearProjectOverview({
             variant="ghost"
             size="icon-xs"
             onClick={onBack}
-            aria-label={t(
+            aria-label={translate(
               'auto.components.linear.project.view.surfaces.5f79bc76b0',
               'Back to projects'
             )}
@@ -205,16 +149,19 @@ export function LinearProjectOverview({
           <div className="min-w-0">
             <div className="truncate text-[13px] font-medium text-foreground">
               {project?.name ??
-                t('auto.components.linear.project.view.surfaces.85607ff793', 'Project')}
+                translate('auto.components.linear.project.view.surfaces.85607ff793', 'Project')}
             </div>
             <div className="truncate text-[11px] text-muted-foreground">
               {project?.workspaceName
-                ? t(
+                ? translate(
                     'auto.components.linear.project.view.surfaces.906b5e4cb8',
                     'Linear / Projects / {{value0}}',
                     { value0: project.workspaceName }
                   )
-                : t('auto.components.linear.project.view.surfaces.f2cc1e0ff6', 'Linear / Projects')}
+                : translate(
+                    'auto.components.linear.project.view.surfaces.f2cc1e0ff6',
+                    'Linear / Projects'
+                  )}
             </div>
           </div>
         </div>
@@ -227,7 +174,7 @@ export function LinearProjectOverview({
               className="gap-1 border-border/50 bg-background/70"
             >
               <Layers3 className="size-3.5" />
-              {t('auto.components.linear.project.view.surfaces.ee3d2caabd', 'Issues')}
+              {translate('auto.components.linear.project.view.surfaces.ee3d2caabd', 'Issues')}
             </Button>
           ) : null}
           <Button
@@ -238,7 +185,7 @@ export function LinearProjectOverview({
             className="gap-1 border-border/50 bg-background/70"
           >
             <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
-            {t('auto.components.linear.project.view.surfaces.a9785c7158', 'Refresh')}
+            {translate('auto.components.linear.project.view.surfaces.a9785c7158', 'Refresh')}
           </Button>
           {project ? (
             <Button
@@ -248,7 +195,7 @@ export function LinearProjectOverview({
               className="gap-1 border-border/50 bg-background/70"
             >
               <ExternalLink className="size-3.5" />
-              {t('auto.components.linear.project.view.surfaces.7b147907dc', 'Linear')}
+              {translate('auto.components.linear.project.view.surfaces.7b147907dc', 'Linear')}
             </Button>
           ) : null}
         </div>

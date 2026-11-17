@@ -23,7 +23,7 @@ public struct AttributeValueCoercion: Equatable {
     }
 
     public enum ReadbackComparison: Equatable {
-        case match
+        case match(actualPreview: String)
         case mismatch(actualPreview: String)
         case unsupported
     }
@@ -44,7 +44,7 @@ public struct AttributeValueCoercion: Equatable {
             return .unsupported
         }
         return actual == writeValue
-            ? .match
+            ? .match(actualPreview: actual.preview)
             : .mismatch(actualPreview: actual.preview)
     }
 

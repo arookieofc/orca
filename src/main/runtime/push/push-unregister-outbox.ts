@@ -6,7 +6,7 @@ import {
   hardenExistingSecureFile,
   isUnreadableError,
   writeSecureJsonFile
-} from '../../../shared/secure-storage/secure-file'
+} from '../../../shared/secure-file'
 
 export type PushUnregisterOutboxItem = {
   reqId: string

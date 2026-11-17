@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { copyFile, lstat, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
-import { parseHooksJsonText } from '../agent-hooks/installation/configuration/hooks-json-read'
-import type { HooksConfig } from '../agent-hooks/installation/configuration/hook-config-schema'
+import { parseHooksJsonText } from '../agent-hooks/hooks-json-read'
+import type { HooksConfig } from '../agent-hooks/installer-utils'
 
 export type AsyncGrokHookConfigSnapshot = {
   raw: string | null

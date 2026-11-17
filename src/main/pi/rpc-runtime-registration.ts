@@ -2,15 +2,16 @@ import type {
   StructuredAgentAdapterContext,
   StructuredAgentRuntimeAdapter,
   StructuredAgentRuntimeRegistration
-} from '../runtime/agent-session/installation/structured-agent-runtime-registration-types'
+} from '../runtime/structured-agent-runtime-registration-types'
 import {
   composeStructuredLaunch,
   structuredAgentLaunchSources
-} from '../runtime/agent-session/launch/structured-agent-launch-composition'
+} from '../runtime/structured-agent-launch-composition'
 import { PI_RPC_AGENT } from './rpc-agent-definition'
-import { piRpcLaunchPart } from './rpc/launch/rpc-launch-resolution'
-import { PiRpcSessionAdapter } from './rpc/rpc-session-adapter'
+import { piRpcLaunchPart } from './rpc-launch-resolution'
+import { PiRpcSessionAdapter } from './rpc-session-adapter'
 import { PI_RPC_RUNTIME_METADATA } from './rpc-runtime-metadata'
+import { reviseAgentSessionProviderResumePoint } from '../runtime/agent-session/ownership/agent-session-provider-handle-transition'
 
 function createPiRpcAdapter(context: StructuredAgentAdapterContext): StructuredAgentRuntimeAdapter {
   const { deps } = context
@@ -20,16 +21,11 @@ function createPiRpcAdapter(context: StructuredAgentAdapterContext): StructuredA
       composeStructuredLaunch(
         PI_RPC_AGENT,
         structuredAgentLaunchSources(context),
-        piRpcLaunchPart({
-          logger: deps.logger,
-          managedExtensionsEnabled: deps.piManagedExtensionsEnabled
-        })
+        piRpcLaunchPart({})
       ),
     ...(deps.openPiConnection ? { openConnection: deps.openPiConnection } : {}),
     ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {}),
     onLifecycle: context.deliverLifecycle,
-    onChildWorkEvidence: (sessionId, evidence, producer) =>
-      context.host()?.publishChildWorkEvidence(sessionId, evidence, producer),
     onSettled: ({ sessionId, clientMessageId, outcome }) => {
       if (outcome.state === 'admitted') {
         return
@@ -41,10 +37,9 @@ function createPiRpcAdapter(context: StructuredAgentAdapterContext): StructuredA
       })
     },
     persistResumePoint: async ({ sessionId, fence, handle }) => {
-      await context.store.updateRecord(sessionId, {
-        kind: 'resume-point',
-        args: { fence, handle, now: Date.now() }
-      })
+      await context.store.transitionHandoff(sessionId, (record) =>
+        reviseAgentSessionProviderResumePoint({ record, fence, handle, now: Date.now() })
+      )
     },
     logger: deps.logger
   })

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Ellipsis, Plus, RefreshCw } from 'lucide-react'
+import { Ellipsis, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -8,14 +8,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { cn } from '@/lib/class-names'
-import { useTranslate } from '@/i18n/use-translate'
-import { getFolderWorkspacePathStatusDescription } from '@/lib/workspace/paths/folder-workspace-path-status'
-import type { ProjectGroup } from '../../../../../../shared/project/groups/project-group-types'
-import type { FolderWorkspacePathStatus } from '../../../../../../shared/folder-workspaces/folder-workspace-path-status'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
-import { getFolderProjectGroupRefreshHandler } from './project-group-folder-refresh'
-import { REPO_HEADER_ACTION_BUTTON_CLASS } from './repo-header-action-button-class'
+import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
+import { getFolderWorkspacePathStatusDescription } from '@/lib/folder-workspace-path-status'
+import type { ProjectGroup } from '../../../../../../shared/project-group-types'
+import type { FolderWorkspacePathStatus } from '../../../../../../shared/folder-workspace-path-status'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import { REPO_HEADER_ACTION_BUTTON_CLASS } from '../../repo-header-action-button-class'
 import {
   handleRepoHeaderActionPointerDown,
   stopRepoHeaderKeyboardToggle,
@@ -26,8 +25,6 @@ export function ProjectGroupHeaderMenu({
   groupId,
   hostId,
   label,
-  projectGroup,
-  onRefreshProjectGroup,
   onRename,
   onDelete
 }: {
@@ -35,13 +32,9 @@ export function ProjectGroupHeaderMenu({
   /** Owner host of the group row, so rename/delete route to the host that holds it. */
   hostId?: ExecutionHostId
   label: string
-  projectGroup: ProjectGroup | null
-  onRefreshProjectGroup?: (projectGroup: ProjectGroup) => void
   onRename: (groupId: string, currentName: string, hostId?: ExecutionHostId) => void
   onDelete: (groupId: string, groupName: string, hostId?: ExecutionHostId) => void
 }): React.JSX.Element {
-  const t = useTranslate()
-  const onRefresh = getFolderProjectGroupRefreshHandler(projectGroup, onRefreshProjectGroup)
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -51,7 +44,7 @@ export function ProjectGroupHeaderMenu({
           size="icon-xs"
           className={REPO_HEADER_ACTION_BUTTON_CLASS}
           data-repo-header-action=""
-          aria-label={t(
+          aria-label={translate(
             'auto.components.sidebar.WorktreeList.79465e9034',
             'Group actions for {{value0}}',
             { value0: label }
@@ -75,17 +68,11 @@ export function ProjectGroupHeaderMenu({
         onClick={stopRepoHeaderMenuEvent}
         onKeyDown={stopRepoHeaderMenuEvent}
       >
-        {onRefresh ? (
-          <DropdownMenuItem onSelect={onRefresh}>
-            <RefreshCw className="size-3.5" />
-            {t('auto.components.sidebar.WorktreeList.refreshProjectGroup', 'Refresh projects')}
-          </DropdownMenuItem>
-        ) : null}
         <DropdownMenuItem onSelect={() => onRename(groupId, label, hostId)}>
-          {t('auto.components.sidebar.WorktreeList.4d7b73658c', 'Rename group')}
+          {translate('auto.components.sidebar.WorktreeList.4d7b73658c', 'Rename group')}
         </DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onSelect={() => onDelete(groupId, label, hostId)}>
-          {t('auto.components.sidebar.WorktreeList.902115cdbe', 'Delete group')}
+          {translate('auto.components.sidebar.WorktreeList.902115cdbe', 'Delete group')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -105,8 +92,7 @@ export function ProjectGroupCreateWorkspaceButton({
   disabled: boolean
   onCreate: (projectGroup: ProjectGroup) => void
 }): React.JSX.Element {
-  const t = useTranslate()
-  const createLabel = t(
+  const createLabel = translate(
     'auto.components.sidebar.WorktreeList.bd37a57ac8',
     'Create workspace for {{value0}}',
     { value0: label }
@@ -142,7 +128,7 @@ export function ProjectGroupCreateWorkspaceButton({
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={6}>
         {pathStatus?.exists === false
-          ? getFolderWorkspacePathStatusDescription(pathStatus, t)
+          ? getFolderWorkspacePathStatusDescription(pathStatus)
           : createLabel}
       </TooltipContent>
     </Tooltip>

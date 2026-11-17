@@ -1,9 +1,9 @@
-import { isPositiveHostedReviewNumber } from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
+import { isPositiveHostedReviewNumber } from '../../../../../../shared/hosted-review'
 import type {
   HostedReviewCreationEligibility,
   HostedReviewInfo,
   HostedReviewProvider
-} from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
+} from '../../../../../../shared/hosted-review'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 
 type SourceControlSuppressionWorktree = Pick<

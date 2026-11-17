@@ -1,10 +1,9 @@
 import '../assets/main.css'
 
 import ReactDOM from 'react-dom/client'
-import { getDefaultSettings } from '../../../shared/orca-profiles/constants'
-import { applyDocumentTheme } from '../app-shell/appearance/document-theme'
-import { installBodyOverlayAttributes } from '../lib/overlay-interaction/body-overlay-attributes'
-import { useAppStore } from '../store/index'
+import { getDefaultSettings } from '../../../shared/constants'
+import { applyDocumentTheme } from '../lib/document-theme'
+import { useAppStore } from '../store'
 import { installWebPreloadApi } from '../web/web-preload-api'
 import type { ComponentFixtureTheme } from './component-fixture'
 import {
@@ -38,7 +37,6 @@ const defaultSettings = getDefaultSettings('/home/fixture')
 useAppStore.setState({ settings: { ...defaultSettings, theme: pageTheme } })
 const baseStoreState = useAppStore.getState()
 document.body.classList.add('bg-background')
-installBodyOverlayAttributes()
 
 function requireRootElement(): HTMLElement {
   const element = document.getElementById('root')

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { watchRuntimeRepoBaseRefDefault } from '@/runtime/source-control/references/runtime-repo-client'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
+import { getRuntimeRepoBaseRefDefault } from '@/runtime/runtime-repo-client'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 
 export function useSourceControlBaseRefDefault({
   activeRepoConnectionId,
@@ -23,15 +23,24 @@ export function useSourceControlBaseRefDefault({
     }
     // Drop the previous repo’s default while loading to prevent transient invalid-base comparisons.
     setDefaultBaseRef(null)
+    let stale = false
     // Resolve on the repo owner, which may differ from the focused host.
-    return watchRuntimeRepoBaseRefDefault(activeRepoExecutionHostId, activeRepoId, {
-      onResult: (result) => setDefaultBaseRef(result.defaultBaseRef),
-      onError: (err) => {
+    void getRuntimeRepoBaseRefDefault(activeRepoExecutionHostId, activeRepoId)
+      .then((result) => {
+        if (!stale) {
+          setDefaultBaseRef(result.defaultBaseRef)
+        }
+      })
+      .catch((err) => {
         console.error('[SourceControl] getBaseRefDefault failed', err)
         // Keep failures unknown so comparison/review fetches cannot use a fabricated ref.
-        setDefaultBaseRef(null)
-      }
-    })
+        if (!stale) {
+          setDefaultBaseRef(null)
+        }
+      })
+    return () => {
+      stale = true
+    }
   }, [
     // Only owner changes reset the base; metadata churn must not restart eligibility’s timeout.
     activeRepoConnectionId,

@@ -1,12 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from '../../../../orca-runtime'
-import { OrchestrationDb } from '../../../../orchestration/db/orchestration-db'
-import '../../../../orchestration/db/contract-constants'
-import '../../../../orchestration/db/messages/mailbox-routing-page'
-import '../../../../orchestration/db/dispatch-row-writer'
-import '../../../../orchestration/db/attempt-outcome-projection'
-import { ORCHESTRATION_METHODS } from '../orchestration'
-import { monitorFederatedSetup } from '../../../../orchestration/legacy-remote/federation-setup'
+import { OrchestrationDb } from '../../../../orchestration/db'
+import { ORCHESTRATION_METHODS } from '../../orchestration'
+import { monitorFederatedSetup } from './federation-setup'
 
 describe('orchestration federated setup evidence', () => {
   const databases: OrchestrationDb[] = []
@@ -150,7 +146,7 @@ describe('orchestration federated setup evidence', () => {
       ]
     })
     db.markWorkerDispatchReady(started.dispatch.id)
-    vi.spyOn(runtime, 'resolveOrchestrationWorkerServer').mockResolvedValue({
+    vi.spyOn(runtime, 'resolveOrchestrationWorkerServer').mockReturnValue({
       environmentId: 'environment_windows',
       name: 'windows',
       peerFingerprint: 'windows_peer'

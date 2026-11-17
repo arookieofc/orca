@@ -1,25 +1,22 @@
-import type { ExecutionHostId } from '../../shared/execution-host/execution-host'
+import type { ExecutionHostId } from '../../shared/execution-host'
 import type {
   CreateHostedReviewInput,
   CreateHostedReviewResult,
   HostedReviewCreationEligibility,
   HostedReviewCreationEligibilityArgs,
   HostedReviewLookupOutcome
-} from '../../shared/source-control/hosted-review/hosted-review-contracts'
-import { supportsHostedReviewCreation } from '../../shared/source-control/hosted-review/hosted-review-creation-providers'
-import { normalizeHostedReviewBaseRef } from '../../shared/source-control/hosted-review/hosted-review-refs'
-import { getRepoSlug } from '../github/client/fetch/repo-slug-upstream'
-import { isDefaultGitHubHost } from '../../shared/github/repositories/repository-identity-key'
-import {
-  detectHostedReviewProvider,
-  getForgeProviderForRepository
-} from './forge-provider-detection'
+} from '../../shared/hosted-review'
+import { supportsHostedReviewCreation } from '../../shared/hosted-review-creation-providers'
+import { normalizeHostedReviewBaseRef } from '../../shared/hosted-review-refs'
+import { getRepoSlug } from '../github/client'
+import { isDefaultGitHubHost } from '../../shared/github/repository-identity-key'
+import { detectHostedReviewProvider, getForgeProviderForRepository } from './forge-provider'
 import { invalidateHostedReviewBranchCache } from './hosted-review-branch-cache'
 import { getHostedReviewForBranch } from './hosted-review'
 import { blockedEligibilityToCreateResult } from './hosted-review-creation-blocking'
 import {
   baseRefExistsOnRemote,
-  getCurrentBranchAndHead,
+  getCurrentBranch,
   getDefaultBaseRef,
   getHostedReviewUpstreamStatus,
   hasUncommittedChanges,
@@ -50,18 +47,13 @@ async function validateCurrentBranchCanCreateReview(
   options: HostedReviewExecutionOptions = {}
 ): Promise<CreateHostedReviewResult | null> {
   const requestedHead = input.head ? stripRefPrefix(input.head).trim() : ''
-  const { branch: currentBranch, headOid } = await getCurrentBranchAndHead(
-    repoPath,
-    executionHostId,
-    options
-  )
+  const currentBranch = await getCurrentBranch(repoPath, executionHostId, options)
   const copy = reviewCopy(input.provider)
   if (requestedHead && requestedHead !== currentBranch) {
     return {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: switch back to the selected branch before creating a ${copy.reviewLabel}.`,
-      reason: 'branch_changed'
+      error: `Create ${copy.shortLabel} failed: switch back to the selected branch before creating a ${copy.reviewLabel}.`
     }
   }
 
@@ -79,7 +71,6 @@ async function validateCurrentBranchCanCreateReview(
       hasUpstream: upstreamStatus.hasUpstream,
       ahead: upstreamStatus.ahead,
       behind: upstreamStatus.behind,
-      currentHeadOid: headOid,
       executionHostId,
       // Providers use submitted base verbatim; recheck remote resolvability at creation.
       enforceBaseOnRemote: true,
@@ -90,8 +81,7 @@ async function validateCurrentBranchCanCreateReview(
       return {
         ok: false,
         code: 'validation',
-        error: `Create ${copy.shortLabel} failed: Orca could not confirm whether this branch already has a ${copy.reviewLabel}. Retry once the ${copy.providerName} lookup succeeds.`,
-        reason: 'review_lookup_unavailable'
+        error: `Create ${copy.shortLabel} failed: Orca could not confirm whether this branch already has a ${copy.reviewLabel}. Retry once the ${copy.providerName} lookup succeeds.`
       }
     }
     // Recheck stale renderer eligibility in main before submission.
@@ -101,8 +91,7 @@ async function validateCurrentBranchCanCreateReview(
     return {
       ok: false,
       code: 'validation',
-      error: `Create ${copy.shortLabel} failed: could not verify branch status. Refresh source control and try again.`,
-      reason: 'branch_status_unverified'
+      error: `Create ${copy.shortLabel} failed: could not verify branch status. Refresh source control and try again.`
     }
   }
 }
@@ -142,7 +131,6 @@ export async function getHostedReviewCreationEligibility(
       linkedBitbucketPR: args.linkedBitbucketPR ?? null,
       linkedAzureDevOpsPR: args.linkedAzureDevOpsPR ?? null,
       linkedGiteaPR: args.linkedGiteaPR ?? null,
-      currentHeadOid: args.currentHeadOid ?? null,
       executionHostId: args.executionHostId,
       // The acted-on worktree earns active pacing so external review creation promptly blocks duplicates (#11532).
       active: true,
@@ -251,8 +239,7 @@ export async function getHostedReviewCreationEligibility(
 export const UNSUPPORTED_HOSTED_REVIEW_PROVIDER: CreateHostedReviewResult = {
   ok: false,
   code: 'unsupported_provider',
-  error: 'Creating reviews for this provider is not supported yet.',
-  reason: 'provider_not_supported'
+  error: 'Creating reviews for this provider is not supported yet.'
 }
 
 export async function createHostedReview(
@@ -274,8 +261,7 @@ export async function createHostedReview(
     return {
       ok: false,
       code: 'unsupported_provider',
-      error: `Creating ${copy.reviewLabel}s requires a ${copy.providerName} remote.`,
-      reason: 'unsupported_provider'
+      error: `Creating ${copy.reviewLabel}s requires a ${copy.providerName} remote.`
     }
   }
   const blocked = await validateCurrentBranchCanCreateReview(

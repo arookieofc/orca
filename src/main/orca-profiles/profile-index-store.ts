@@ -8,10 +8,7 @@ import {
 } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
-import {
-  bestEffortFsyncDirectorySync,
-  fsyncFileSync
-} from '../../shared/secure-storage/secure-file'
+import { bestEffortFsyncDirectorySync, fsyncFileSync } from '../../shared/secure-file'
 import {
   createDefaultLocalOrcaProfile,
   DEFAULT_LOCAL_ORCA_PROFILE_ID,
@@ -22,7 +19,7 @@ import {
   type OrcaProfileIndex,
   type OrcaProfileListState,
   type OrcaProfileSummary
-} from '../../shared/orca-profiles/orca-profiles'
+} from '../../shared/orca-profiles'
 import {
   getOrcaProfileDataFile,
   getOrcaProfileDirectory,
@@ -31,10 +28,21 @@ import {
   hasOrcaProfileStateDatabase,
   getProfileUserDataPath
 } from './profile-storage-paths'
-import { copyLegacyStateToProfile } from './storage/profile-legacy-state-import'
+import { copyLegacyStateToProfile } from './profile-legacy-state-import'
 import { profileStateJsonExportPaths } from '../persistence/profile-state/legacy-json/profile-state-export-path'
-import { hasProfileStateAuthorityMarker } from '../persistence/profile-state/database/profile-state-authority-marker'
-import { profileStateDatabaseBackups } from '../persistence/profile-state/backup/profile-state-backup-path'
+import { hasProfileStateAuthorityMarker } from '../persistence/profile-state/profile-state-authority-marker'
+import { profileStateDatabaseBackups } from '../persistence/profile-state/profile-state-backup-path'
+
+export {
+  getOrcaProfileBrowserSessionMetaFile,
+  getOrcaProfileDataFile,
+  getOrcaProfileDirectory,
+  getOrcaProfileIndexPath,
+  getOrcaProfileStateDatabaseFile,
+  hasOrcaProfileStateDatabase,
+  getOrcaProfilesDirectory,
+  initOrcaProfilePaths
+} from './profile-storage-paths'
 
 export type ActiveOrcaProfileState = {
   index: OrcaProfileIndex
@@ -134,6 +142,8 @@ export function writeProfileIndex(indexPath: string, index: OrcaProfileIndex): v
   renameSync(tmpPath, indexPath)
   bestEffortFsyncDirectorySync(dirname(indexPath))
 }
+
+export { seedNewOrcaProfileTelemetryConsent } from './profile-telemetry-consent-seed'
 
 function createInitialProfileIndex(now = Date.now()): OrcaProfileIndex {
   const profile = createDefaultLocalOrcaProfile(now)

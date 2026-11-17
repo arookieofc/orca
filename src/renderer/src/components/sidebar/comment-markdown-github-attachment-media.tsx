@@ -1,4 +1,3 @@
-import { GitHubBodyImageUrlsContext } from './comment-markdown-github-image-urls'
 import React from 'react'
 
 export function isGitHubUserAttachmentUrl(href: string | undefined): href is string {
@@ -86,29 +85,11 @@ export function GitHubUserAttachmentImage({
   src: string
   alt: string | undefined
 }): React.ReactElement {
-  const imageUrls = React.useContext(GitHubBodyImageUrlsContext)
-  return <AttachmentImage key={src} src={src} candidate={imageUrls?.[src] ?? src} alt={alt} />
-}
-
-function AttachmentImage({
-  src,
-  candidate,
-  alt
-}: {
-  src: string
-  candidate: string
-  alt: string | undefined
-}): React.ReactElement {
-  const [loadedSource, setLoadedSource] = React.useState<string | null>(null)
-  const [failedSource, setFailedSource] = React.useState<string | null>(null)
-  const displaySrc = loadedSource ?? candidate
-  const activeSource = React.useRef(displaySrc)
-  React.useLayoutEffect(() => {
-    activeSource.current = displaySrc
-  }, [displaySrc])
+  const [failed, setFailed] = React.useState(false)
   const label = alt?.trim() || src
 
-  if (failedSource === displaySrc || (!loadedSource && failedSource && candidate === src)) {
+  // Private images need GitHub cookies; fallback links open top-level authenticated sessions after inline failures.
+  if (failed) {
     return <AttachmentFallbackLink href={src}>{label}</AttachmentFallbackLink>
   }
 
@@ -121,22 +102,10 @@ function AttachmentImage({
       onClick={(e) => e.stopPropagation()}
     >
       <img
-        key={displaySrc}
-        src={displaySrc}
+        src={src}
         alt={alt ?? ''}
         className="my-3 max-h-96 max-w-full rounded-md object-contain outline outline-1 outline-black/10 dark:outline-white/10"
-        onLoad={() => {
-          if (activeSource.current === displaySrc) {
-            setLoadedSource(displaySrc)
-          }
-        }}
-        onError={() => {
-          if (activeSource.current !== displaySrc) {
-            return
-          }
-          setLoadedSource(null)
-          setFailedSource(displaySrc)
-        }}
+        onError={() => setFailed(true)}
       />
     </a>
   )

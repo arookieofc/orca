@@ -20,13 +20,12 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { GitHubUserAvatar } from '@/components/github/github-user-avatar'
-import { parseGitHubItemRepository as parseOwnerRepoFromItemUrl } from '../../../../../shared/github/work-items/work-item-target'
+import { parseOwnerRepoFromItemUrl } from '@/components/github/github-work-item-identity'
 import { formatRelativeTime, getStateLabel } from '@/components/github/work-item-state-presentation'
-import { cn } from '@/lib/class-names'
-import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
-import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
+import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
+import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
 import { getSolidStateTone } from '../presentation/state-badge'
-import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 
 export function PullRequestPageHeader({
   workItem,
@@ -57,14 +56,12 @@ export function PullRequestPageHeader({
   onOpenOrUsePR: () => void
   onUseWorkItem: () => void
 }): React.JSX.Element {
-  const t = useTranslate()
-  const intlLocale = useIntlLocale()
   const ownerRepo = parseOwnerRepoFromItemUrl(workItem.url)
   const headBranch = workItem.branchName
   const baseBranch = workItem.baseRefName
   const stateBadgeItem = { ...workItem, state: localState }
   const stateBadgeTone = getSolidStateTone(stateBadgeItem)
-  const stateBadgeLabel = getStateLabel(stateBadgeItem, t)
+  const stateBadgeLabel = getStateLabel(stateBadgeItem)
 
   return (
     <>
@@ -102,7 +99,10 @@ export function PullRequestPageHeader({
                   variant="ghost"
                   size="icon-sm"
                   onClick={onCopyLink}
-                  aria-label={t('auto.components.PullRequestPage.347034903a', 'Copy GitHub link')}
+                  aria-label={translate(
+                    'auto.components.PullRequestPage.347034903a',
+                    'Copy GitHub link'
+                  )}
                 >
                   {linkCopied ? (
                     <Check className="size-4 text-emerald-500" />
@@ -113,8 +113,8 @@ export function PullRequestPageHeader({
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
                 {linkCopied
-                  ? t('auto.components.PullRequestPage.3b6886b2ee', 'Copied')
-                  : t('auto.components.PullRequestPage.347034903a', 'Copy GitHub link')}
+                  ? translate('auto.components.PullRequestPage.3b6886b2ee', 'Copied')
+                  : translate('auto.components.PullRequestPage.347034903a', 'Copy GitHub link')}
               </TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -122,14 +122,17 @@ export function PullRequestPageHeader({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  onClick={(event) => openAppHttpLink(workItem.url, { event })}
-                  aria-label={t('auto.components.PullRequestPage.8ecda455a0', 'Open on GitHub')}
+                  onClick={() => window.api.shell.openUrl(workItem.url)}
+                  aria-label={translate(
+                    'auto.components.PullRequestPage.8ecda455a0',
+                    'Open on GitHub'
+                  )}
                 >
                   <ExternalLink className="size-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
-                {t('auto.components.PullRequestPage.8ecda455a0', 'Open on GitHub')}
+                {translate('auto.components.PullRequestPage.8ecda455a0', 'Open on GitHub')}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -137,41 +140,42 @@ export function PullRequestPageHeader({
       </div>
 
       <div className="flex-none border-b border-border/60 px-6 py-5">
-        {/* Why: a floor rather than min-w-0 — otherwise the title shrinks away and the actions never wrap. */}
-        <div className="flex flex-wrap items-start gap-4">
-          <h1 className="min-w-40 flex-1 text-[26px] font-medium leading-snug text-foreground">
+        <div className="flex items-start gap-4">
+          <h1 className="min-w-0 flex-1 text-[26px] font-medium leading-snug text-foreground">
             <span className="break-words">{workItem.title}</span>
             <span className="ml-2 align-baseline text-[20px] font-normal text-muted-foreground/70">
               #{workItem.number}
             </span>
           </h1>
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <DropdownMenu modal={false}>
-              <ButtonGroup className="max-w-full min-w-0 items-center">
-                {/* Why: on its own line a long label is still wider than a narrow page, and nowrap would clip the chevron. */}
+              <ButtonGroup>
                 <Button
                   type="button"
                   onClick={onOpenOrUsePR}
-                  className="h-auto min-w-[180px] max-w-full shrink justify-center whitespace-normal"
+                  className="w-[180px] justify-center gap-1.5 whitespace-nowrap"
                   aria-label={
                     hasAttachedWorkspace
-                      ? t(
+                      ? translate(
                           'auto.components.PullRequestPage.a459866967',
                           'Resume workspace attached to PR'
                         )
-                      : t('auto.components.PullRequestPage.25690a3855', 'Start workspace from PR')
+                      : translate(
+                          'auto.components.PullRequestPage.25690a3855',
+                          'Start workspace from PR'
+                        )
                   }
                 >
                   {hasAttachedWorkspace
-                    ? t('auto.components.PullRequestPage.c9e7094a7b', 'Resume workspace')
-                    : t('auto.components.PullRequestPage.71a3c0f9d2', 'Start workspace')}
+                    ? translate('auto.components.PullRequestPage.c9e7094a7b', 'Resume workspace')
+                    : translate('auto.components.PullRequestPage.71a3c0f9d2', 'Start workspace')}
                   <ArrowRight className="size-4" />
                 </Button>
                 <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
                     size="icon"
-                    aria-label={t(
+                    aria-label={translate(
                       'auto.components.PullRequestPage.57c13a5aa4',
                       'More PR workspace actions'
                     )}
@@ -184,12 +188,12 @@ export function PullRequestPageHeader({
                 {hasAttachedWorkspace ? (
                   <DropdownMenuItem onSelect={onUseWorkItem}>
                     <Plus className="size-4" />
-                    {t('auto.components.PullRequestPage.1a2570e18e', 'Start new workspace')}
+                    {translate('auto.components.PullRequestPage.1a2570e18e', 'Start new workspace')}
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuItem onSelect={() => openAppHttpLink(workItem.url)}>
+                <DropdownMenuItem onSelect={() => window.api.shell.openUrl(workItem.url)}>
                   <ExternalLink className="size-4" />
-                  {t('auto.components.PullRequestPage.8ecda455a0', 'Open on GitHub')}
+                  {translate('auto.components.PullRequestPage.8ecda455a0', 'Open on GitHub')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -214,7 +218,8 @@ export function PullRequestPageHeader({
               />
             ) : null}
             <span className="font-semibold text-foreground">
-              {workItem.author ?? t('auto.components.PullRequestPage.77d9388fb0', 'unknown')}
+              {workItem.author ??
+                translate('auto.components.PullRequestPage.77d9388fb0', 'unknown')}
             </span>
           </span>
           <span className="flex flex-wrap items-center gap-1.5">
@@ -224,7 +229,7 @@ export function PullRequestPageHeader({
               </span>
             ) : (
               <span className="italic">
-                {t('auto.components.PullRequestPage.c44b70352b', 'base branch')}
+                {translate('auto.components.PullRequestPage.c44b70352b', 'base branch')}
               </span>
             )}
             <ArrowLeft className="size-3.5 shrink-0 text-muted-foreground/70" />
@@ -234,14 +239,14 @@ export function PullRequestPageHeader({
               </span>
             ) : (
               <span className="italic">
-                {t('auto.components.PullRequestPage.00b7b82329', 'head branch')}
+                {translate('auto.components.PullRequestPage.00b7b82329', 'head branch')}
               </span>
             )}
           </span>
           <span className="text-muted-foreground/40">·</span>
           <span className="text-muted-foreground/80">
-            {t('auto.components.PullRequestPage.dd5d9a4f17', 'updated {{value0}}', {
-              value0: formatRelativeTime(workItem.updatedAt, intlLocale)
+            {translate('auto.components.PullRequestPage.dd5d9a4f17', 'updated {{value0}}', {
+              value0: formatRelativeTime(workItem.updatedAt)
             })}
           </span>
           {attachedWorkspaceLabel ? (

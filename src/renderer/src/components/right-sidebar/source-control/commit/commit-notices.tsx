@@ -5,8 +5,8 @@ import {
 } from './pull-policy-error-notice'
 import { SourceControlRecoveryNotice } from './recovery-notice'
 import type { CommitNoticesProps } from './commit-area-types'
-import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
+import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 
 export function CommitNotices({
   worktreeId,
@@ -33,15 +33,17 @@ export function CommitNotices({
   onFixCommitFailureWithAI,
   onFixPushFailureWithAI
 }: CommitNoticesProps): React.JSX.Element {
-  const t = useTranslate()
   return (
     <>
       {commitError && commitFailureSummary ? (
         <SourceControlRecoveryNotice
           id="commit-area-error"
           recoveryKind="commit"
-          title={t('auto.components.right.sidebar.SourceControl.011f9713fc', 'Commit blocked')}
-          detailsTitle={t(
+          title={translate(
+            'auto.components.right.sidebar.SourceControl.011f9713fc',
+            'Commit blocked'
+          )}
+          detailsTitle={translate(
             'auto.components.right.sidebar.SourceControl.a9bf7c171a',
             'Commit Failed'
           )}
@@ -67,11 +69,11 @@ export function CommitNotices({
         <SourceControlRecoveryNotice
           id="commit-area-push-error"
           recoveryKind="push"
-          title={t(
+          title={translate(
             'auto.components.right.sidebar.SourceControl.pushRecovery.011f9713fc',
             'Push blocked'
           )}
-          detailsTitle={t(
+          detailsTitle={translate(
             'auto.components.right.sidebar.SourceControl.pushRecovery.a9bf7c171a',
             'Push Failed'
           )}
@@ -127,7 +129,7 @@ export function CommitNotices({
               className="text-left font-medium text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground"
               onClick={() => onOpenSourceControlAiSettings()}
             >
-              {t(
+              {translate(
                 'auto.components.right.sidebar.SourceControl.473f18758e',
                 'Source Control AI settings'
               )}

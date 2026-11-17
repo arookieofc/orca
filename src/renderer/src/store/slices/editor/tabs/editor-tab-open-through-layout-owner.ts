@@ -1,31 +1,24 @@
 // Window writes OpenFile immediately but selects proposed tabs only after main frames draw them. Tab consumers wait via afterPendingTab.
 
-import type { Tab } from '../../../../../../shared/workspace-layout/tab-groups/tab-types'
-import { createNonSecureContextUuid as createBrowserUuid } from '../../../../../../shared/identifiers/non-secure-context-uuid'
-import {
-  sendLayoutApply,
-  type WindowLayoutCommand
-} from '@/runtime/workspace-layout/commands/layout-apply-send'
-import {
-  beginPendingTab,
-  isPendingTab
-} from '@/runtime/workspace-layout/intents/layout-owner-pending-tabs'
-import { newGroupSplitOf } from '@/runtime/workspace-layout/commands/layout-owner-new-group-split'
+import type { Tab } from '../../../../../../shared/tab-types'
+import { createBrowserUuid } from '@/lib/browser-uuid'
+import { sendLayoutApply, type WindowLayoutCommand } from '@/runtime/layout-apply-send'
+import { beginPendingTab } from '@/runtime/layout-owner-pending-tabs'
+import { newGroupSplitOf } from '@/runtime/layout-owner-new-group-split'
 import type { AppState } from '../../../types'
 import type { EditorTabSelection, OpenFile } from '../types/open-file'
 import { isEditorTabContentType, type EditorTabContentType } from './editor-tab-content-type'
 import { restorableEditorFile } from './editor-tab-layout-owner'
 import { layoutEditorViewOfOpenFile } from './open-file-layout-view'
-import { layoutFrameWorkspace } from '@/runtime/workspace-layout/frames/layout-frame-workspaces'
-import { editorTabFile } from '../../../../../../shared/workspace-layout/editor-tabs/workspace-layout-editor-tab-file'
-import { stableJson } from '../../../../../../shared/workspace-layout/persistence/workspace-layout-load-report'
+import { layoutFrameWorkspace } from '@/runtime/layout-frame-workspaces'
+import { editorTabFile } from '../../../../../../shared/workspace-layout/workspace-layout-editor-tab-file'
+import { stableJson } from '../../../../../../shared/workspace-layout/workspace-layout-load-report'
 import {
   publishEditorFile,
   publishEditorView
-} from '../../../../../../shared/workspace-layout/published-layout/workspace-layout-published'
+} from '../../../../../../shared/workspace-layout/workspace-layout-published'
 
 type EditorTabOpen = {
-  fixedTabId?: string
   fileId: string
   worktreeId: string
   contentType: EditorTabContentType
@@ -40,20 +33,17 @@ type EditorTabOpen = {
 
 /** What lets a reload or a second client rebuild the tab: an edit file's record, any view. */
 export function editorTabContent(
-  file: OpenFile,
-  placementWorkspaceId = file.worktreeId
+  file: OpenFile
 ): Pick<Extract<WindowLayoutCommand, { type: 'openEditorTab' }>, 'file' | 'view'> {
-  const view = layoutEditorViewOfOpenFile(file, placementWorkspaceId)
+  const view = layoutEditorViewOfOpenFile(file)
   return {
-    ...(file.mode === 'edit' && placementWorkspaceId === file.worktreeId
-      ? { file: restorableEditorFile(file) }
-      : {}),
+    ...(file.mode === 'edit' ? { file: restorableEditorFile(file) } : {}),
     ...(view ? { view } : {})
   }
 }
 
-function openFileOf(state: AppState, fileId: string): OpenFile | undefined {
-  return state.openFiles.find((file) => file.id === fileId)
+function openFileOf(state: AppState, worktreeId: string, fileId: string): OpenFile | undefined {
+  return state.openFiles.find((file) => file.id === fileId && file.worktreeId === worktreeId)
 }
 
 /** A live group of the window's, else its active one, else a root group frames then draw. */
@@ -81,19 +71,19 @@ export function openEditorTabThroughLayoutOwner(
   open: EditorTabOpen
 ): string | null {
   const { fileId, worktreeId } = open
-  const file = openFileOf(state, fileId)
+  const file = openFileOf(state, worktreeId, fileId)
   // A store without the tab slice draws no tab, as today's optional create does.
   if (!file || !state.createUnifiedTab) {
     return null
   }
-  const tabId = open.fixedTabId ?? createBrowserUuid()
+  const tabId = createBrowserUuid()
   const groupId = placementGroupId(state, worktreeId, open.groupId)
   const command: WindowLayoutCommand = {
     type: 'openEditorTab',
     tabId,
     fileId,
     contentType: open.contentType,
-    ...editorTabContent(file, worktreeId),
+    ...editorTabContent(file),
     ...(groupId ? { groupId, ...newGroupSplitOf(state, worktreeId, groupId, tabId) } : {}),
     ...(open.index !== undefined ? { index: open.index } : {}),
     // Main stamps the tab's time (ledger L186); the frame draws it.
@@ -102,9 +92,6 @@ export function openEditorTabThroughLayoutOwner(
   const settle = beginPendingTab(tabId, worktreeId, fileId, { kind: 'open', groupId })
   const sent = sendLayoutApply(state, worktreeId, command, {
     apply: (result) => {
-      if (!isPendingTab(tabId)) {
-        return
-      }
       const shownId = result.tabId ?? tabId
       // A throwing selection must not leave the tab pending: its waiters would never run.
       try {
@@ -114,9 +101,6 @@ export function openEditorTabThroughLayoutOwner(
       }
     },
     asToday: () => {
-      if (!isPendingTab(tabId)) {
-        return
-      }
       let shownId: string | null = null
       try {
         shownId = open.drawHere(tabId)?.id ?? null
@@ -174,11 +158,11 @@ export function sendReusedEditorTabToLayoutOwner(
   state: AppState,
   tab: Pick<Tab, 'id' | 'entityId' | 'worktreeId' | 'groupId' | 'contentType'>
 ): void {
-  const file = openFileOf(state, tab.entityId)
+  const file = openFileOf(state, tab.worktreeId, tab.entityId)
   if (!file || !isEditorTabContentType(tab.contentType)) {
     return
   }
-  const content = editorTabContent(file, tab.worktreeId)
+  const content = editorTabContent(file)
   if ((!content.file && !content.view) || frameHoldsEditorContent(tab, content)) {
     return
   }

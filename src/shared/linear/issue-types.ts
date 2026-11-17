@@ -40,7 +40,6 @@ export type LinearIssueChildSummary = {
   identifier: string
   title: string
   url: string
-  state?: LinearIssue['state']
 }
 
 export type LinearComment = {

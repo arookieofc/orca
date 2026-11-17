@@ -13,11 +13,11 @@ import path from 'node:path'
 import { test as base, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
-import { RuntimeClient } from '../../src/cli/runtime/client'
+import { RuntimeClient } from '../../src/cli/runtime-client'
 import type {
   RuntimeTerminalListResult,
   RuntimeTerminalSummary
-} from '../../src/shared/terminal/runtime/runtime-terminal-contracts'
+} from '../../src/shared/runtime-types'
 import {
   buildFakeAgentCommandOverride,
   FAKE_AGENT_WINDOWS_SHELL

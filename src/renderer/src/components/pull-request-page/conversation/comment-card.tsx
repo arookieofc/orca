@@ -1,34 +1,30 @@
-import { githubCommentImageUploadAddress } from '@/components/github/github-comment-image-upload-address'
 import React from 'react'
 import { ExternalLink, MessageSquarePlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import {
   PR_COMMENT_OPEN_AUTHOR_CLASS,
   PR_COMMENT_RESOLVED_AUTHOR_CLASS,
   PR_COMMENT_RESOLVED_CONTAINER_CLASS
-} from '@/lib/source-control/review/comments/pr-comment-resolution-classes'
+} from '@/lib/pr-comment-resolution-classes'
 import { formatRelativeTime } from '@/components/github/work-item-state-presentation'
 import { CommentCodeContext } from '@/components/github/CommentCodeContext'
 import { CommentReactions } from '@/components/github/CommentReactions'
 import { GitHubUserAvatar } from '@/components/github/github-user-avatar'
-import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
-import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../../shared/github/repositories/repository-identity'
-import type { GitHubPRFile } from '../../../../../shared/github/pull-requests/pull-request-types'
-import type { PRComment } from '../../../../../shared/github/comments/comment-types'
-import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
+import { translate } from '@/i18n/i18n'
+import type { GitHubOwnerRepo, GitHubPRFile } from '../../../../../shared/github/pull-request-types'
+import type { PRComment } from '../../../../../shared/github/comment-types'
+import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import type { MentionOption } from '../page-types'
 import { loadPRFileContents } from '../cache/file-content'
 import { CommentReplyForm } from '../comments/reply-form'
-import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 
 export function ConversationCommentCard({
   comment,
   isReply = false,
   repoPath,
-  itemType,
   repoId,
   sourceContext,
   prNumber,
@@ -44,7 +40,6 @@ export function ConversationCommentCard({
 }: {
   comment: PRComment
   isReply?: boolean
-  itemType: 'issue' | 'pr'
   repoPath: string | null
   repoId: string
   sourceContext?: TaskSourceContext | null
@@ -59,8 +54,6 @@ export function ConversationCommentCard({
   onToggleReply: (commentId: number) => void
   onSubmitReply: (comment: PRComment, replyBody: string) => Promise<boolean>
 }): React.JSX.Element {
-  const t = useTranslate()
-  const intlLocale = useIntlLocale()
   return (
     <div
       className={cn(
@@ -85,13 +78,13 @@ export function ConversationCommentCard({
           {comment.author}
         </span>
         <span className="shrink-0 text-[12px] text-muted-foreground">
-          · {formatRelativeTime(comment.createdAt, intlLocale)}
+          · {formatRelativeTime(comment.createdAt)}
         </span>
         {comment.path && (
           <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground/70">
             {comment.path.split('/').pop()}
             {comment.line
-              ? t('auto.components.PullRequestPage.34b9f7c264', ':L{{value0}}', {
+              ? translate('auto.components.PullRequestPage.34b9f7c264', ':L{{value0}}', {
                   value0: comment.line
                 })
               : ''}
@@ -99,7 +92,7 @@ export function ConversationCommentCard({
         )}
         {comment.isResolved && (
           <span className="rounded-full border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground">
-            {t('auto.components.PullRequestPage.76b2a0ac5b', 'resolved')}
+            {translate('auto.components.PullRequestPage.76b2a0ac5b', 'resolved')}
           </span>
         )}
         <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -110,13 +103,16 @@ export function ConversationCommentCard({
                 size="icon-xs"
                 className="size-7"
                 onClick={() => onToggleReply(comment.id)}
-                aria-label={t('auto.components.PullRequestPage.d6c6679de7', 'Reply to comment')}
+                aria-label={translate(
+                  'auto.components.PullRequestPage.d6c6679de7',
+                  'Reply to comment'
+                )}
               >
                 <MessageSquarePlus className="size-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              {t('auto.components.PullRequestPage.d6c6679de7', 'Reply to comment')}
+              {translate('auto.components.PullRequestPage.d6c6679de7', 'Reply to comment')}
             </TooltipContent>
           </Tooltip>
           {comment.url && (
@@ -127,8 +123,8 @@ export function ConversationCommentCard({
                   variant="ghost"
                   size="icon-xs"
                   className="size-7"
-                  onClick={(event) => openAppHttpLink(comment.url, { event })}
-                  aria-label={t(
+                  onClick={() => window.api.shell.openUrl(comment.url)}
+                  aria-label={translate(
                     'auto.components.PullRequestPage.0ac19bb52e',
                     'Open comment on GitHub'
                   )}
@@ -137,7 +133,7 @@ export function ConversationCommentCard({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                {t('auto.components.PullRequestPage.0ac19bb52e', 'Open comment on GitHub')}
+                {translate('auto.components.PullRequestPage.0ac19bb52e', 'Open comment on GitHub')}
               </TooltipContent>
             </Tooltip>
           )}
@@ -158,7 +154,6 @@ export function ConversationCommentCard({
         />
         <CommentMarkdown
           content={comment.body}
-          bodyImageUrls={comment.bodyImageUrls}
           variant="document"
           githubRepo={markdownGitHubRepo}
           className="min-w-0 max-w-full overflow-hidden break-words text-[13px] leading-relaxed [&_a]:break-all [&_code]:break-words [&_pre]:max-w-full"
@@ -166,18 +161,14 @@ export function ConversationCommentCard({
         <CommentReactions reactions={comment.reactions} />
         {resolvedReplyingTo === comment.id && (
           <CommentReplyForm
-            imageUploadAddress={githubCommentImageUploadAddress({
-              repoPath: repoPath ?? '',
-              repoId,
-              sourceContext,
-              type: itemType,
-              prRepo
-            })}
             className="mt-3"
             placeholder={
               comment.path
-                ? t('auto.components.PullRequestPage.408e634fbb', 'Reply in this review thread')
-                : t('auto.components.PullRequestPage.31a7b202f2', 'Reply to @{{value0}}', {
+                ? translate(
+                    'auto.components.PullRequestPage.408e634fbb',
+                    'Reply in this review thread'
+                  )
+                : translate('auto.components.PullRequestPage.31a7b202f2', 'Reply to @{{value0}}', {
                     value0: comment.author
                   })
             }

@@ -3,7 +3,7 @@ import type {
   CookieClearIdentity,
   CookieClearPartitionKey,
   CookieImportWriteStore
-} from './storage/cookie-store-contracts'
+} from './browser-cookie-import-clear'
 import type { SourcePartitionRead } from './sources/browser-cookie-source-partition'
 
 export type ImportedCookieFields = {

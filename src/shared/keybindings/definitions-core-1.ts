@@ -36,7 +36,11 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
     group: 'Global',
     scope: 'global',
     searchKeywords: ['shortcut', 'global', 'worktree', 'switch', 'jump'],
-    defaultBindings: platformBindings(['Mod+K'])
+    defaultBindings: {
+      darwin: ['Mod+J'],
+      linux: ['Mod+Shift+J'],
+      win32: ['Mod+Shift+J']
+    }
   },
   {
     id: 'worktree.navigateUp',
@@ -82,22 +86,22 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
   },
   {
     id: 'workspace.delete',
-    title: 'Delete Selected Workspace',
+    title: 'Delete Workspace',
     group: 'Global',
     scope: 'global',
     searchKeywords: [
       'shortcut',
       'global',
       'workspace',
-      'selected workspace',
-      'sidebar',
+      'current workspace',
       'worktree',
       'delete',
       'remove',
       'trash'
     ],
     // Why: Backspace avoids the terminal pane's D-based split shortcuts on every platform.
-    defaultBindings: platformBindings(['Mod+Shift+Backspace'])
+    defaultBindings: platformBindings(['Mod+Shift+Backspace']),
+    allowInTerminal: true
   },
   {
     id: 'workspace.openBoard',
@@ -175,14 +179,6 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
     scope: 'global',
     searchKeywords: ['shortcut', 'tasks', 'github issues', 'linear'],
     defaultBindings: platformBindings([])
-  },
-  {
-    id: 'view.plugins',
-    title: 'Open Plugins',
-    group: 'Global',
-    scope: 'global',
-    searchKeywords: ['shortcut', 'plugins', 'extensions', 'marketplace'],
-    defaultBindings: { darwin: ['Mod+Alt+X'], linux: ['Mod+Shift+Y'], win32: ['Mod+Shift+Y'] }
   },
   {
     id: 'sidebar.left.toggle',

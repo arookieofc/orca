@@ -4,18 +4,17 @@ import { Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
 import type {
   BrowserCertificateFailure,
   BrowserCertificateProceedFailureReason,
   BrowserCertificateProceedResult,
   BrowserLoadError
-} from '../../../../../shared/browser/workspaces/browser-workspace-types'
-import { normalizeCertificateError } from '../../../../../shared/browser/certificate-trust/browser-certificate-errors'
+} from '../../../../../shared/browser-workspace-types'
+import { normalizeCertificateError } from '../../../../../shared/browser-certificate-errors'
 import {
   describeBrowserLoadFailure,
   type BrowserLoadFailureRoute
-} from '../../../../../shared/browser/navigation/browser-load-failure'
+} from '../../../../../shared/browser-load-failure'
 import {
   formatLoadFailureDescription,
   formatLoadFailureTitle,
@@ -86,28 +85,27 @@ function getMatchingCertificateFailure(args: {
 }
 
 function formatCertificateProceedFailure(
-  reason: BrowserCertificateProceedFailureReason | 'request-failed',
-  t: Translate = translate
+  reason: BrowserCertificateProceedFailureReason | 'request-failed'
 ): string {
   if (reason === 'expired') {
-    return t(
+    return translate(
       'browser.loadFailure.certificateChallengeExpired',
       'This certificate approval expired. Retry the page to request a new one.'
     )
   }
   if (reason === 'changed' || reason === 'navigated') {
-    return t(
+    return translate(
       'browser.loadFailure.certificateChallengeChanged',
       'The certificate request changed. Retry the page and review the new warning.'
     )
   }
   if (reason === 'request-failed') {
-    return t(
+    return translate(
       'browser.loadFailure.certificateProceedFailed',
       'Orca could not approve this certificate request. Retry the page and try again.'
     )
   }
-  return t(
+  return translate(
     'browser.loadFailure.certificateChallengeUnavailable',
     'This certificate request is no longer available. Retry the page to request a new one.'
   )
@@ -126,7 +124,6 @@ export function BrowserLoadFailureOverlay({
   route = null,
   autoRetry
 }: BrowserLoadFailureOverlayProps): React.JSX.Element {
-  const t = useTranslate()
   const connectingTimerRef = useRef<{
     challengeId: string
     timer: ReturnType<typeof setTimeout>
@@ -149,7 +146,7 @@ export function BrowserLoadFailureOverlay({
       : loadError
   const certificateError = isCertificateLoadError(presentationLoadError)
   const failure = describeBrowserLoadFailure(presentationLoadError, route)
-  const description = formatLoadFailureDescription(presentationLoadError, failure, sshRoutedHint, t)
+  const description = formatLoadFailureDescription(presentationLoadError, failure, sshRoutedHint)
   const activeProceedAttempt =
     proceedAttempt?.challengeId === matchingCertificateFailure?.challengeId ? proceedAttempt : null
   const actionsDisabled = activeProceedAttempt?.state === 'submitting'
@@ -222,14 +219,14 @@ export function BrowserLoadFailureOverlay({
       disabled={actionsDisabled}
       onClick={() => void onRetry()}
     >
-      {t('browser.loadFailure.retry', 'Retry')}
+      {translate('browser.loadFailure.retry', 'Retry')}
     </Button>
   )
   const certificateActions = (
     <>
       {externalUrl && onOpenExternal ? (
         <Button size="sm" disabled={actionsDisabled} onClick={() => onOpenExternal(externalUrl)}>
-          {t('browser.loadFailure.openExternally', 'Open Externally')}
+          {translate('browser.loadFailure.openExternally', 'Open Externally')}
         </Button>
       ) : null}
       {retryButton}
@@ -244,10 +241,10 @@ export function BrowserLoadFailureOverlay({
           {activeProceedAttempt?.state === 'submitting' && activeProceedAttempt.showConnecting ? (
             <>
               <Loader2 className="animate-spin" />
-              {t('browser.loadFailure.connecting', 'Connecting…')}
+              {translate('browser.loadFailure.connecting', 'Connecting…')}
             </>
           ) : (
-            t('browser.loadFailure.proceedUnsafe', 'Proceed Anyway (Unsafe)')
+            translate('browser.loadFailure.proceedUnsafe', 'Proceed Anyway (Unsafe)')
           )}
         </Button>
       ) : null}
@@ -259,7 +256,7 @@ export function BrowserLoadFailureOverlay({
         <div className="flex min-h-full items-center justify-center px-8 pt-12 pb-24">
           <div aria-live="polite" className="w-full max-w-lg">
             <h2 className="text-xl font-semibold text-balance text-foreground">
-              {formatLoadFailureTitle(presentationLoadError, failure, t)}
+              {formatLoadFailureTitle(presentationLoadError, failure)}
             </h2>
             {description ? (
               <p className="mt-2 text-sm text-pretty text-muted-foreground">{description}</p>
@@ -269,7 +266,7 @@ export function BrowserLoadFailureOverlay({
             ) : null}
             {activeProceedAttempt?.state === 'failed' && activeProceedAttempt.reason ? (
               <p role="alert" className="mt-3 text-sm text-destructive">
-                {formatCertificateProceedFailure(activeProceedAttempt.reason, t)}
+                {formatCertificateProceedFailure(activeProceedAttempt.reason)}
               </p>
             ) : null}
             <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -285,7 +282,7 @@ export function BrowserLoadFailureOverlay({
                       data-testid="browser-load-failure-recheck-ssh-route"
                       onClick={onRecheckSshRoute}
                     >
-                      {t('browser.loadFailure.recheckSshRoute', 'Run connection check')}
+                      {translate('browser.loadFailure.recheckSshRoute', 'Run connection check')}
                     </Button>
                   ) : null}
                 </>

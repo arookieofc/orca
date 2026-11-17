@@ -1,10 +1,10 @@
 import type { SshConnectionCallbacks } from '../../ssh/connection/ssh-connection-callbacks'
-import type { SshConnectionState } from '../../../shared/remote-runtime/ssh/ssh-types'
+import type { SshConnectionState } from '../../../shared/ssh-types'
 import { isSshHostCensusInFlight } from '../../ssh/connection/ssh-connection-attribution'
 import {
   clearSshCredentialDeclined,
   isSshCredentialDeclined
-} from '../../ssh/authentication/ssh-credential-decline'
+} from '../../ssh/ssh-credential-decline'
 import {
   connectInFlight,
   credentialRequestedForTarget,

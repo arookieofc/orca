@@ -1,20 +1,20 @@
-import { getEnvironmentSshStateGeneration } from '../../ssh/runtime-environment-ssh'
-import { getRuntimeEnvironmentConnectionGeneration } from '../../runtime-status/runtime-status-connection-generation'
+import { getEnvironmentSshStateGeneration } from '../../runtime-environment-ssh'
+import { getRuntimeEnvironmentConnectionGeneration } from '../../runtime-status'
 import {
   createDetectedWorktreeRefreshLeaseRegistry,
   type DetectedWorktreeRefreshLease
-} from './detected-worktree-refresh-leases'
+} from '../../detected-worktree-refresh-leases'
 import {
   LOCAL_EXECUTION_HOST_ID,
   parseExecutionHostId,
   type ExecutionHostId
-} from '../../../../../../shared/execution-host/execution-host'
+} from '../../../../../../shared/execution-host'
 import type { DetectedWorktreeListResult } from '../../../../../../shared/worktree/types'
 import type {
   HostQualifiedDetectedWorktreeResult,
   ProviderRequestId,
   SshExecutionHostId
-} from '../../../../../../shared/worktree/catalog/detected-worktree-provider-contract'
+} from '../../../../../../shared/detected-worktree-provider-contract'
 import type {
   DetectedWorktreeRefreshOptions,
   DetectedWorktreeRefreshOutcome
@@ -61,11 +61,10 @@ export function acquireDetectedWorktreeRefreshLeaseForRepo(
   }
   const publicKey = detectedWorktreeRefreshKey(repoId, options)
   if (parsedHost.kind === 'local') {
-    return detectedWorktreeRefreshLeaseRegistry.acquire(
-      publicKey,
-      { repoId, executionHostId: LOCAL_EXECUTION_HOST_ID },
-      options.forceFresh
-    )
+    return detectedWorktreeRefreshLeaseRegistry.acquire(publicKey, {
+      repoId,
+      executionHostId: LOCAL_EXECUTION_HOST_ID
+    })
   }
   if (
     !options.directSshAuthority ||
@@ -73,15 +72,11 @@ export function acquireDetectedWorktreeRefreshLeaseForRepo(
   ) {
     throw new Error('Direct SSH provider leases require exact target authority')
   }
-  return detectedWorktreeRefreshLeaseRegistry.acquire(
-    publicKey,
-    {
-      repoId,
-      executionHostId: options.executionHostId as SshExecutionHostId,
-      expectedAuthority: { ...options.directSshAuthority }
-    },
-    options.forceFresh
-  )
+  return detectedWorktreeRefreshLeaseRegistry.acquire(publicKey, {
+    repoId,
+    executionHostId: options.executionHostId as SshExecutionHostId,
+    expectedAuthority: { ...options.directSshAuthority }
+  })
 }
 
 export function qualifiedProviderResultIsAdmitted(
@@ -153,7 +148,7 @@ async function listDetectedWorktreesForRuntimeRepoOnce(
   const key = detectedWorktreeRefreshKey(repoId, options)
   const connectionGeneration = getEnvironmentSshStateGeneration(environmentId)
   const runtimeConnectionGeneration = getRuntimeEnvironmentConnectionGeneration(environmentId)
-  let refresh = options.forceFresh ? undefined : runtimeDetectedWorktreeRefreshesInFlight.get(key)
+  let refresh = runtimeDetectedWorktreeRefreshesInFlight.get(key)
   if (!refresh) {
     refresh = listDetectedWorktreesForRepo({ kind: 'environment', environmentId }, repoId, {
       reuseRecentCompatibilityFailure: options.reuseRecentCompatibilityFailure

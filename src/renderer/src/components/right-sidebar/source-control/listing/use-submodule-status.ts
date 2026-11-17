@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { requireGitOwnerTarget } from '../sync/worktree-git-owner-target'
-import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
-import type { GitStatusEntry } from '../../../../../../shared/git/status/git-status-types'
-import { isWslDistroNotRunningRefusal } from '../../../../../../shared/remote-runtime/wsl-hosts/wsl-distro-not-running-refusal'
-import {
-  sourceControlConnectionId,
-  useSourceControlScope,
-  useSourceControlSectionActive
-} from '../panel/worktree-scope'
-import { getRuntimeGitSubmoduleStatus } from '@/runtime/source-control/git/runtime-git-status-client'
+import { requireGitOwnerTarget } from '../../worktree-git-owner-target'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
+import type { GitStatusEntry } from '../../../../../../shared/git-status-types'
+import { getConnectionId } from '@/lib/connection-context'
+import { getRuntimeGitSubmoduleStatus } from '@/runtime/runtime-git-status-client'
 import {
   getSubmoduleExpansionKey,
   isExpandableSubmoduleEntry,
@@ -34,13 +29,11 @@ export type UseSourceControlSubmoduleStatusResult = {
 export function useSourceControlSubmoduleStatus(
   input: UseSourceControlSubmoduleStatusInput
 ): UseSourceControlSubmoduleStatusResult {
-  const scope = useSourceControlScope()
-  const sectionActive = useSourceControlSectionActive()
   const { activeWorktreeId, worktreePath, activeRepoTarget, entries } = input
   const [expandedSubmoduleKeys, setExpandedSubmoduleKeys] = useState<Set<string>>(() => new Set())
   const activeRuntimeRouteKey =
     activeRepoTarget?.kind === 'environment' ? activeRepoTarget.environmentId : ''
-  const activeConnectionRouteKey = sourceControlConnectionId(scope, activeWorktreeId ?? null) ?? ''
+  const activeConnectionRouteKey = getConnectionId(activeWorktreeId ?? null) ?? ''
   const submoduleStatusScopeKey = `${activeConnectionRouteKey}\0${activeRuntimeRouteKey}\0${activeWorktreeId ?? ''}\0${worktreePath ?? ''}`
   // Store scope with results so late previous-host/worktree updates can no-op without render-time refs.
   const [submoduleStatusStore, setSubmoduleStatusStore] = useState<{
@@ -75,7 +68,7 @@ export function useSourceControlSubmoduleStatus(
             }
       )
       try {
-        const connectionId = sourceControlConnectionId(scope, activeWorktreeId ?? null)
+        const connectionId = getConnectionId(activeWorktreeId ?? null) ?? undefined
         const result = await getRuntimeGitSubmoduleStatus(
           {
             // Use the repo owner like the rest of the panel.
@@ -104,9 +97,7 @@ export function useSourceControlSubmoduleStatus(
         )
       } catch (error) {
         setSubmoduleStatusStore((prev) =>
-          prev.scope !== scopeAtStart ||
-          // A poll refused for a stopped WSL distro keeps the children already shown.
-          (prev.byKey[expansionKey]?.status === 'loaded' && isWslDistroNotRunningRefusal(error))
+          prev.scope !== scopeAtStart
             ? prev
             : {
                 ...prev,
@@ -121,7 +112,7 @@ export function useSourceControlSubmoduleStatus(
         )
       }
     },
-    [activeRepoTarget, activeWorktreeId, scope, submoduleStatusScopeKey, worktreePath]
+    [activeRepoTarget, activeWorktreeId, submoduleStatusScopeKey, worktreePath]
   )
 
   const toggleSubmodule = useCallback((entry: Pick<GitStatusEntry, 'area' | 'path'>) => {
@@ -139,9 +130,6 @@ export function useSourceControlSubmoduleStatus(
 
   // Refresh expanded children when parent entries change; collapsed submodules incur no Git work.
   useEffect(() => {
-    if (!sectionActive) {
-      return
-    }
     const visibleExpandableKeys = new Set(
       entries.filter(isExpandableSubmoduleEntry).map(getSubmoduleExpansionKey)
     )
@@ -150,7 +138,7 @@ export function useSourceControlSubmoduleStatus(
         void fetchSubmoduleStatus(expansionKey)
       }
     }
-  }, [expandedSubmoduleKeys, entries, fetchSubmoduleStatus, sectionActive])
+  }, [expandedSubmoduleKeys, entries, fetchSubmoduleStatus])
 
   return { expandedSubmoduleKeys, submoduleStatusByKey, toggleSubmodule }
 }

@@ -1,17 +1,17 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
-import type { Repo } from '../../../../shared/repository/repo-types'
-import { applyManualRepoOrder } from '../../../../shared/repository/manual-repo-order'
-import { retainValidFilterRepoIds } from './repo-filter-selection'
-import { readRuntimeWorktreeVisibilitySnapshot } from '../slices/settings/worktree-visibility-owner-settings'
-import { getRepoHostIdentity } from '../../../../shared/repository/repo-host-identity'
-import { filterSetupScriptPromptDismissalsToValidRepos } from '@/runtime/repo-hooks/setup-script-prompt'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host/execution-host'
-import { isRemovedRuntimeHostId } from '../host-catalog/removed-runtime-host-rows'
+import type { Repo } from '../../../../shared/repo-types'
+import { applyManualRepoOrder } from '../../../../shared/manual-repo-order'
+import { retainValidFilterRepoIds } from '../slices/repo-filter-selection'
+import { readRuntimeWorktreeVisibilitySnapshot } from '../slices/worktree-visibility-owner-settings'
+import { getRepoHostIdentity } from '../slices/repo-host-identity'
+import { filterSetupScriptPromptDismissalsToValidRepos } from '@/lib/setup-script-prompt'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host'
+import { isRemovedRuntimeHostId } from '../slices/stale-runtime-host-rows'
 import type { FetchedRepoCatalog } from './repo-catalog-merge'
 import type { LocalRepoCatalogFetchOutcome } from './repo-catalog-fencing'
 import type { RepoSlice } from './repo-state'
-import { arrayElementsUnchanged } from '../../lib/catalog-reconciliation/catalog-identity'
+import { arrayElementsUnchanged } from '../catalog-identity'
 import {
   latestAllHostRepoCatalogGenerationByStore,
   startLocalRepoCatalogFetch
@@ -21,7 +21,7 @@ import {
   isHostCatalogFenceCurrent,
   loadRuntimeHostCatalogs,
   type HostCatalogFence
-} from '../host-catalog/host-catalog-fence'
+} from '../host-catalog-fencing'
 import {
   fetchRepoCatalogForTarget,
   filterSetupsForPrunedRepoRows,
@@ -30,14 +30,9 @@ import {
   reconcileFetchedCatalogWorktreeState,
   reconcileSupersededSshRepos
 } from './repo-catalog-merge'
-import { getRuntimeTargetHostId } from '../../runtime/rpc/targets/runtime-client-target'
-import { mergeFetchedHostProjectCatalog } from '../../../../shared/project/catalog/project-compatibility-host-merge'
+import { getRuntimeTargetHostId } from '../../runtime/runtime-client-target'
+import { mergeFetchedHostProjectCatalog } from '../../../../shared/project-compatibility-host-merge'
 import { scheduleSafeAutoForkSync } from './safe-auto-fork-sync'
-import { noteLiveRepoCatalogApplied } from './saved-host-catalog-rows'
-import {
-  withWslMovedRepoIds,
-  withWslMovedSetupScriptDismissals
-} from './wsl-moved-repo-ui-retention'
 
 export function createAllHostRepoCatalogActions(
   set: Parameters<StateCreator<AppState>>[0],
@@ -73,9 +68,9 @@ export function createAllHostRepoCatalogActions(
           const finalizedRepos = applyManualRepoOrder(reconciliation.repos, s.manualRepoOrder)
           const mergedProjectCompatibility = mergeFetchedHostProjectCatalog({
             previous: {
-              projects: s.projects,
+              projects: s.endpointProjects,
               projectHostSetups: filterSetupsForPrunedRepoRows(
-                s.projectHostSetups,
+                s.endpointProjectHostSetups,
                 result.repos,
                 finalizedRepos
               )
@@ -90,13 +85,9 @@ export function createAllHostRepoCatalogActions(
           return {
             repos: finalizedRepos,
             pendingSshRepoReadoptions: reconciliation.pendingReadoptions,
-            ...reconcileFetchedCatalogWorktreeState(
-              s,
-              catalog,
-              finalizedRepos,
-              reconciliation.pendingReadoptions
-            ),
-            ...mergedProjectCompatibility,
+            ...reconcileFetchedCatalogWorktreeState(s, catalog, finalizedRepos),
+            endpointProjects: mergedProjectCompatibility.projects,
+            endpointProjectHostSetups: mergedProjectCompatibility.projectHostSetups,
             ...(arrayElementsUnchanged(finalizedRepos, s.repos)
               ? {}
               : { folderWorkspacePathStatuses: {} }),
@@ -105,7 +96,6 @@ export function createAllHostRepoCatalogActions(
             setupScriptPromptDismissedRepoIds: s.setupScriptPromptDismissedRepoIds
           }
         })
-        noteLiveRepoCatalogApplied(get, catalog.hostId)
         // Why: keep the safe-auto fork sync (as fetchRepos does) so cold-start, which now routes here, still updates safe-auto forks.
         scheduleSafeAutoForkSync(hostRepos)
         if (options?.onHostLoaded) {
@@ -128,24 +118,15 @@ export function createAllHostRepoCatalogActions(
         set((s) => {
           const validRepoIds = new Set(s.repos.map((repo) => repo.id))
           const validRepoHostIdentities = new Set(s.repos.map(getRepoHostIdentity))
-          // A moved repo's host may be the catalog that didn't load (e.g. its WSL environment).
-          const retainedRepoIds = withWslMovedRepoIds(validRepoIds, s.wslMovedProjects)
           return {
             activeRepoId:
               s.activeRepoId && validRepoIds.has(s.activeRepoId) ? s.activeRepoId : null,
-            filterRepoIds: retainValidFilterRepoIds(s.filterRepoIds, retainedRepoIds),
-            setupScriptPromptDismissedRepoIds: withWslMovedSetupScriptDismissals(
+            filterRepoIds: retainValidFilterRepoIds(s.filterRepoIds, validRepoIds),
+            setupScriptPromptDismissedRepoIds: filterSetupScriptPromptDismissalsToValidRepos(
               s.setupScriptPromptDismissedRepoIds,
-              filterSetupScriptPromptDismissalsToValidRepos(
-                s.setupScriptPromptDismissedRepoIds,
-                validRepoHostIdentities
-              ),
-              s.wslMovedProjects
+              validRepoHostIdentities
             ),
-            trustedOrcaHooks: filterTrustedOrcaHooksToValidRepos(
-              s.trustedOrcaHooks,
-              retainedRepoIds
-            )
+            trustedOrcaHooks: filterTrustedOrcaHooksToValidRepos(s.trustedOrcaHooks, validRepoIds)
           }
         })
       }
@@ -156,14 +137,7 @@ export function createAllHostRepoCatalogActions(
       const localFence = claimHostCatalogFence(get, 'repos', { kind: 'local' })
       try {
         if (
-          !applyCatalog(
-            await fetchRepoCatalogForTarget(
-              { kind: 'local' },
-              get().repos,
-              get().githubSourceCollections
-            ),
-            localFence
-          )
+          !applyCatalog(await fetchRepoCatalogForTarget({ kind: 'local' }, get().repos), localFence)
         ) {
           failed = true
         }
@@ -190,7 +164,7 @@ export function createAllHostRepoCatalogActions(
         'repos',
         async (target, fence) => {
           const [catalogResult, visibilitySnapshot] = await Promise.all([
-            fetchRepoCatalogForTarget(target, get().repos, get().githubSourceCollections).then(
+            fetchRepoCatalogForTarget(target, get().repos).then(
               (catalog) => ({ ok: true as const, catalog }),
               (error: unknown) => ({ ok: false as const, error })
             ),

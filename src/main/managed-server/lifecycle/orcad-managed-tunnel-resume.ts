@@ -1,11 +1,11 @@
-import { sendRemoteRuntimeRequestOnSocket } from '../../../shared/remote-runtime/requests/remote-runtime-request-socket'
+import { sendRemoteRuntimeRequest } from '../../../shared/remote-runtime/remote-runtime-client'
 import {
   getPreferredPairedRuntimeConnection,
   type KnownRuntimeEnvironment,
   type RuntimeSshTunnelLink
-} from '../../../shared/remote-runtime/host-catalog/runtime-environments'
+} from '../../../shared/runtime-environments'
 import type { SshConnection } from '../../ssh/connection/ssh-connection'
-import type { SshTarget } from '../../../shared/remote-runtime/ssh/ssh-types'
+import type { SshTarget } from '../../../shared/ssh-types'
 import type { OrcadManagedServing } from './orcad-managed-serving'
 import type { SshConnectionManager } from '../../ssh/connection/ssh-connection-manager'
 import type { SshPortForwardManager } from '../../ssh/port-forwarding/ssh-port-forward'
@@ -36,9 +36,7 @@ export type OrcadManagedServingCheck = (input: {
 
 export type OrcadManagedTunnelResumeOptions = {
   attempts: number
-  resolveEnvironment: (
-    environmentId: string
-  ) => KnownRuntimeEnvironment | null | Promise<KnownRuntimeEnvironment | null>
+  resolveEnvironment: (environmentId: string) => KnownRuntimeEnvironment | null
   timeoutMs: number
 }
 
@@ -107,11 +105,8 @@ export class OrcadManagedTunnelResumeRecovery {
   ): Promise<void> {
     const ownershipGeneration = this.dependencies.ownershipGenerations.get(environmentId) ?? 0
     for (let attempt = 0; attempt < options.attempts; attempt++) {
-      const resolved = await this.resolveEnvironment(environmentId, active, options)
-      if (
-        !resolved ||
-        !this.stillOwned(environmentId, active, ownershipGeneration, managerGeneration)
-      ) {
+      const resolved = this.resolveEnvironment(environmentId, active, options)
+      if (!resolved) {
         return
       }
       if (await this.probeTunnel(resolved.environment, options.timeoutMs)) {
@@ -129,11 +124,10 @@ export class OrcadManagedTunnelResumeRecovery {
     if (!this.stillOwned(environmentId, active, ownershipGeneration, managerGeneration)) {
       return
     }
-    const resolved = await this.resolveEnvironment(environmentId, active, options)
+    const resolved = this.resolveEnvironment(environmentId, active, options)
     const connectionManager = this.dependencies.getConnectionManager()
     if (
       !resolved ||
-      !this.stillOwned(environmentId, active, ownershipGeneration, managerGeneration) ||
       !connectionManager ||
       connectionManager.getConnection(active.targetId) !== active.connection
     ) {
@@ -173,10 +167,7 @@ export class OrcadManagedTunnelResumeRecovery {
     ) {
       return
     }
-    if (
-      !(await this.resolveEnvironment(environment.id, active, options)) ||
-      !this.stillOwned(environment.id, active, ownershipGeneration, managerGeneration)
-    ) {
+    if (!this.resolveEnvironment(environment.id, active, options)) {
       return
     }
 
@@ -196,11 +187,8 @@ export class OrcadManagedTunnelResumeRecovery {
       return
     }
 
-    const current = await this.resolveEnvironment(environment.id, active, options)
-    if (
-      !current ||
-      !this.stillOwned(environment.id, active, ownershipGeneration, managerGeneration)
-    ) {
+    const current = this.resolveEnvironment(environment.id, active, options)
+    if (!current) {
       return
     }
     const { deployment } = current
@@ -214,13 +202,10 @@ export class OrcadManagedTunnelResumeRecovery {
       target,
       connection: active.connection
     })
-    const stillCurrent = async (): Promise<() => boolean> => {
-      const resolved = await this.resolveEnvironment(environment.id, active, options)
-      return () =>
-        active.connection.getConnectGeneration() === transportGeneration &&
-        this.stillOwned(environment.id, active, ownershipGeneration, managerGeneration) &&
-        resolved !== null
-    }
+    const stillCurrent = (): boolean =>
+      active.connection.getConnectGeneration() === transportGeneration &&
+      this.stillOwned(environment.id, active, ownershipGeneration, managerGeneration) &&
+      this.resolveEnvironment(environment.id, active, options) !== null
     const forward = await forwardToVerifiedOrcad({
       targetId: active.targetId,
       connection: active.connection,
@@ -231,7 +216,7 @@ export class OrcadManagedTunnelResumeRecovery {
       stillCurrent
     })
     // Teardown may occur between the build's last check and recording its forward.
-    if (!forward || !(await stillCurrent())()) {
+    if (!forward || !stillCurrent()) {
       await (forward && this.dependencies.forwards.removeForwardAndWait(forward.id))
       return
     }
@@ -246,12 +231,12 @@ export class OrcadManagedTunnelResumeRecovery {
     await this.dependencies.checkServing?.(current.environment)
   }
 
-  private async resolveEnvironment(
+  private resolveEnvironment(
     environmentId: string,
     active: ActiveOrcadTunnel,
     options: OrcadManagedTunnelResumeOptions
-  ): Promise<ResolvedManagedTunnelEnvironment | null> {
-    const environment = await options.resolveEnvironment(environmentId)
+  ): ResolvedManagedTunnelEnvironment | null {
+    const environment = options.resolveEnvironment(environmentId)
     const deployment = managedTunnelAccess(
       environment,
       this.dependencies.getTargetStore()?.getTarget(active.targetId),
@@ -286,17 +271,11 @@ export async function probeManagedOrcadTunnel(
   timeoutMs: number
 ): Promise<boolean> {
   try {
-    await sendRemoteRuntimeRequestOnSocket(
+    await sendRemoteRuntimeRequest(
       getPreferredPairedRuntimeConnection(environment),
       'status.get',
       undefined,
-      timeoutMs,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined
+      timeoutMs
     )
     return true
   } catch {

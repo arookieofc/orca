@@ -1,8 +1,7 @@
 import { useAppStore } from '@/store'
-import type { AgentCompletionStatusSnapshot } from '@/components/terminal-pane/agent-completion/agent-completion-coordinator-types'
-import { NOTIFICATION_COOLDOWN_MS } from '../../../shared/notifications/notification-burst-cooldown'
-import type { NotificationDispatchResult } from '../../../shared/notifications/notification-settings-types'
-import { recordAgentFinishDropped } from '@/attention/agent-finish-drop-breadcrumb'
+import type { AgentCompletionStatusSnapshot } from '@/components/terminal-pane/agent-completion-coordinator-types'
+import { NOTIFICATION_COOLDOWN_MS } from '../../../shared/notification-burst-cooldown'
+import type { NotificationDispatchResult } from '../../../shared/notification-settings-types'
 
 export type HookLaneCompletionSubmit = (
   onResult: (result: NotificationDispatchResult | null) => void
@@ -43,11 +42,7 @@ function clearTimer(requests: PaneRequests): void {
   }
 }
 
-function armHeldTimer(
-  paneKey: string,
-  requests: PaneRequests,
-  submitAfterCooldown: () => void
-): void {
+function armHeldTimer(requests: PaneRequests, submitAfterCooldown: () => void): void {
   const held = requests.held
   if (!held) {
     return
@@ -56,7 +51,6 @@ function armHeldTimer(
   const cooldownEndsAt = requests.cooldownEndsAt
   if (cooldownEndsAt !== null && cooldownEndsAt > held.expiresAt) {
     requests.held = null
-    recordAgentFinishDropped('held-revision-expired', { paneKey })
     return
   }
   // Use fixed expiry so repeated revisions cannot retain an unanswered request forever.
@@ -66,7 +60,6 @@ function armHeldTimer(
       requests.timer = null
       if (cooldownEndsAt === null) {
         requests.held = null
-        recordAgentFinishDropped('held-revision-expired', { paneKey })
         return
       }
       submitAfterCooldown()
@@ -95,7 +88,7 @@ function submitNow(
       clearTimer(requests)
       return
     }
-    armHeldTimer(paneKey, requests, () => submitHeld(paneKey, requests))
+    armHeldTimer(requests, () => submitHeld(paneKey, requests))
   })
   if (!sent && requests.requestSeq === seq) {
     requests.cooldownEndsAt = 0
@@ -121,13 +114,12 @@ export function submitHookLaneCompletion(
   const segment = done?.stateStartedAt
   // Why: sent only while the pane still shows this end and the lane keeps hook authority.
   const isCurrent = (): boolean => {
-    const row = useAppStore.getState().agentStatusByPaneKey.get(paneKey)
+    const row = useAppStore.getState().agentStatusByPaneKey[paneKey]
     return (
-      lane.keepsAuthority() &&
-      (!row ||
-        (row.state === 'done' &&
-          row.stateStartedAt === segment &&
-          row.turnEndedAt === done?.turnEndedAt))
+      row?.state === 'done' &&
+      row.stateStartedAt === segment &&
+      row.turnEndedAt === done?.turnEndedAt &&
+      lane.keepsAuthority()
     )
   }
   let requests = requestsByPaneKey.get(paneKey)
@@ -148,7 +140,7 @@ export function submitHookLaneCompletion(
       expiresAt: requests.held?.expiresAt ?? Date.now() + 2 * NOTIFICATION_COOLDOWN_MS
     }
     const paneRequests = requests
-    armHeldTimer(paneKey, requests, () => submitHeld(paneKey, paneRequests))
+    armHeldTimer(requests, () => submitHeld(paneKey, paneRequests))
     return
   }
   clearTimer(requests)

@@ -1,7 +1,7 @@
-import type { WorkspaceAttachmentMutation } from '../../../../../../shared/workspace-attachments/workspace-attachment-mutation'
+import type { WorkspaceAttachmentMutation } from '../../../../../../shared/workspace-attachment-mutation'
 import type { WorktreeMeta } from '../../../../../../shared/worktree/meta-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
-import { getHostedReviewLinkForMetaRefresh } from './hosted-review-link-update-encoding'
+import { getHostedReviewLinkForMetaRefresh } from './hosted-review-link-mutation'
 
 const REVIEW_SLOTS = [
   'linkedPR',

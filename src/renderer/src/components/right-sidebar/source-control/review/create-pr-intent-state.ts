@@ -1,4 +1,7 @@
-import type { PrimaryAction } from './source-control-primary-action-types'
+import type { PrimaryAction } from '../../source-control-primary-action-types'
+import { resolveCreateReviewIntentEligibility } from '../../../../../../shared/source-control-create-review-intent'
+
+export const resolveCreatePrIntentEligibility = resolveCreateReviewIntentEligibility
 
 export function resolveVisibleCreatePrHeaderAction({
   createPrHeaderAction

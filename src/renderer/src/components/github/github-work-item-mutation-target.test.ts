@@ -47,4 +47,8 @@ describe('getGitHubMutationTarget', () => {
       environmentId: 'board-runtime'
     })
   })
+
+  it("uses this computer's credentials for other slug edits with no known repo", () => {
+    expect(getGitHubMutationTarget(null, undefined)).toEqual({ kind: 'local' })
+  })
 })

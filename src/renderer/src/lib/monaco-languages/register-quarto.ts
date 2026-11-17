@@ -15,6 +15,9 @@ type QuartoMonaco = {
 
 export const QUARTO_LANGUAGE_ID = 'quarto'
 
+// Quarto files are edited as Markdown: same comment syntax and bracket pairs.
+export const quartoLanguageConfiguration: Monaco.languages.LanguageConfiguration = markdownConf
+
 const markdownTokenizer = markdownLanguage.tokenizer
 
 // `$S2` substitutes the opening fence; a regex literal would interpret `$` as an anchor.
@@ -96,6 +99,6 @@ export function registerQuartoLanguage(monaco: QuartoMonaco): void {
     extensions: ['.qmd', '.rmd', '.rmarkdown'],
     aliases: ['Quarto', 'quarto', 'R Markdown']
   })
-  monaco.languages.setLanguageConfiguration(QUARTO_LANGUAGE_ID, markdownConf)
+  monaco.languages.setLanguageConfiguration(QUARTO_LANGUAGE_ID, quartoLanguageConfiguration)
   monaco.languages.setMonarchTokensProvider(QUARTO_LANGUAGE_ID, quartoMonarchLanguage)
 }

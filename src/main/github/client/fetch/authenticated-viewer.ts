@@ -1,6 +1,5 @@
-import type { GitHubViewer } from '../../../../shared/github/pull-requests/pull-request-types'
-import { ghExecFileAsync } from '../../../git/command-runner/hosted-cli/gh-exec-file'
-import { acquire, release } from '../../execution/github-operation-slots'
+import type { GitHubViewer } from '../../../../shared/github/pull-request-types'
+import { ghExecFileAsync, acquire, release } from '../../gh-utils'
 /** Use the bounded runner so failed viewer probes return null without stranding a GitHub admission slot. */
 export async function getAuthenticatedViewer(): Promise<GitHubViewer | null> {
   await acquire()
@@ -21,20 +20,5 @@ export async function getAuthenticatedViewer(): Promise<GitHubViewer | null> {
     return null
   } finally {
     release()
-  }
-}
-
-/** gh keys --cache by token, so a switched account never gets the old login. */
-export async function readViewerLogin(
-  ghOptions: Parameters<typeof ghExecFileAsync>[1]
-): Promise<string | null> {
-  try {
-    const { stdout } = await ghExecFileAsync(
-      ['api', '--cache', '60s', 'user', '--jq', '.login'],
-      ghOptions
-    )
-    return stdout.trim() || null
-  } catch {
-    return null
   }
 }

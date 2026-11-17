@@ -1,8 +1,4 @@
-import type {
-  MessageType,
-  MessageRow,
-  LegacyCompatibilityPrincipalRow
-} from '../orchestration-records'
+import type { MessageType, MessageRow, LegacyCompatibilityPrincipalRow } from '../../types'
 import { LEGACY_CONTRACT_VERSION } from '../contract-constants'
 import { ORCHESTRATION_DELIVERY_BATCH_LIMIT } from '../messages/mailbox-routing-page'
 import { exposeMessageListTimestamps } from '../utc-timestamp'

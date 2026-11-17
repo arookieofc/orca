@@ -1,18 +1,19 @@
-import type { RuntimeNativeChatFileContext } from '../../../shared/native-chat/file-access/native-chat-file-context'
-import type { RuntimeTerminalPathResolution } from '../../../shared/terminal/runtime-terminal-file-path'
-import { parseWslPath } from '../../wsl/filesystem/unc-path-access'
-import {
-  relativePathInsideRoot,
-  resolveRuntimePath
-} from '../../../shared/file-access/cross-platform-path'
+import type {
+  RuntimeNativeChatFileContext,
+  RuntimeTerminalPathResolution
+} from '../../../shared/runtime-types'
+import { parseWslPath } from '../../wsl'
+import { relativePathInsideRoot, resolveRuntimePath } from '../../../shared/cross-platform-path'
 import { homedir } from 'node:os'
 import { resolveTerminalAbsolutePath } from './terminal-file-path'
 import { requireRuntimeFileProvider, runtimeFileRouteForTarget } from '../files/file-target'
 import { isSafeMobileRelativePath } from '../files/mobile-file-kind'
-import { isENOENT } from '../../filesystem/local-file-io/filesystem-path-containment'
+import { isENOENT } from '../../ipc/filesystem/filesystem-path-containment'
 import type { RuntimeFileCommandHost } from '../files/file-command-host'
 import type { RuntimeTerminalArtifacts } from './artifacts/terminal-artifacts'
-import { SSH_OUTSIDE_WORKSPACE_UNSUPPORTED_MESSAGE } from '../../../shared/terminal/runtime-terminal-file-path'
+
+const SSH_OUTSIDE_WORKSPACE_UNSUPPORTED_MESSAGE =
+  "Files outside an SSH workspace can't be opened from another device yet."
 
 type RuntimeTerminalPathHost = Pick<
   RuntimeFileCommandHost,
@@ -21,7 +22,6 @@ type RuntimeTerminalPathHost = Pick<
   | 'resolveKnownWorkspaceFileTarget'
   | 'resolveTerminalCwd'
   | 'resolveTerminalFileUriHostname'
-  | 'resolveNativeChatMediaPath'
 >
 type RuntimeTerminalArtifactAuthority = Pick<RuntimeTerminalArtifacts, 'resolveAbsoluteFileGrant'>
 
@@ -39,7 +39,8 @@ export class RuntimeTerminalPathResolver {
     clientId?: string,
     terminalHandle?: string | null,
     crossWorkspace?: boolean,
-    nativeChatContext?: RuntimeNativeChatFileContext | null
+    // Why: still sent by clients; any caller may open any host path, so the citing chat no longer matters.
+    _nativeChatContext?: RuntimeNativeChatFileContext | null
   ): Promise<RuntimeTerminalPathResolution> {
     // Why: an absent store fails as runtime_unavailable before target resolution.
     this.host.requireStore()
@@ -66,30 +67,12 @@ export class RuntimeTerminalPathResolver {
       isDirectory: false
     }
 
-    const media = nativeChatContext
-      ? await this.host.resolveNativeChatMediaPath?.({
-          worktreeId: worktree.id,
-          worktreePath: worktree.path,
-          executionHostId: target.executionHostId,
-          pathText,
-          context: nativeChatContext
-        })
-      : undefined
-    if (media?.kind === 'ambiguous') {
-      return empty
-    }
-
     // Never expand SSH/WSL home-relative grants using this machine's home.
     const isTilde = pathText.startsWith('~/') || pathText.startsWith('~\\')
     if (isTilde && (connectionId || parseWslPath(worktree.path))) {
       return empty
     }
-    const expanded =
-      media?.kind === 'matched'
-        ? media.absolutePath
-        : isTilde
-          ? resolveRuntimePath(homedir(), pathText.slice(2))
-          : pathText
+    const expanded = isTilde ? resolveRuntimePath(homedir(), pathText.slice(2)) : pathText
     const absolutePath = resolveTerminalAbsolutePath({
       base,
       expanded,
@@ -119,23 +102,6 @@ export class RuntimeTerminalPathResolver {
               absolutePath
             )
           ).type === 'directory'
-        // Why: a workspace nested inside this one is inside its root, so the outside-root lookup above never sees it.
-        const nestedWorkspace =
-          crossWorkspace && isDirectory && !knownWorkspaceTarget && ownedRelativePath !== ''
-            ? await this.host.resolveKnownWorkspaceFileTarget?.(
-                absolutePath,
-                target.executionHostId
-              )
-            : null
-        if (nestedWorkspace?.relativePath === '') {
-          return {
-            worktree: nestedWorkspace.worktree.id,
-            relativePath: '',
-            absolutePath,
-            exists: true,
-            isDirectory: true
-          }
-        }
         return {
           worktree: ownedWorktree.id,
           relativePath: ownedRelativePath,

@@ -3,10 +3,12 @@ import { toast } from 'sonner'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 import type { Platform } from './MobileHero'
-import { ANDROID_INSTALL_GUIDE_URL, getInstallCopy } from './mobile-platform-copy'
-import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
+import { ANDROID_INSTALL_GUIDE_URL, getInstallCopy, type IosChannel } from './mobile-platform-copy'
 
-export function useMobileInstallActions(platform: Platform): {
+export function useMobileInstallActions(
+  platform: Platform,
+  iosChannel: IosChannel
+): {
   copyInstallUrl: () => Promise<void>
   openAndroidInstallGuide: () => void
   openInstallUrl: () => void
@@ -14,16 +16,16 @@ export function useMobileInstallActions(platform: Platform): {
   const mountedRef = useMountedRef()
 
   const openInstallUrl = useCallback((): void => {
-    openAppHttpLink(getInstallCopy(platform).url)
-  }, [platform])
+    void window.api.shell.openUrl(getInstallCopy(platform, iosChannel).url)
+  }, [iosChannel, platform])
 
   const openAndroidInstallGuide = useCallback((): void => {
-    openAppHttpLink(ANDROID_INSTALL_GUIDE_URL)
+    void window.api.shell.openUrl(ANDROID_INSTALL_GUIDE_URL)
   }, [])
 
   const copyInstallUrl = useCallback(async (): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(getInstallCopy(platform).url)
+      await window.api.ui.writeClipboardText(getInstallCopy(platform, iosChannel).url)
       if (mountedRef.current) {
         toast.success(
           translate('auto.components.mobile.MobilePage.fad833de8d', 'Install link copied')
@@ -37,7 +39,7 @@ export function useMobileInstallActions(platform: Platform): {
         )
       }
     }
-  }, [mountedRef, platform])
+  }, [iosChannel, mountedRef, platform])
 
   return { copyInstallUrl, openAndroidInstallGuide, openInstallUrl }
 }

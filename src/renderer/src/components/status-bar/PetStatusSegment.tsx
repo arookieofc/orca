@@ -13,18 +13,13 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { useAppStore } from '../../store/index'
+import { useAppStore } from '../../store'
 import { BUNDLED_PET, BUNDLED_PETS, findBundledPet, isBundledPetId } from '../pet/pet-models'
-import { PET_SIZE_MAX, PET_SIZE_MIN } from '../../../../shared/pets/pet-types'
-import { useTranslate } from '@/i18n/use-translate'
-import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
-import { isPetImportFailure } from '../../../../shared/pets/pet-import-failure-copy'
-import { customPetLabel, petImportFailureText } from '../pet/pet-import-failure-text'
+import { PET_SIZE_MAX, PET_SIZE_MIN } from '../../../../shared/pet-types'
+import { translate } from '@/i18n/i18n'
 
 // Keep visibility separate from experimental enablement so users can dismiss the pet without revisiting Settings.
 function PetStatusSegmentInner(): React.JSX.Element {
-  const t = useTranslate()
-  useUiLanguageRevision()
   const petVisible = useAppStore((s) => s.petVisible)
   const setPetVisible = useAppStore((s) => s.setPetVisible)
   const petId = useAppStore((s) => s.petId)
@@ -40,23 +35,15 @@ function PetStatusSegmentInner(): React.JSX.Element {
   const bundled = isBundledPetId(petId)
   const activeBundled = bundled ? (findBundledPet(petId) ?? BUNDLED_PET) : null
   const activeCustom = bundled ? null : customPets.find((m) => m.id === petId)
-  const activeLabel = activeBundled
-    ? activeBundled.label
-    : activeCustom
-      ? customPetLabel(activeCustom, t)
-      : t('auto.components.status.bar.PetStatusSegment.petFallbackLabel', 'Pet')
-  const label = petVisible
-    ? activeLabel
-    : t('auto.components.status.bar.PetStatusSegment.petHiddenLabel', '{{pet}} hidden', {
-        pet: activeLabel
-      })
+  const activeLabel = activeBundled ? activeBundled.label : (activeCustom?.label ?? 'Pet')
+  const label = petVisible ? activeLabel : `${activeLabel} hidden`
 
   const handleImport = async (): Promise<void> => {
     console.log('[pet-overlay] upload: click')
     if (!window.api?.pet?.import) {
       console.warn('[pet-overlay] upload: window.api.pet.import missing — restart Orca')
       toast.error(
-        t(
+        translate(
           'auto.components.status.bar.PetStatusSegment.e6234bcc17',
           'Custom pet upload needs a full app restart (not just reload).'
         )
@@ -69,10 +56,6 @@ function PetStatusSegmentInner(): React.JSX.Element {
       if (!model) {
         return
       }
-      if (isPetImportFailure(model)) {
-        toast.error(petImportFailureText(model))
-        return
-      }
       addCustomPet(model)
       if (!petVisible) {
         setPetVisible(true)
@@ -83,7 +66,10 @@ function PetStatusSegmentInner(): React.JSX.Element {
       toast.error(
         error instanceof Error
           ? error.message
-          : t('auto.components.status.bar.PetStatusSegment.f395c9a685', 'Failed to import file')
+          : translate(
+              'auto.components.status.bar.PetStatusSegment.f395c9a685',
+              'Failed to import file'
+            )
       )
     }
   }
@@ -91,7 +77,7 @@ function PetStatusSegmentInner(): React.JSX.Element {
   const handleImportPetBundle = async (): Promise<void> => {
     if (!window.api?.pet?.importPetBundle) {
       toast.error(
-        t(
+        translate(
           'auto.components.status.bar.PetStatusSegment.2021d4f6db',
           'Pet bundle import needs a full app restart (not just reload).'
         )
@@ -101,10 +87,6 @@ function PetStatusSegmentInner(): React.JSX.Element {
     try {
       const model = await window.api.pet.importPetBundle()
       if (!model) {
-        return
-      }
-      if (isPetImportFailure(model)) {
-        toast.error(petImportFailureText(model))
         return
       }
       addCustomPet(model)
@@ -117,7 +99,7 @@ function PetStatusSegmentInner(): React.JSX.Element {
       toast.error(
         error instanceof Error
           ? error.message
-          : t(
+          : translate(
               'auto.components.status.bar.PetStatusSegment.cef0ab4636',
               'Failed to import pet bundle'
             )
@@ -131,7 +113,10 @@ function PetStatusSegmentInner(): React.JSX.Element {
         <button
           type="button"
           className="group inline-flex items-center cursor-pointer pl-1 py-0.5"
-          aria-label={t('auto.components.status.bar.PetStatusSegment.aec479308a', 'Pet menu')}
+          aria-label={translate(
+            'auto.components.status.bar.PetStatusSegment.aec479308a',
+            'Pet menu'
+          )}
         >
           <span
             className={`rounded px-1 py-0.5 text-[11px] font-medium text-muted-foreground group-hover:bg-accent/70 group-hover:text-foreground ${petVisible ? '' : 'opacity-50'}`}
@@ -142,7 +127,7 @@ function PetStatusSegmentInner(): React.JSX.Element {
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="end" sideOffset={8} className="min-w-[220px]">
         <DropdownMenuLabel>
-          {t('auto.components.status.bar.PetStatusSegment.34c25dfe9c', 'Pet')}
+          {translate('auto.components.status.bar.PetStatusSegment.34c25dfe9c', 'Pet')}
         </DropdownMenuLabel>
         <DropdownMenuItem
           onSelect={(event) => {
@@ -151,8 +136,8 @@ function PetStatusSegmentInner(): React.JSX.Element {
           }}
         >
           {petVisible
-            ? t('auto.components.status.bar.PetStatusSegment.1fbc51cc77', 'Hide pet')
-            : t('auto.components.status.bar.PetStatusSegment.6d0a8cd179', 'Show pet')}
+            ? translate('auto.components.status.bar.PetStatusSegment.1fbc51cc77', 'Hide pet')
+            : translate('auto.components.status.bar.PetStatusSegment.6d0a8cd179', 'Show pet')}
         </DropdownMenuItem>
         {/* Resize in place for oversized imports; stop pointer propagation so Radix keeps the menu open during dragging. */}
         <div
@@ -162,10 +147,12 @@ function PetStatusSegmentInner(): React.JSX.Element {
           onKeyDown={(e) => e.stopPropagation()}
         >
           <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>{t('auto.components.status.bar.PetStatusSegment.2f7bbaa457', 'Size')}</span>
+            <span>
+              {translate('auto.components.status.bar.PetStatusSegment.2f7bbaa457', 'Size')}
+            </span>
             <span className="tabular-nums">
               {petSize}
-              {t('auto.components.status.bar.PetStatusSegment.c6aa805b1b', 'px')}
+              {translate('auto.components.status.bar.PetStatusSegment.c6aa805b1b', 'px')}
             </span>
           </div>
           <input
@@ -176,12 +163,15 @@ function PetStatusSegmentInner(): React.JSX.Element {
             value={petSize}
             onChange={(e) => setPetSize(Number(e.target.value))}
             className="w-full"
-            aria-label={t('auto.components.status.bar.PetStatusSegment.b75484a01a', 'Pet size')}
+            aria-label={translate(
+              'auto.components.status.bar.PetStatusSegment.b75484a01a',
+              'Pet size'
+            )}
           />
         </div>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            {t('auto.components.status.bar.PetStatusSegment.0608ad02a2', 'Choose pet')}
+            {translate('auto.components.status.bar.PetStatusSegment.0608ad02a2', 'Choose pet')}
           </DropdownMenuSubTrigger>
           {/* Portal the submenu out of the parent content’s scroll clipping. */}
           <DropdownMenuPortal>
@@ -222,14 +212,14 @@ function PetStatusSegmentInner(): React.JSX.Element {
                     <span className="flex w-4 items-center justify-center">
                       {selected ? <Check className="size-3.5" aria-hidden /> : null}
                     </span>
-                    <span className="flex-1 truncate">{customPetLabel(model, t)}</span>
+                    <span className="flex-1 truncate">{model.label}</span>
                     <button
                       type="button"
                       className="ml-2 flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-                      aria-label={t(
+                      aria-label={translate(
                         'auto.components.status.bar.PetStatusSegment.3668339495',
                         'Remove {{value0}}',
-                        { value0: customPetLabel(model, t) }
+                        { value0: model.label }
                       )}
                       onClick={(event) => {
                         event.stopPropagation()
@@ -250,7 +240,10 @@ function PetStatusSegmentInner(): React.JSX.Element {
                 }}
               >
                 <Upload className="size-3.5" aria-hidden />
-                {t('auto.components.status.bar.PetStatusSegment.59b5955621', 'Upload your own…')}
+                {translate(
+                  'auto.components.status.bar.PetStatusSegment.59b5955621',
+                  'Upload your own…'
+                )}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
@@ -258,7 +251,7 @@ function PetStatusSegmentInner(): React.JSX.Element {
                 }}
               >
                 <PackageOpen className="size-3.5" aria-hidden />
-                {t(
+                {translate(
                   'auto.components.status.bar.PetStatusSegment.ed176ad68f',
                   'Import .codex-pet bundle…'
                 )}
@@ -277,7 +270,7 @@ function PetStatusSegmentInner(): React.JSX.Element {
             openSettingsPage()
           }}
         >
-          {t('auto.components.status.bar.PetStatusSegment.cd8c6c654c', 'Pet settings…')}
+          {translate('auto.components.status.bar.PetStatusSegment.cd8c6c654c', 'Pet settings…')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

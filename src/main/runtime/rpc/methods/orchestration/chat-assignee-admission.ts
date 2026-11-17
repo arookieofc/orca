@@ -1,29 +1,26 @@
-import type { AgentSessionConversationView } from '../../../../../shared/agent-session/lifecycle/leases/agent-session-conversation-view'
+import type { AgentSessionConversationView } from '../../../../../shared/agent-session-conversation-view'
 import {
   formatOrcaSessionAddress,
   type OrcaSessionId
-} from '../../../../../shared/agent-session/identity/orca-session-address'
-import { ORCHESTRATION_SESSION_CALLER_ERROR_CODES as CODES } from '../../../../../shared/orchestration/orchestration-session-caller-codes'
+} from '../../../../../shared/orca-session-address'
+import { ORCHESTRATION_SESSION_CALLER_ERROR_CODES as CODES } from '../../../../../shared/orchestration-session-caller-codes'
 import type { OrcaRuntimeService } from '../../../orca-runtime'
-import type { AgentLaunchModeReceipt as WorkerStartModeReceipt } from '../../../../../shared/agent-launch/contracts/agent-launch-intent'
-import { observeChatAssignee } from '../../../orchestration/workers/lifecycle/chat-assignee'
-import type { OrchestrationDb } from '../../../orchestration/db/orchestration-db'
+import type { WorkerStartModeReceipt } from '../orchestration-worker-start-mode'
+import { observeChatAssignee } from '../../../orchestration/chat-assignee'
+import type { OrchestrationDb } from '../../../orchestration/db'
 import { OrchestrationError } from '../../../orchestration/orchestration-error'
-import type { OrchestrationPartyIdentity as OrchestrationParty } from '../../../../../shared/orchestration/mailbox/orchestration-party-identity'
-import { readAgentSessionRecordStore } from '../../../orchestration/addressing/session-lineage/structured-session-lineage'
-import {
-  refuseUndeliverableSessionRecipient,
-  resolveTerminalAgentRecipient
-} from './messaging/session-recipient'
+import type { OrchestrationParty } from '../../../orchestration/orchestration-party'
+import { readAgentSessionRecordStore } from '../../../orchestration/structured-session-lineage'
+import { refuseUndeliverableSessionRecipient } from './messaging/session-recipient'
 
 const NO_EFFECTS = 'No effects were applied.'
 
-/** A chat with no worker handle has no pane or process; its Dispatch names it by its Orca session ID alone. */
+/** A chat has no pane or process; its Dispatch names it by its Orca session ID alone. */
 export const CHAT_WORKER_AUTHORITY = { paneKey: null, processIncarnation: null } as const
 
-/** The chat a party is, whichever name reached it: a structured worker's handle names its chat too. Null for a terminal. */
+/** The chat a Dispatch assignee party names; null for a terminal or a structured worker. */
 export function chatAssigneeOf(party: OrchestrationParty): OrcaSessionId | null {
-  return party.orcaSessionId
+  return party.terminalHandle === null ? party.orcaSessionId : null
 }
 
 /** Use the same reach rules as mail before creating anything; return the assignee's currently running session. */
@@ -34,14 +31,11 @@ export async function admitChatAssignee(
 ): Promise<AgentSessionConversationView> {
   // A failed install leaves no store, which the refusal below names.
   await runtime.ensureStructuredAgentSessionHost().catch(() => undefined)
-  const terminalRecipient = await resolveTerminalAgentRecipient(sessionId)
-  // Read after every wait: the store this admission checks is the one it then observes.
   const store = readAgentSessionRecordStore()
   const refusal = refuseUndeliverableSessionRecipient(
     { sessionId, address: formatOrcaSessionAddress(sessionId) },
     store,
     db,
-    terminalRecipient,
     NO_EFFECTS
   )
   if (refusal) {

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef } from 'react'
-import type { AgentStatusChange } from '@/store/slices/agent-status/contracts/agent-status-contract'
-import type { AgentStatusEntry } from '../../../../shared/agent-status/contracts/agent-status-types'
-import { agentTurnEndedUncleanly } from '../../../../shared/agent-status/lifecycle/agent-main-agent-verdict'
+import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
+import { agentTurnEndedUncleanly } from '../../../../shared/agent-main-agent-verdict'
 import { useAppStore } from '@/store'
-import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
+import { addAppKeyListener, removeAppKeyListener } from '@/lib/app-keyboard-router'
 
 // Leave a quiet window after completion so prompts cannot interrupt follow-up typing or status churn.
 const QUIET_WINDOW_MS = 1200
 const CHECK_DELAY_MS = 1200
+const ACTIVE_AGENT_STATES = new Set(['working', 'waiting', 'blocked'])
 const NON_TYPING_MODIFIER_KEYS = new Set(['Alt', 'Control', 'Meta', 'Shift'])
 
+type AgentStatusSnapshot = Record<string, AgentStatusEntry>
 type AgentValueMomentPreparation = Awaited<ReturnType<typeof window.api.starNag.agentValueMoment>>
 
 function hasMeaningfulPrompt(entry: AgentStatusEntry): boolean {
@@ -19,11 +20,18 @@ function hasMeaningfulPrompt(entry: AgentStatusEntry): boolean {
   return entry.stateHistory.some((history) => history.prompt.trim())
 }
 
-function hasSuccessfulDoneTransition(changes: readonly AgentStatusChange[]): boolean {
-  for (const { previous: previousEntry, current: entry } of changes) {
+function hasActiveAgent(entries: AgentStatusSnapshot): boolean {
+  return Object.values(entries).some((entry) => ACTIVE_AGENT_STATES.has(entry.state))
+}
+
+function hasSuccessfulDoneTransition(
+  previous: AgentStatusSnapshot,
+  current: AgentStatusSnapshot
+): boolean {
+  for (const [paneKey, entry] of Object.entries(current)) {
+    const previousEntry = previous[paneKey]
     if (
       previousEntry &&
-      entry &&
       previousEntry.state !== 'done' &&
       entry.state === 'done' &&
       // Session-boundary done is idle connection, not completed work; resume must not trigger a launch-time nag.
@@ -44,7 +52,9 @@ function isTypingKeyEvent(event: KeyboardEvent): boolean {
 }
 
 export function StarNagAgentValueMomentObserver(): null {
-  const projection = useAppStore((state) => state.agentStatusByPaneKey.projection)
+  // Subscribe to state/freshness epochs and read snapshots imperatively so same-state pings cannot rescan every agent.
+  const agentStatusEpoch = useAppStore((state) => state.agentStatusEpoch)
+  const previousEntriesRef = useRef<AgentStatusSnapshot | null>(null)
   const pendingRef = useRef(false)
   const requestedRef = useRef(false)
   const preparationRef = useRef<AgentValueMomentPreparation | null>(null)
@@ -62,7 +72,7 @@ export function StarNagAgentValueMomentObserver(): null {
       }
       const elapsedSinceTyping = Date.now() - lastTypingAtRef.current
       if (
-        useAppStore.getState().agentStatusByPaneKey.projection.hasActiveAgents() ||
+        hasActiveAgent(useAppStore.getState().agentStatusByPaneKey) ||
         elapsedSinceTyping < QUIET_WINDOW_MS
       ) {
         scheduleCheck()
@@ -79,7 +89,7 @@ export function StarNagAgentValueMomentObserver(): null {
         }
         const freshElapsedSinceTyping = Date.now() - lastTypingAtRef.current
         if (
-          useAppStore.getState().agentStatusByPaneKey.projection.hasActiveAgents() ||
+          hasActiveAgent(useAppStore.getState().agentStatusByPaneKey) ||
           freshElapsedSinceTyping < QUIET_WINDOW_MS
         ) {
           scheduleCheck()
@@ -109,16 +119,19 @@ export function StarNagAgentValueMomentObserver(): null {
     }
   }, [])
 
-  useEffect(
-    () =>
-      projection.subscribeTransitions((changes) => {
-        if (!requestedRef.current && hasSuccessfulDoneTransition(changes)) {
-          pendingRef.current = true
-          scheduleCheck()
-        }
-      }),
-    [projection, scheduleCheck]
-  )
+  useEffect(() => {
+    const currentEntries = useAppStore.getState().agentStatusByPaneKey
+    const previousEntries = previousEntriesRef.current
+    previousEntriesRef.current = currentEntries
+    if (!previousEntries || requestedRef.current) {
+      return
+    }
+    if (!hasSuccessfulDoneTransition(previousEntries, currentEntries)) {
+      return
+    }
+    pendingRef.current = true
+    scheduleCheck()
+  }, [agentStatusEpoch, scheduleCheck])
 
   useEffect(() => {
     return () => {

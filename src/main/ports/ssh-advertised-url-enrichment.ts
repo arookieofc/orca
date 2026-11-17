@@ -1,11 +1,7 @@
 // Remote PTY banners are workspace-keyed; SSH listener scans are connection-scoped.
 
-import type {
-  DetectedPort,
-  EnrichedDetectedPort,
-  PortForwardEntry
-} from '../../shared/remote-runtime/ssh/ssh-types'
-import type { Store } from '../persistence/loading-store/store'
+import type { DetectedPort, EnrichedDetectedPort, PortForwardEntry } from '../../shared/ssh-types'
+import type { Store } from '../persistence'
 import { splitWorktreeId } from '../../shared/worktree/id'
 import {
   advertisedUrlWatcher,

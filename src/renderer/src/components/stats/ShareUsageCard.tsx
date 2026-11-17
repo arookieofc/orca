@@ -1,6 +1,6 @@
 import { forwardRef } from 'react'
-import type { ClaudeUsageSummary } from '../../../../shared/agent-usage/analytics/claude-usage-types'
-import type { CodexUsageSummary } from '../../../../shared/agent-usage/analytics/codex-usage-types'
+import type { ClaudeUsageSummary } from '../../../../shared/claude-usage-types'
+import type { CodexUsageSummary } from '../../../../shared/codex-usage-types'
 import {
   BackgroundGlows,
   CardFooter,
@@ -14,7 +14,7 @@ import {
   RANGE_LABELS
 } from './share-card-utils'
 import type { ClaudeShareData, CodexShareData } from './share-card-utils'
-import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 export type ShareUsageCardProps = (ClaudeShareData | CodexShareData) & {
   range: string
@@ -23,8 +23,6 @@ export type ShareUsageCardProps = (ClaudeShareData | CodexShareData) & {
 // Keep styles inline for portable image capture without depending on retained Tailwind classes.
 export const ShareUsageCard = forwardRef<HTMLDivElement, ShareUsageCardProps>(
   function ShareUsageCard(props, ref) {
-    const t = useTranslate()
-    const intlLocale = useIntlLocale()
     const { provider, summary, daily, range } = props
     const slicedDaily = daily.slice(-10)
 
@@ -46,11 +44,11 @@ export const ShareUsageCard = forwardRef<HTMLDivElement, ShareUsageCardProps>(
     const turnsOrEvents =
       provider === 'claude'
         ? {
-            label: t('auto.components.stats.ShareUsageCard.6adac63cfe', 'turns'),
+            label: translate('auto.components.stats.ShareUsageCard.6adac63cfe', 'turns'),
             count: (summary as ClaudeUsageSummary).turns
           }
         : {
-            label: t('auto.components.stats.ShareUsageCard.960324e9b8', 'events'),
+            label: translate('auto.components.stats.ShareUsageCard.960324e9b8', 'events'),
             count: (summary as CodexUsageSummary).events
           }
 
@@ -78,7 +76,7 @@ export const ShareUsageCard = forwardRef<HTMLDivElement, ShareUsageCardProps>(
         <div
           style={{ fontSize: 11, color: '#555', position: 'relative', zIndex: 1, marginBottom: 16 }}
         >
-          {formatDateRange(range, intlLocale)}
+          {formatDateRange(range)}
         </div>
 
         <StatsGrid summary={summary} totalTokens={totalTokens} topModel={topModel} />
@@ -97,7 +95,6 @@ export const ShareUsageCard = forwardRef<HTMLDivElement, ShareUsageCardProps>(
 )
 
 function CardHeader(props: { providerLabel: string; range: string }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div
       style={{
@@ -114,10 +111,11 @@ function CardHeader(props: { providerLabel: string; range: string }): React.JSX.
         </div>
         <div style={{ display: 'inline-block', verticalAlign: 'middle', marginLeft: 10 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#fafafa', lineHeight: 1.2 }}>
-            {t('auto.components.stats.ShareUsageCard.0eb31e79ee', 'Orca IDE')}
+            {translate('auto.components.stats.ShareUsageCard.0eb31e79ee', 'Orca IDE')}
           </div>
           <div style={{ fontSize: 10, color: '#555', letterSpacing: 0.3 }}>
-            {props.providerLabel} {t('auto.components.stats.ShareUsageCard.da62578d9d', 'Usage')}
+            {props.providerLabel}{' '}
+            {translate('auto.components.stats.ShareUsageCard.da62578d9d', 'Usage')}
           </div>
         </div>
       </div>
@@ -145,20 +143,18 @@ function StatsGrid(props: {
   totalTokens: number
   topModel: string
 }): React.JSX.Element {
-  const t = useTranslate()
-  const intlLocale = useIntlLocale()
   const cards = [
     {
       value: formatCost(props.summary.estimatedCostUsd ?? null),
-      label: t('auto.components.stats.ShareUsageCard.beb6f24f37', 'Est. cost'),
+      label: translate('auto.components.stats.ShareUsageCard.beb6f24f37', 'Est. cost'),
       bg: 'rgba(20, 71, 230, 0.1)',
       border: '1px solid rgba(20, 71, 230, 0.2)',
       valueColor: '#93b4ff',
       valueFontSize: 16
     },
     {
-      value: formatTokens(props.totalTokens, intlLocale),
-      label: t('auto.components.stats.ShareUsageCard.2d9eb39264', 'Total tokens'),
+      value: formatTokens(props.totalTokens),
+      label: translate('auto.components.stats.ShareUsageCard.2d9eb39264', 'Total tokens'),
       bg: 'rgba(255, 255, 255, 0.04)',
       border: '1px solid rgba(255, 255, 255, 0.06)',
       valueColor: '#fafafa',
@@ -166,7 +162,7 @@ function StatsGrid(props: {
     },
     {
       value: props.topModel,
-      label: t('auto.components.stats.ShareUsageCard.b760c0b622', 'Top model'),
+      label: translate('auto.components.stats.ShareUsageCard.b760c0b622', 'Top model'),
       bg: 'rgba(255, 255, 255, 0.04)',
       border: '1px solid rgba(255, 255, 255, 0.06)',
       valueColor: '#fafafa',
@@ -218,7 +214,6 @@ function ChartHeader(props: {
   sessions: number
   turnsOrEvents: { label: string; count: number }
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div style={{ display: 'table', width: '100%', marginBottom: 10 }}>
       <div style={{ display: 'table-cell', verticalAlign: 'bottom' }}>
@@ -231,12 +226,13 @@ function ChartHeader(props: {
             textTransform: 'uppercase' as const
           }}
         >
-          {t('auto.components.stats.ShareUsageCard.66c83284cf', 'Daily tokens')}
+          {translate('auto.components.stats.ShareUsageCard.66c83284cf', 'Daily tokens')}
         </span>
       </div>
       <div style={{ display: 'table-cell', verticalAlign: 'bottom', textAlign: 'right' }}>
         <span style={{ fontSize: 10, color: '#444' }}>
-          {props.sessions} {t('auto.components.stats.ShareUsageCard.4a4c6c79a3', 'sessions ·')}{' '}
+          {props.sessions}{' '}
+          {translate('auto.components.stats.ShareUsageCard.4a4c6c79a3', 'sessions ·')}{' '}
           {props.turnsOrEvents.count} {props.turnsOrEvents.label}
         </span>
       </div>
@@ -247,7 +243,6 @@ function ChartHeader(props: {
 function DailyChart(props: {
   slicedDaily: Parameters<typeof getDailySegments>[0][]
 }): React.JSX.Element {
-  const intlLocale = useIntlLocale()
   const CHART_H = 120
   const maxSegSum = Math.max(
     1,
@@ -273,7 +268,7 @@ function DailyChart(props: {
                 key={entry.day}
                 style={{ textAlign: 'center', padding: '0 3px', fontSize: 8, color: '#444' }}
               >
-                {formatTokens(getDailyTotal(entry), intlLocale)}
+                {formatTokens(getDailyTotal(entry))}
               </td>
             ))}
           </tr>
@@ -341,10 +336,9 @@ function DayLabels(props: { slicedDaily: { day: string }[] }): React.JSX.Element
 }
 
 function Legend(props: { provider: 'claude' | 'codex' }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div style={{ marginTop: 10 }}>
-      {getLegendItems(props.provider, t).map((item, i) => (
+      {getLegendItems(props.provider).map((item, i) => (
         <span
           key={item.label}
           style={{

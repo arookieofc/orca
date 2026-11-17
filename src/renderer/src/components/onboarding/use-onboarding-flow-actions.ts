@@ -1,19 +1,15 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 import { toast } from 'sonner'
-import { applyDocumentTheme } from '@/app-shell/appearance/document-theme'
-import { track } from '@/diagnostics/telemetry/telemetry'
+import { applyDocumentTheme } from '@/lib/document-theme'
+import { track } from '@/lib/telemetry'
 import { translate } from '@/i18n/i18n'
-import { useAppStore } from '@/store/index'
-import { getExecutionHostIdForWorktree } from '@/lib/workspace/ownership/worktree-runtime-owner'
-import { launchOnboardingCompletionAgent } from './onboarding-completion-agent-launch'
-import { ONBOARDING_FINAL_STEP } from '../../../../shared/onboarding/onboarding-defaults'
-import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
-import type { OnboardingState } from '../../../../shared/onboarding/onboarding-state-types'
-import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
+import { ONBOARDING_FINAL_STEP } from '../../../../shared/onboarding-defaults'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { OnboardingState } from '../../../../shared/onboarding-state-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import { buildWindowsTerminalSnapshotPayload } from './windows-terminal-onboarding-telemetry'
 import { persistStep, type PersistCurrentStepResult } from './use-onboarding-flow-persistence'
-import { STEPS, type AgentSurface, type StepNumber } from './use-onboarding-flow-types'
-import { captureThemeLookSettings } from './onboarding-theme-look-settings'
+import { STEPS, type StepNumber } from './use-onboarding-flow-types'
 import {
   prepareSkippedOnboardingPreferences,
   resolveStepIndex,
@@ -24,7 +20,7 @@ import {
 type CloseWith = (
   outcome: 'completed' | 'dismissed',
   lastStepReached: StepNumber,
-  completedPath?: 'add_project_modal' | 'workspace',
+  completedPath?: 'add_project_modal',
   dismissedExtras?: { advancedVia: 'button' | 'keyboard'; durationMs: number }
 ) => Promise<boolean>
 
@@ -41,7 +37,6 @@ type OnboardingFlowActionsArgs = {
   ) => void
   settings: GlobalSettings | null
   persistCurrentStep: () => Promise<PersistCurrentStepResult>
-  selectedWorkspaceId: string | null
   closeWith: CloseWith
   openModal: (modal: 'add-repo') => void
   getNextStepIndex: (index: number) => number
@@ -49,8 +44,7 @@ type OnboardingFlowActionsArgs = {
   stepIndex: number
   setStepIndex: Dispatch<SetStateAction<number>>
   selectedAgent: TuiAgent | null
-  agentSurface: AgentSurface
-  themeLookBaseline: GlobalSettings | null
+  themeStepEntryThemeRef: { current: GlobalSettings['theme'] | null }
   setTheme: Dispatch<SetStateAction<GlobalSettings['theme']>>
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void> | void
   skipOptions: OnboardingStepSkipOptions
@@ -65,7 +59,6 @@ export function useOnboardingFlowActions({
   trackTaskSourcesSnapshot,
   settings,
   persistCurrentStep,
-  selectedWorkspaceId: worktreeId,
   closeWith,
   openModal,
   getNextStepIndex,
@@ -73,8 +66,7 @@ export function useOnboardingFlowActions({
   stepIndex,
   setStepIndex,
   selectedAgent,
-  agentSurface,
-  themeLookBaseline,
+  themeStepEntryThemeRef,
   setTheme,
   updateSettings,
   skipOptions
@@ -83,10 +75,6 @@ export function useOnboardingFlowActions({
   const nextInFlightRef = useRef(false)
   const trackCurrentStepCompleted = useCallback(
     (advancedVia: 'button' | 'keyboard'): void => {
-      // Step 1 spans the Chat/Terminal page and the agent page; only the agent page completes it.
-      if (currentStep.id === 'agent_surface') {
-        return
-      }
       const durationMs = consumeStepDurationMs()
       track('onboarding_step_completed', {
         step: currentStep.stepNumber,
@@ -118,51 +106,27 @@ export function useOnboardingFlowActions({
       trackTaskSourcesSnapshot
     ]
   )
-  const complete = useCallback(
-    async (
-      workspaceExecutionHostId: Parameters<typeof launchOnboardingCompletionAgent>[2],
-      path: 'workspace' | 'add_project_modal',
-      agent?: TuiAgent | null
-    ): Promise<boolean> => {
-      const closed = await closeWith('completed', ONBOARDING_FINAL_STEP, path)
-      if (closed && !worktreeId && path === 'add_project_modal') {
-        openModal('add-repo')
-      } else if (closed && worktreeId) {
-        await launchOnboardingCompletionAgent(worktreeId, agent, workspaceExecutionHostId)
-      }
-      return closed
-    },
-    [closeWith, openModal, worktreeId]
-  )
-
   const next = useCallback(
     async (advancedVia: 'button' | 'keyboard' = 'button') => {
       if (nextInFlightRef.current || busyLabel) {
         return
       }
       nextInFlightRef.current = true
-      const agent = selectedAgent
-      const workspaceExecutionHostId = worktreeId
-        ? getExecutionHostIdForWorktree(useAppStore.getState(), worktreeId)
-        : undefined
       try {
         const result = await persistCurrentStep()
         if (result.ok) {
           trackCurrentStepCompleted(advancedVia)
           if (currentStep.id === 'notifications') {
             setBusyLabel(
-              worktreeId
-                ? translate('components.onboarding.flow.actions.continue', 'Continue')
-                : translate(
-                    'components.onboarding.flow.actions.openingAddProject',
-                    'Opening Add Project...'
-                  )
+              translate(
+                'components.onboarding.flow.actions.openingAddProject',
+                'Opening Add Project...'
+              )
             )
-            await complete(
-              workspaceExecutionHostId,
-              worktreeId ? 'workspace' : 'add_project_modal',
-              agent
-            )
+            const closed = await closeWith('completed', ONBOARDING_FINAL_STEP, 'add_project_modal')
+            if (closed) {
+              openModal('add-repo')
+            }
             return
           }
           const nextIndex = getNextStepIndex(stepIndex)
@@ -192,13 +156,12 @@ export function useOnboardingFlowActions({
     },
     [
       busyLabel,
-      complete,
+      closeWith,
       currentStep.id,
       currentStep.stepNumber,
       getNextStepIndex,
-      worktreeId,
-      selectedAgent,
       onOnboardingChange,
+      openModal,
       persistCurrentStep,
       stepIndex,
       trackCurrentStepCompleted,
@@ -207,35 +170,37 @@ export function useOnboardingFlowActions({
     ]
   )
 
-  const setUpLater = useCallback(async () => {
-    if (nextInFlightRef.current || busyLabel || currentStep.id === 'notifications') {
+  const skipToRepo = useCallback(async () => {
+    if (busyLabel) {
       return
     }
-    nextInFlightRef.current = true
-    const workspaceExecutionHostId = worktreeId
-      ? getExecutionHostIdForWorktree(useAppStore.getState(), worktreeId)
-      : undefined
-    const agent = currentStep.id === 'agent' ? selectedAgent : undefined
+    setError(null)
+    if (currentStep.id === 'notifications') {
+      return
+    }
     const durationMs = consumeStepDurationMs()
+    const preferencesSaved = await prepareSkippedOnboardingPreferences({
+      currentStepId: currentStep.id,
+      themeBeforePreview: themeStepEntryThemeRef.current,
+      settingsTheme: settings?.theme,
+      selectedAgent,
+      setTheme,
+      applyTheme: applyDocumentTheme,
+      updateSettings,
+      setError
+    })
+    if (!preferencesSaved) {
+      return
+    }
     const stepId = currentStep.id
     const stepNumber = currentStep.stepNumber
     const valueKind = currentStep.valueKind
-    setError(null)
-    setBusyLabel(translate('components.onboarding.flow.actions.continue', 'Continue'))
+    setBusyLabel(
+      translate('components.onboarding.flow.actions.openingAddProject', 'Opening Add Project...')
+    )
     try {
-      const preferencesSaved = await prepareSkippedOnboardingPreferences({
-        currentStepId: stepId,
-        lookBeforePreview: themeLookBaseline ? captureThemeLookSettings(themeLookBaseline) : null,
-        settingsTheme: settings?.theme,
-        selectedAgent,
-        agentSurface,
-        settings,
-        setTheme,
-        applyTheme: applyDocumentTheme,
-        updateSettings,
-        setError
-      })
-      if (!preferencesSaved || !(await complete(workspaceExecutionHostId, 'workspace', agent))) {
+      const closed = await closeWith('completed', ONBOARDING_FINAL_STEP, 'add_project_modal')
+      if (!closed) {
         return
       }
       track('onboarding_step_skipped', {
@@ -258,18 +223,18 @@ export function useOnboardingFlowActions({
           })
         )
       }
+      openModal('add-repo')
     } finally {
       setBusyLabel(null)
-      nextInFlightRef.current = false
     }
   }, [
     busyLabel,
-    complete,
+    closeWith,
     consumeStepDurationMs,
     currentStep.id,
     currentStep.stepNumber,
     currentStep.valueKind,
-    agentSurface,
+    openModal,
     selectedAgent,
     settings,
     trackTaskSourcesSnapshot,
@@ -277,8 +242,7 @@ export function useOnboardingFlowActions({
     setBusyLabel,
     setError,
     setTheme,
-    themeLookBaseline,
-    worktreeId
+    themeStepEntryThemeRef
   ])
 
   const dismissOnboarding = useCallback(
@@ -306,5 +270,5 @@ export function useOnboardingFlowActions({
     [setStepIndex, skipOptions, stepIndex]
   )
 
-  return { next, setUpLater, dismissOnboarding, back, jumpToStep }
+  return { next, skipToRepo, dismissOnboarding, back, jumpToStep }
 }

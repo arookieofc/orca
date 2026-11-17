@@ -14,8 +14,6 @@ export class AgentPromptPermissionReturnedError extends Error {
 export type AgentPromptPermissionHold = {
   /** The writer's predicate; throws when the write must not happen at all (binding changed). */
   isBlocked: () => boolean
-  /** Brings screen evidence current before a timed re-read; undefined when nothing needs reading. */
-  refresh?: () => Promise<void> | undefined
   /** Hook-store changes for the pane; absent when the pane has no key. */
   subscribeStatus?: (wake: () => void) => () => void
   subscribeExit: (exited: () => void) => () => void
@@ -73,17 +71,9 @@ export function waitWhileAgentPromptBlocked(hold: AgentPromptPermissionHold): Pr
       signal.addEventListener('abort', onAbort)
       own(() => signal.removeEventListener('abort', onAbort))
     }
-    const recheck = (): void => {
-      const refreshed = hold.refresh?.()
-      if (refreshed) {
-        void refreshed.then(check, check)
-      } else {
-        check()
-      }
-    }
-    recheck()
+    check()
     if (!done) {
-      const timer = setInterval(recheck, AGENT_PROMPT_PERMISSION_RECHECK_MS)
+      const timer = setInterval(check, AGENT_PROMPT_PERMISSION_RECHECK_MS)
       own(() => clearInterval(timer))
     }
   })

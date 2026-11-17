@@ -1,10 +1,5 @@
 import { ipcMain } from 'electron'
-import {
-  listTeams,
-  getTeamStates,
-  getTeamLabels,
-  getTeamMembers
-} from '../../linear/teams/linear-team-queries'
+import { listTeams, getTeamStates, getTeamLabels, getTeamMembers } from '../../linear/teams'
 import { normalizeWorkspaceId, normalizeWorkspaceSelection } from './ipc-args'
 import type { LinearWorkspaceSelection } from '../../../shared/linear/workspace-types'
 

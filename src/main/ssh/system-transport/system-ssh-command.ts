@@ -1,8 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { Duplex } from 'node:stream'
 import type { ClientChannel } from 'ssh2'
-import type { SshTarget } from '../../../shared/remote-runtime/ssh/ssh-types'
-import { wrapRemoteCommandForPosixShell } from '../remote-exec/ssh-posix-command-wrapper'
+import type { SshTarget } from '../../../shared/ssh-types'
+import { wrapRemoteCommandForPosixShell } from '../ssh-posix-command-wrapper'
 import type { SshExecOptions } from '../connection/ssh-exec-options'
 import { buildSshArgs, type SystemSshBuildArgsOptions } from './system-ssh-args'
 import { findSystemSsh } from './system-ssh-binary'
@@ -21,11 +21,7 @@ export type SystemSshCommandChannel = ClientChannel & {
   _closeRequested?: boolean
 }
 
-export type SystemSshCommandOptions = SshExecOptions &
-  SystemSshBuildArgsOptions & {
-    /** For commands that send no input: Windows OpenSSH can hang after remote exit while its stdin pipe stays open. */
-    closeStdin?: boolean
-  }
+type SystemSshCommandOptions = SshExecOptions & SystemSshBuildArgsOptions
 
 /** Expose system SSH stdin/stdout as the relay channel when ssh2 cannot provide the required authentication/reuse. */
 export function spawnSystemSsh(
@@ -68,11 +64,7 @@ export function spawnSystemSshCommand(
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true
   })
-  const channel = wrapCommandProcess(proc)
-  if (options?.closeStdin) {
-    channel.stdin.end()
-  }
-  return channel
+  return wrapCommandProcess(proc)
 }
 
 function wrapChildProcess(proc: ChildProcess): SystemSshProcess {

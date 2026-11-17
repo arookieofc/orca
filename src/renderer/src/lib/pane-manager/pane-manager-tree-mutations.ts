@@ -1,13 +1,13 @@
 import type { ManagedPane, PaneSplitOptions } from './pane-manager-types'
 import type { PaneManagerHost } from './pane-manager-host'
-import type { SplitPaneAroundLeafIdsOptions } from './pane-layout/pane-subtree-split'
+import type { SplitPaneAroundLeafIdsOptions } from './pane-subtree-split'
 import {
   closeManagedPane,
   detachManagedPaneForExternalMove,
   retireManagedPanePreservingPty,
   splitManagedPane
-} from './pane-layout/pane-split-close'
-import { splitPaneAroundMountedSubtree } from './pane-layout/pane-subtree-split'
+} from './pane-split-close'
+import { splitPaneAroundMountedSubtree } from './pane-subtree-split'
 
 export function splitPaneOnManager(
   host: PaneManagerHost,
@@ -27,7 +27,6 @@ export function splitPaneOnManager(
     createDivider: (isVertical) => host.createDivider(isVertical),
     publishPaneCreated: (pane, spawnHints) => host.publishPaneCreated(pane, spawnHints),
     getDragCallbacks: () => host.getDragCallbacks(),
-    activePaneId: host.getActivePaneId(),
     setActivePaneId: (id) => {
       host.setActivePaneId(id)
     },
@@ -56,7 +55,6 @@ export function splitPaneAroundLeafIdsOnManager(
     createDivider: (isVertical) => host.createDivider(isVertical),
     publishPaneCreated: (pane, spawnHints) => host.publishPaneCreated(pane, spawnHints),
     getDragCallbacks: () => host.getDragCallbacks(),
-    activePaneId: host.getActivePaneId(),
     setActivePaneId: (id) => {
       host.setActivePaneId(id)
     },

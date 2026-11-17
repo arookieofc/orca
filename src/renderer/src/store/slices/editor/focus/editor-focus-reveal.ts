@@ -1,6 +1,8 @@
 import type { PendingEditorReveal } from '../types/pending-editor-reveal'
 import type { AppState } from '../../../types'
-import '../types/pending-editor-reveal'
+import { EDITOR_FOCUS_REQUEST_TTL_MS } from '../types/pending-editor-reveal'
+
+export { EDITOR_FOCUS_REQUEST_TTL_MS }
 
 export let nextEditorFocusRequestToken = 0
 

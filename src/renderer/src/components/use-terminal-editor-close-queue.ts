@@ -1,19 +1,9 @@
-import { useCallback, useRef } from 'react'
+import { useCallback } from 'react'
 import { useAppStore } from '../store'
 import { needsSavePromptOnClose } from '@/store/slices/editor/buffers/editor-buffer-close-rule'
-import { runAfterEditorFramesFlush } from './editor/save/flush/editor-pending-flush'
-import { appendUniqueOpenFileIds } from './terminal/workspace-files/unsaved-close-queue'
+import { appendUniqueOpenFileIds } from './terminal/unsaved-close-queue'
 import { isPinnedActiveEditorTab } from './terminal-workspace-model'
-import {
-  editorCloseTarget,
-  editorTabNeedsSavePrompt
-} from '@/store/slices/editor/tabs/editor-tab-close-target'
-import {
-  editorPlacementIndex,
-  openFileIndex
-} from '@/store/slices/editor/tabs/workspace-editor-files'
-import { editorViewTab } from '@/store/slices/editor/tabs/editor-view-placement'
-import { selectWorkspaceSurface } from '@/lib/workspace/activation/workspace-surface-reveal'
+import { selectWorkspaceSurface } from '@/lib/workspace-surface-reveal'
 import type { TerminalEditorCloseFoundation } from './use-terminal-editor-close-foundation'
 
 export function useTerminalEditorCloseQueue(controller: TerminalEditorCloseFoundation) {
@@ -29,46 +19,33 @@ export function useTerminalEditorCloseQueue(controller: TerminalEditorCloseFound
     setSaveDialogFileId,
     windowCloseAfterDirtyRef
   } = controller
-  const closeTabIds = useRef(new Map<string, string>())
-  const queuedEditorCloseTabId = useCallback(
-    (fileId: string) => closeTabIds.current.get(fileId),
-    []
-  )
-  const waitForFileClosed = useCallback(
-    (fileId: string, timeoutMs: number, tabId?: string): Promise<boolean> => {
-      const isClosed = (state: ReturnType<typeof useAppStore.getState>) =>
-        tabId
-          ? !editorPlacementIndex(state.unifiedTabsByWorktree).workspaceByTabId.has(tabId)
-          : !openFileIndex(state.openFiles).has(fileId)
-      if (isClosed(useAppStore.getState())) {
-        return Promise.resolve(true)
-      }
-      return new Promise((resolve) => {
-        let unsub: (() => void) | null = null
-        const timeoutId = window.setTimeout(() => {
-          unsub?.()
-          resolve(false)
-        }, timeoutMs)
-        unsub = useAppStore.subscribe((state) => {
-          if (isClosed(state)) {
-            window.clearTimeout(timeoutId)
-            unsub?.()
-            resolve(true)
-          }
-        })
-        if (isClosed(useAppStore.getState())) {
+  const waitForFileClosed = useCallback((fileId: string, timeoutMs: number): Promise<boolean> => {
+    if (!useAppStore.getState().openFiles.some((file) => file.id === fileId)) {
+      return Promise.resolve(true)
+    }
+    return new Promise((resolve) => {
+      let unsub: (() => void) | null = null
+      const timeoutId = window.setTimeout(() => {
+        unsub?.()
+        resolve(false)
+      }, timeoutMs)
+      unsub = useAppStore.subscribe((state) => {
+        if (!state.openFiles.some((file) => file.id === fileId)) {
           window.clearTimeout(timeoutId)
           unsub?.()
           resolve(true)
         }
       })
-    },
-    []
-  )
+      if (!useAppStore.getState().openFiles.some((file) => file.id === fileId)) {
+        window.clearTimeout(timeoutId)
+        unsub?.()
+        resolve(true)
+      }
+    })
+  }, [])
 
   const settleQueuedClose = useCallback(
     (fileId: string) => {
-      closeTabIds.current.delete(fileId)
       pendingEditorCloseQueueRef.current = pendingEditorCloseQueueRef.current.filter(
         (queuedId) => queuedId !== fileId
       )
@@ -86,22 +63,12 @@ export function useTerminalEditorCloseQueue(controller: TerminalEditorCloseFound
         return null
       }
       const state = useAppStore.getState()
-      if (!openFileIndex(state.openFiles).has(fileId)) {
+      if (!state.openFiles.some((candidate) => candidate.id === fileId)) {
         settleQueuedClose(fileId)
         continue
       }
-      const tabId = closeTabIds.current.get(fileId)
-      const tab = tabId ? editorCloseTarget(state, tabId).tab : undefined
-      if (tabId && !tab) {
-        settleQueuedClose(fileId)
-        continue
-      }
-      if (tab ? !editorTabNeedsSavePrompt(state, tab) : !needsSavePromptOnClose(state, fileId)) {
-        if (tab) {
-          state.closeUnifiedTab(tab.id)
-        } else {
-          closeFile(fileId)
-        }
+      if (!needsSavePromptOnClose(state, fileId)) {
+        closeFile(fileId)
         settleQueuedClose(fileId)
         continue
       }
@@ -114,18 +81,12 @@ export function useTerminalEditorCloseQueue(controller: TerminalEditorCloseFound
     const nextFileId = getNextQueuedEditorClose()
     if (nextFileId) {
       const state = useAppStore.getState()
-      const file = openFileIndex(state.openFiles).get(nextFileId)
-      const tabId = closeTabIds.current.get(nextFileId)
-      const tab = tabId ? editorCloseTarget(state, tabId).tab : undefined
-      const workspaceId = tab?.worktreeId ?? file?.worktreeId ?? state.activeWorktreeId
-      if (workspaceId && workspaceId !== state.activeWorktreeId) {
-        selectWorkspaceSurface(state, workspaceId)
+      const file = state.openFiles.find((candidate) => candidate.id === nextFileId)
+      if (file && file.worktreeId !== state.activeWorktreeId) {
+        selectWorkspaceSurface(state, file.worktreeId)
       }
-      if (tab) {
-        state.activateTab(tab.id, { preservePreview: true })
-      }
-      setActiveFile(nextFileId, workspaceId ?? undefined)
-      setActiveTabType('editor', workspaceId)
+      setActiveFile(nextFileId)
+      setActiveTabType('editor', file?.worktreeId ?? state.activeWorktreeId)
       setSaveDialogFileId(nextFileId)
       return
     }
@@ -149,25 +110,9 @@ export function useTerminalEditorCloseQueue(controller: TerminalEditorCloseFound
       if (pendingWindowClose) {
         windowCloseAfterDirtyRef.current = pendingWindowClose
       }
-      const state = useAppStore.getState()
-      if (pendingEditorCloseQueueRef.current.length === 0) {
-        closeTabIds.current.clear()
-      }
-      const requests = fileIds.flatMap((id) => {
-        const { file, tab } = editorCloseTarget(state, id)
-        if (!file) {
-          return []
-        }
-        if (tab && !pendingWindowClose) {
-          closeTabIds.current.set(file.id, tab.id)
-        } else {
-          closeTabIds.current.delete(file.id)
-        }
-        return [file.id]
-      })
       pendingEditorCloseQueueRef.current = appendUniqueOpenFileIds(
         pendingEditorCloseQueueRef.current,
-        requests,
+        fileIds,
         new Set(useAppStore.getState().openFiles.map((file) => file.id))
       )
       advanceEditorCloseQueue()
@@ -176,44 +121,21 @@ export function useTerminalEditorCloseQueue(controller: TerminalEditorCloseFound
   )
 
   const handleCloseFile = useCallback(
-    (id: string) => {
+    (fileId: string) => {
       const state = useAppStore.getState()
-      const requested = editorCloseTarget(state, id)
-      const file = requested.file
-      if (!file) {
+      if (activeWorktreeId && isPinnedActiveEditorTab(state, activeWorktreeId, fileId)) {
         return
       }
-      const tab = requested.tab ?? editorViewTab(state, file.id)
-      if (
-        tab?.isPinned ||
-        (activeWorktreeId && !tab && isPinnedActiveEditorTab(state, activeWorktreeId, file.id))
-      ) {
+      if (needsSavePromptOnClose(state, fileId)) {
+        queueEditorCloseRequests([fileId])
         return
       }
-      runAfterEditorFramesFlush(state, [file.id], () => {
-        const latest = useAppStore.getState()
-        const live = tab ? editorCloseTarget(latest, tab.id).tab : undefined
-        if (tab && !live) {
-          return
-        }
-        if (
-          live ? editorTabNeedsSavePrompt(latest, live) : needsSavePromptOnClose(latest, file.id)
-        ) {
-          queueEditorCloseRequests([live?.id ?? file.id])
-          return
-        }
-        if (live) {
-          latest.closeUnifiedTab(live.id)
-        } else {
-          closeFile(file.id)
-        }
-      })
+      closeFile(fileId)
     },
     [activeWorktreeId, closeFile, queueEditorCloseRequests]
   )
 
   return {
-    queuedEditorCloseTabId,
     waitForFileClosed,
     settleQueuedClose,
     getNextQueuedEditorClose,

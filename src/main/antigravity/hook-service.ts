@@ -1,31 +1,33 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { SFTPWrapper } from 'ssh2'
-import type {
-  AgentHookInstallState,
-  AgentHookInstallStatus
-} from '../../shared/agent-hook-listener/configuration/agent-hook-types'
-import { getSharedManagedScriptPath } from '../agent-hooks/installation/scripts/managed-hook-script-path'
-import { readHooksJson } from '../agent-hooks/installation/configuration/hooks-json-read'
-import { wrapPosixHookCommand } from '../agent-hooks/installation/commands/posix-hook-command'
-import { writeHooksJson } from '../agent-hooks/installation/configuration/hooks-json-write'
-import { writeManagedScript } from '../agent-hooks/installation/scripts/managed-hook-script-write'
-import type { HookDefinition } from '../agent-hooks/installation/configuration/hook-config-schema'
+import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
+import {
+  getSharedManagedScriptPath,
+  readHooksJson,
+  wrapPosixHookCommand,
+  writeHooksJson,
+  writeManagedScript,
+  type HookDefinition
+} from '../agent-hooks/installer-utils'
 import {
   readHooksJsonRemote,
-  writeHooksJsonRemote
-} from '../agent-hooks/installation/configuration/hooks-json-remote'
-import { writeManagedScriptRemote } from '../agent-hooks/installation/scripts/managed-script-write-remote'
-import { wrapWindowsBatchHookCommand } from '../agent-hooks/installation/commands/windows-direct-cmd-hook-command'
+  writeHooksJsonRemote,
+  writeManagedScriptRemote
+} from '../agent-hooks/installer-utils-remote'
+import { wrapWindowsBatchHookCommand } from '../agent-hooks/windows-direct-cmd-hook-command'
 import { WINDOWS_ANTIGRAVITY_JSON_POST_SCRIPT } from './windows-hook-json-post'
 import {
   restoreManagedScript,
   refreshManagedScriptIfPresent,
   scriptStillExists
-} from '../agent-hooks/installation/scripts/managed-hook-script-refresh'
-import { ANTIGRAVITY_EVENTS, getAntigravityNoOpStdout, type AntigravityEvent } from './hook-events'
-import { quotePosixShell } from '../../shared/shell/launch/shell-argument-quoting'
-import { HOOK_PARENT_CAPTURE } from '../agent-hooks/installation/scripts/hook-process-capture'
+} from '../agent-hooks/managed-hook-script-refresh'
+import {
+  ANTIGRAVITY_EVENTS,
+  ANTIGRAVITY_PRE_TOOL_USE_DECISION,
+  type AntigravityEvent
+} from './hook-events'
+import { quotePosixShell } from '../../shared/shell-argument-quoting'
 import { getManagedScript, getWindowsWrapperScript } from './hook-script'
 import {
   buildInstalledConfig,
@@ -56,10 +58,11 @@ function getPosixManagedCommand(scriptPath: string, event: AntigravityEvent): st
   const command = wrapPosixHookCommand(
     scriptPath,
     { ORCA_ANTIGRAVITY_EVENT: event.eventName },
-    { fallbackStdout: getAntigravityNoOpStdout(event.eventName), stdinMayStayOpen: true }
+    // Keep tools usable if the managed script disappears: silence denies PreToolUse.
+    event.eventName === 'PreToolUse' ? { fallbackStdout: ANTIGRAVITY_PRE_TOOL_USE_DECISION } : {}
   )
   // ACP hosts tokenize the command into argv; the shell must be the executable, not `if`.
-  return `/bin/sh -c ${quotePosixShell(`${HOOK_PARENT_CAPTURE}${command}`)}`
+  return `/bin/sh -c ${quotePosixShell(command)}`
 }
 
 function getManagedCommand(scriptPath: string, event: AntigravityEvent): string {

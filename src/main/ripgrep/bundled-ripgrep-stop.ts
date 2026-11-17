@@ -1,10 +1,10 @@
 import { signalProcessTree } from '@orca/process-host/process-tree-termination'
-import { killSpawnedRipgrepProcess } from '../../shared/ripgrep/ripgrep-process-availability'
-import type { ChildProcess } from 'node:child_process'
+import { killSpawnedRipgrepProcess } from '../../shared/ripgrep-process-availability'
+import type { ChildProcessHandle } from '@orca/process-host/process-spec'
 
-const stoppingChildren = new WeakSet<ChildProcess>()
+const stoppingChildren = new WeakSet<ChildProcessHandle>()
 
-export function stopBundledRipgrep(child: ChildProcess, wsl = false): void {
+export function stopBundledRipgrep(child: ChildProcessHandle, wsl = false): void {
   if (stoppingChildren.has(child)) {
     return
   }

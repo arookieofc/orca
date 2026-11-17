@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
-import type { Repo } from '../../../../../shared/repository/repo-types'
+import type { Repo } from '../../../../../shared/repo-types'
 import type { JiraProjectReference } from '../../../../../shared/jira/jira-project-reference'
-import { getRepoExecutionHostId } from '../../../../../shared/execution-host/execution-host'
-import { taskSourceRuntimeTarget } from '@/lib/work-items/task-source-runtime-target'
+import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
+import { taskSourceRuntimeTarget } from '@/lib/task-source-runtime-target'
 import { useAppStore } from '@/store/index'
 import { useJiraProjectInventory } from '../../use-jira-project-inventory'
 import { JiraProjectPicker } from '../../jira-project-picker'
-import { SearchableSetting } from '../section-layout/SearchableSetting'
-import { useTranslate } from '@/i18n/use-translate'
+import { SearchableSetting } from '../SearchableSetting'
+import { translate } from '@/i18n/i18n'
 
 export function RepositoryJiraProjectSection({
   repo,
@@ -18,7 +18,6 @@ export function RepositoryJiraProjectSection({
   updateRepo: (id: string, updates: { defaultJiraProject: JiraProjectReference | null }) => unknown
   forceVisible?: boolean
 }): React.JSX.Element {
-  const t = useTranslate()
   const hostId = getRepoExecutionHostId(repo)
   const source = useMemo(() => taskSourceRuntimeTarget({ hostId }), [hostId])
   const inventory = useJiraProjectInventory(source, true)
@@ -31,7 +30,7 @@ export function RepositoryJiraProjectSection({
       const result = await updateRepo(repo.id, { defaultJiraProject: project })
       if (result === false) {
         throw new Error(
-          t(
+          translate(
             'components.RepositoryJiraProjectSection.saveFailed',
             'Could not save the default Jira project.'
           )
@@ -47,7 +46,7 @@ export function RepositoryJiraProjectSection({
         (echoed?.siteId ?? null) !== (project?.siteId ?? null)
       ) {
         throw new Error(
-          t(
+          translate(
             'components.RepositoryJiraProjectSection.runtimeUpdate',
             'Update this runtime to save a default Jira project.'
           )
@@ -59,17 +58,17 @@ export function RepositoryJiraProjectSection({
       setSaving(false)
     }
   }
-  const label = t('components.RepositoryJiraProjectSection.title', 'Default Jira project')
+  const label = translate('components.RepositoryJiraProjectSection.title', 'Default Jira project')
   return (
     <SearchableSetting
       title={label}
-      description={t(
+      description={translate(
         'components.RepositoryJiraProjectSection.description',
         'Default the Jira issue picker and Tasks list to this project. You can change it for each worktree.'
       )}
       keywords={['jira', 'project', repo.displayName]}
       forceVisible={forceVisible}
-      className="space-y-2 py-3"
+      className="space-y-2"
     >
       <p className="text-sm font-semibold">{label}</p>
       <JiraProjectPicker
@@ -77,12 +76,12 @@ export function RepositoryJiraProjectSection({
         value={repo.defaultJiraProject ?? null}
         onChange={(project) => void applyProject(project)}
         label={label}
-        emptyLabel={t('components.RepositoryJiraProjectSection.none', 'No default project')}
+        emptyLabel={translate('components.RepositoryJiraProjectSection.none', 'No default project')}
         disabled={inventory.loading || saving}
       />
       {!inventory.loading && !inventory.connected && !inventory.error ? (
         <p className="text-xs text-muted-foreground">
-          {t(
+          {translate(
             'components.RepositoryJiraProjectSection.connect',
             'Connect Jira in Integrations to choose a project.'
           )}

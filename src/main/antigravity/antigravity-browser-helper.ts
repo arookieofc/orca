@@ -1,8 +1,7 @@
 // Capture sign-in URLs on stderr so remote hosts never open a browser.
 
-import { quotePosixShellDoubleQuotedApostrophe } from '../../shared/shell/launch/shell-argument-quoting'
+import { quotePosixShellDoubleQuotedApostrophe } from '../../shared/shell-argument-quoting'
 import { runProcess } from '@orca/process-host'
-import { scrubAntigravityAcpEnvironment } from './antigravity-acp-environment-sanitizer'
 
 export const ANTIGRAVITY_BROWSER_MARKER = '__ORCA_ANTIGRAVITY_AUTH_URL__'
 
@@ -18,33 +17,13 @@ const PREFLIGHT_URL = 'https://example.invalid/orca-antigravity-browser-prefligh
 const executable = process.execPath.replaceAll('\\', '\\\\').replaceAll(':', '\\072')
 const shell = `exec /usr/bin/env ELECTRON_RUN_AS_NODE=1 "$(printf %b ${quotePosixShellDoubleQuotedApostrophe(executable)})" -e ${quotePosixShellDoubleQuotedApostrophe(HELPER_SOURCE)} -- "$1"`
 const BROWSER_ARGV = ['/bin/sh', '-c', shell, '--', '%s']
-const WINDOWS_BROWSER_ARGV = [process.execPath, '-e', HELPER_SOURCE, '--', '%s']
-const POSIX_BROWSER_COMMAND = BROWSER_ARGV.map(quotePosixShellDoubleQuotedApostrophe).join(' ')
-const WINDOWS_BROWSER_COMMAND = WINDOWS_BROWSER_ARGV.map(
-  (arg) => `'${arg.replaceAll("'", `'"'"'`)}'`
+export const ANTIGRAVITY_BROWSER_COMMAND = BROWSER_ARGV.map(
+  quotePosixShellDoubleQuotedApostrophe
 ).join(' ')
-const usable =
-  !/[\r\n\0]|%s/.test(process.execPath) &&
-  (process.platform !== 'win32' || !process.execPath.includes(';'))
-
-export const ANTIGRAVITY_BROWSER_COMMAND =
-  process.platform === 'win32' ? WINDOWS_BROWSER_COMMAND : POSIX_BROWSER_COMMAND
+const usable = !/[\r\n\0]|%s/.test(process.execPath)
 
 export const antigravityBrowserArgv = (link: string): string[] =>
-  (process.platform === 'win32' ? WINDOWS_BROWSER_ARGV : BROWSER_ARGV).map((arg) =>
-    arg === '%s' ? link : arg
-  )
-
-export const antigravityBrowserHelperPreflightPassed = (result: {
-  readonly code: number | null
-  readonly stdout: string
-  readonly stderr: string
-  readonly outputTruncated?: boolean
-}): boolean =>
-  result.code === 0 &&
-  result.stdout === '' &&
-  !result.outputTruncated &&
-  result.stderr === `${ANTIGRAVITY_BROWSER_MARKER}${JSON.stringify(PREFLIGHT_URL)}\n`
+  BROWSER_ARGV.map((arg) => (arg === '%s' ? link : arg))
 
 /** Check before each server start: a broken helper could let Python launch a real browser. */
 export async function antigravityBrowserHelperWorks(): Promise<boolean> {
@@ -52,15 +31,11 @@ export async function antigravityBrowserHelperWorks(): Promise<boolean> {
     return false
   }
   const [program = '', ...args] = antigravityBrowserArgv(PREFLIGHT_URL)
-  const env: Record<string, string | undefined> = { ...process.env }
-  scrubAntigravityAcpEnvironment(env, process.env)
-  const spec = {
-    program,
-    args,
-    ...(process.platform === 'win32' ? { env: { ...env, ELECTRON_RUN_AS_NODE: '1' } } : {}),
-    timeoutMs: 5_000,
-    maxOutputBytes: 4_096
-  }
+  const spec = { program, args, timeoutMs: 5_000, maxOutputBytes: 4_096 }
   const result = await runProcess(spec).catch(() => null)
-  return result !== null && antigravityBrowserHelperPreflightPassed(result)
+  return (
+    result?.code === 0 &&
+    result.stdout === '' &&
+    result.stderr === `${ANTIGRAVITY_BROWSER_MARKER}${JSON.stringify(PREFLIGHT_URL)}\n`
+  )
 }

@@ -1,9 +1,8 @@
 import React from 'react'
-import { ChevronDown, Minus, Plus, Trash, Undo2 } from 'lucide-react'
-import { FolderIcon } from '@/components/FileTypeIcon'
-import { cn } from '@/lib/class-names'
-import { useTranslate } from '@/i18n/use-translate'
-import type { DiscardAllArea } from '../../../../../../shared/source-control/listing/source-control-discard-all-sequence'
+import { ChevronDown, Folder, FolderOpen, Minus, Plus, Trash, Undo2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
+import type { DiscardAllArea } from '../../../../../../shared/source-control-discard-all-sequence'
 import type {
   BranchSourceControlTreeDirectoryNode,
   SourceControlDirectoryActionPaths,
@@ -43,7 +42,11 @@ function SourceControlTreeDirectoryHeader({
         <ChevronDown
           className={cn('size-3 shrink-0 transition-transform', isCollapsed && '-rotate-90')}
         />
-        <FolderIcon folderPath={node.name} open={!isCollapsed} className="size-3 shrink-0" />
+        {isCollapsed ? (
+          <Folder className="size-3 shrink-0" />
+        ) : (
+          <FolderOpen className="size-3 shrink-0" />
+        )}
         <span className="min-w-0 flex-1 truncate">{node.name}</span>
       </button>
       <span className="w-4 shrink-0 text-center text-[10px] font-bold tabular-nums text-muted-foreground/80">
@@ -76,7 +79,6 @@ export function SourceControlTreeDirectoryRow({
   onStagePaths: (paths: readonly string[]) => Promise<void>
   onUnstagePaths: (paths: readonly string[]) => Promise<void>
 }): React.JSX.Element {
-  const t = useTranslate()
   // Filtered descendants represent only a subset; avoid promising whole-folder actions.
   const canStage = !hideBulkActions && actionPaths.stagePaths.length > 0
   const canUnstage = !hideBulkActions && actionPaths.unstagePaths.length > 0
@@ -91,11 +93,14 @@ export function SourceControlTreeDirectoryRow({
               icon={node.area === 'untracked' ? Trash : Undo2}
               title={
                 node.area === 'untracked'
-                  ? t(
+                  ? translate(
                       'auto.components.right.sidebar.SourceControl.9b367363b6',
                       'Delete untracked in folder'
                     )
-                  : t('auto.components.right.sidebar.SourceControl.6d7f2a47e5', 'Discard folder')
+                  : translate(
+                      'auto.components.right.sidebar.SourceControl.6d7f2a47e5',
+                      'Discard folder'
+                    )
               }
               onClick={(event) => {
                 event.stopPropagation()
@@ -107,7 +112,10 @@ export function SourceControlTreeDirectoryRow({
           {canStage && (
             <ActionButton
               icon={Plus}
-              title={t('auto.components.right.sidebar.SourceControl.bfe9011a0e', 'Stage folder')}
+              title={translate(
+                'auto.components.right.sidebar.SourceControl.bfe9011a0e',
+                'Stage folder'
+              )}
               onClick={(event) => {
                 event.stopPropagation()
                 void onStagePaths(actionPaths.stagePaths)
@@ -118,7 +126,10 @@ export function SourceControlTreeDirectoryRow({
           {canUnstage && (
             <ActionButton
               icon={Minus}
-              title={t('auto.components.right.sidebar.SourceControl.ab31221779', 'Unstage folder')}
+              title={translate(
+                'auto.components.right.sidebar.SourceControl.ab31221779',
+                'Unstage folder'
+              )}
               onClick={(event) => {
                 event.stopPropagation()
                 void onUnstagePaths(actionPaths.unstagePaths)

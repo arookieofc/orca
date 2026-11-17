@@ -1,4 +1,4 @@
-import type { RepoMethod } from '../../../shared/telemetry/schemas/telemetry-property-schemas'
+import type { RepoMethod } from '../../../shared/telemetry-events'
 import { track } from '../../telemetry/client'
 import { getCohortAtEmit } from '../../telemetry/cohort-classifier'
 

@@ -1,12 +1,12 @@
 // COMPAT(wsl-bridge): removed when WSL runs as an orcad host.
 import { useCallback, useMemo, useRef, type KeyboardEvent } from 'react'
-import { track } from '@/diagnostics/telemetry/telemetry'
-import { notifyInstalledAgentSkillsChanged } from '@/hooks/skills/discovery/installed-agent-skill-discovery'
-import { useActiveProjectSkillRuntime } from '@/hooks/skills/runtime/useActiveProjectSkillRuntime'
+import { track } from '@/lib/telemetry'
+import { notifyInstalledAgentSkillsChanged } from '@/hooks/useInstalledAgentSkills'
+import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRuntime'
 import {
   buildSkillCommandForRuntime,
   buildSkillSetupTerminalCommand
-} from '../../lib/skills/runtime/skill-runtime-command'
+} from '../settings/CliSkillRuntimeSetup'
 import { OnboardingInlineCommandTerminal } from './OnboardingInlineCommandTerminal'
 import {
   getOnboardingFeatureSetupAgentRuntime,
@@ -16,7 +16,7 @@ import {
   onboardingFeatureSetupTelemetrySelection,
   type OnboardingFeatureSetupSelection
 } from './onboarding-feature-setup'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 type FeatureSetupInlineTerminalProps = {
   command: string
@@ -29,7 +29,6 @@ export function FeatureSetupInlineTerminal({
   runtimeContext,
   selection
 }: FeatureSetupInlineTerminalProps): React.JSX.Element {
-  const t = useTranslate()
   const terminalOpenedTrackedRef = useRef(false)
   const terminalInteractedTrackedRef = useRef(false)
   const activeSkillRuntime = useActiveProjectSkillRuntime()
@@ -81,12 +80,15 @@ export function FeatureSetupInlineTerminal({
       prepareCommandForShell={prepareCommandForShell}
       shellOverride={setupRuntime.terminalShellOverride}
       forceHostRuntime={Boolean(setupRuntime.installDisabledReason)}
-      title={t('auto.components.onboarding.FeatureSetupInlineTerminal.c767ab7061', 'Skill setup')}
-      ariaLabel={t(
+      title={translate(
+        'auto.components.onboarding.FeatureSetupInlineTerminal.c767ab7061',
+        'Skill setup'
+      )}
+      ariaLabel={translate(
         'auto.components.onboarding.FeatureSetupInlineTerminal.47fc6cc6dc',
         'Skill setup command'
       )}
-      description={t(
+      description={translate(
         'auto.components.onboarding.FeatureSetupInlineTerminal.789b59936e',
         'Press Enter to run the command and confirm npx if asked. You can also set this up later in Settings.'
       )}

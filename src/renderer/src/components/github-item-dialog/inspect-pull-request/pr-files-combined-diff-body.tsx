@@ -1,23 +1,18 @@
-import type { GitHubImageIntake } from '@/components/github/use-github-image-uploads'
-import {
-  combinedDiffViewportAttributes,
-  combinedDiffRowAttributes
-} from '@/components/editor/combined-diff/scroll-viewport/combined-diff-viewport'
 import React from 'react'
 import type { Virtualizer } from '@tanstack/react-virtual'
 import type { editor as monacoEditor } from 'monaco-editor'
-import { DiffSectionItem } from '@/components/editor/diff/sections/DiffSectionItem'
-import { useTranslate } from '@/i18n/use-translate'
+import { DiffSectionItem } from '@/components/editor/DiffSectionItem'
+import { translate } from '@/i18n/i18n'
 import type { DecoratedDiffComment } from '@/components/diff-comments/decorated-diff-comment'
 import { CombinedDiffFileTree } from '../../editor/combined-diff/browse-files/combined-diff-file-tree'
-import type { DiffSection } from '@/components/editor/diff/sections/diff-section-types'
+import type { DiffSection } from '@/components/editor/diff-section-types'
 import type { CombinedDiffFileTreeEntry } from '../../editor/combined-diff/resolve-changes/combined-diff-section-identity'
-import type { GitHubPRFile } from '../../../../../shared/github/pull-requests/pull-request-types'
-import type { GitBranchChangeEntry } from '../../../../../shared/git/diff/git-diff-compare-types'
+import type { GitHubPRFile } from '../../../../../shared/github/pull-request-types'
+import type { GitBranchChangeEntry } from '../../../../../shared/git-diff-compare-types'
+import type { DiffSectionItemProps } from '@/components/editor/diff-section-item-props'
 import { PRFilesCombinedDiffToolbar } from './pr-files-combined-diff-toolbar'
 
 export function PRFilesCombinedDiffBody({
-  imageUploadAddress,
   files,
   repoPath,
   repoId,
@@ -37,6 +32,7 @@ export function PRFilesCombinedDiffBody({
   virtualizer,
   sections,
   isDark,
+  settings,
   sectionHeights,
   inlineReviewComments,
   loadSection,
@@ -51,7 +47,6 @@ export function PRFilesCombinedDiffBody({
   handleSectionSaveRef,
   getCommentableLineNumbers
 }: {
-  imageUploadAddress?: GitHubImageIntake['address']
   files: GitHubPRFile[]
   repoPath: string
   repoId: string
@@ -71,6 +66,7 @@ export function PRFilesCombinedDiffBody({
   virtualizer: Virtualizer<HTMLDivElement, Element>
   sections: DiffSection[]
   isDark: boolean
+  settings: DiffSectionItemProps['settings']
   sectionHeights: Record<number, number>
   inlineReviewComments: DecoratedDiffComment[]
   loadSection: (index: number) => void
@@ -89,7 +85,6 @@ export function PRFilesCombinedDiffBody({
   modifiedEditorsRef: React.RefObject<Map<number, monacoEditor.IStandaloneCodeEditor>>
   handleSectionSaveRef: React.MutableRefObject<(index: number) => Promise<void>>
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <PRFilesCombinedDiffToolbar
@@ -113,11 +108,7 @@ export function PRFilesCombinedDiffBody({
           onCollapsedChange={setFileTreeCollapsed}
           onNavigate={handleTreeNavigate}
         />
-        <div
-          {...combinedDiffViewportAttributes}
-          ref={scrollContainerRef}
-          className="min-w-0 flex-1 overflow-auto scrollbar-editor"
-        >
+        <div ref={scrollContainerRef} className="min-w-0 flex-1 overflow-auto scrollbar-editor">
           <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
             {virtualizer.getVirtualItems().map((virtualItem) => {
               const section = sections[virtualItem.index]
@@ -127,7 +118,6 @@ export function PRFilesCombinedDiffBody({
               return (
                 <div
                   key={virtualItem.key}
-                  {...combinedDiffRowAttributes}
                   data-index={virtualItem.index}
                   ref={virtualizer.measureElement}
                   className="absolute left-0 top-0 w-full"
@@ -139,6 +129,7 @@ export function PRFilesCombinedDiffBody({
                     isBranchMode={false}
                     sideBySide={sideBySide}
                     isDark={isDark}
+                    settings={settings}
                     sectionHeight={sectionHeights[virtualItem.index]}
                     worktreeId={`github-pr:${repoId}:${prNumber}`}
                     inlineComments={inlineReviewComments}
@@ -146,18 +137,17 @@ export function PRFilesCombinedDiffBody({
                     retrySection={retrySection}
                     toggleSection={toggleSection}
                     openSection={openFilesOnGitHub}
-                    openSectionTitle={t(
+                    openSectionTitle={translate(
                       'auto.components.GitHubItemDialog.85a2b66f54',
                       'Open files on GitHub'
                     )}
                     renderHeaderTrailingContent={renderViewedCheckbox}
-                    imageUploadAddress={imageUploadAddress}
                     onAddLineComment={handleAddLineComment}
-                    addLineCommentLabel={t(
+                    addLineCommentLabel={translate(
                       'auto.components.GitHubItemDialog.bf43425540',
                       'Comment'
                     )}
-                    addLineCommentPlaceholder={t(
+                    addLineCommentPlaceholder={translate(
                       'auto.components.GitHubItemDialog.86d84a17ca',
                       'Add a review comment'
                     )}

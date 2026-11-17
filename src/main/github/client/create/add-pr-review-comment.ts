@@ -1,19 +1,16 @@
-import { githubBodyMediaHeaders } from '../../attachments/body-image-urls'
 import type {
   GitHubCommentResult,
   GitHubPRReviewCommentInput
-} from '../../../../shared/github/comments/comment-types'
-import { ghExecFileAsync } from '../../../git/command-runner/hosted-cli/gh-exec-file'
-import { acquire, release } from '../../execution/github-operation-slots'
-import { classifyGhError } from '../../api/gh-error-classification'
-import type { LocalGitExecOptions } from '../../repositories/github-repository-identity'
-import { resolveGitHubRepoExecution } from '../../repositories/github-api-repository'
-import type { GitHubRepositoryIdentity as GitHubApiRepository } from '../../../../shared/github/repositories/repository-identity'
-import { mapReviewCommentResponse } from './../map/review-comment-response'
+} from '../../../../shared/github/comment-types'
 import {
-  codeHostFailure,
-  classifiedFailure
-} from '../../../../shared/source-control/code-host-failure-copy'
+  ghExecFileAsync,
+  acquire,
+  release,
+  classifyGhError,
+  type LocalGitExecOptions
+} from '../../gh-utils'
+import { resolveGitHubRepoExecution, type GitHubApiRepository } from '../../github-api-repository'
+import { mapReviewCommentResponse } from './../map/review-comment-response'
 export async function addPRReviewComment(
   args: GitHubPRReviewCommentInput & {
     connectionId?: string | null
@@ -27,13 +24,12 @@ export async function addPRReviewComment(
     args.localGitOptions
   )
   if (!ownerRepo) {
-    return codeHostFailure('github.repoUnresolved')
+    return { ok: false, error: 'Could not resolve GitHub owner/repo for this repository' }
   }
   await acquire()
   try {
     const fields = [
       'api',
-      ...githubBodyMediaHeaders(args.body),
       '-X',
       'POST',
       `repos/${ownerRepo.owner}/${ownerRepo.repo}/pulls/${args.prNumber}/comments`,
@@ -60,7 +56,7 @@ export async function addPRReviewComment(
     const data = JSON.parse(stdout) as Parameters<typeof mapReviewCommentResponse>[0]
     // Reject synthetic fallback IDs that replies and reactions could otherwise target.
     if (typeof data.id !== 'number' || !Number.isSafeInteger(data.id) || data.id < 1) {
-      return codeHostFailure('github.unexpectedResponse')
+      return { ok: false, error: 'Unexpected response from GitHub' }
     }
     return {
       ok: true,
@@ -68,7 +64,7 @@ export async function addPRReviewComment(
     }
   } catch (err) {
     const stderr = err instanceof Error ? err.message : String(err)
-    return classifiedFailure(classifyGhError(stderr))
+    return { ok: false, error: classifyGhError(stderr).message }
   } finally {
     release()
   }
@@ -93,14 +89,13 @@ export async function addPRReviewCommentReply(
     localGitOptions
   )
   if (!ownerRepo) {
-    return codeHostFailure('github.repoUnresolved')
+    return { ok: false, error: 'Could not resolve GitHub owner/repo for this repository' }
   }
   await acquire()
   try {
     const { stdout } = await ghExecFileAsync(
       [
         'api',
-        ...githubBodyMediaHeaders(body),
         '-X',
         'POST',
         `repos/${ownerRepo.owner}/${ownerRepo.repo}/pulls/${prNumber}/comments/${commentId}/replies`,
@@ -111,7 +106,7 @@ export async function addPRReviewCommentReply(
     )
     const data = JSON.parse(stdout) as Parameters<typeof mapReviewCommentResponse>[0]
     if (typeof data.id !== 'number' || !Number.isSafeInteger(data.id) || data.id < 1) {
-      return codeHostFailure('github.unexpectedResponse')
+      return { ok: false, error: 'Unexpected response from GitHub' }
     }
     return {
       ok: true,
@@ -119,7 +114,7 @@ export async function addPRReviewCommentReply(
     }
   } catch (err) {
     const stderr = err instanceof Error ? err.message : String(err)
-    return classifiedFailure(classifyGhError(stderr))
+    return { ok: false, error: classifyGhError(stderr).message }
   } finally {
     release()
   }

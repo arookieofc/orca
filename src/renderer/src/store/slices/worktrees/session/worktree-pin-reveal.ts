@@ -1,21 +1,19 @@
-import type { WorktreeMetaBatchUpdate } from '../metadata/worktree-meta-update-options'
-import type { WorktreeSlice } from '../worktree-slice-contract'
+import type { WorktreeMetaBatchUpdate, WorktreeSlice } from '../../worktree-helpers'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import {
   getActiveSidebarWorkspaceId,
   parseWorkspaceKey
-} from '../../../../../../shared/workspace/identity/workspace-scope'
+} from '../../../../../../shared/workspace-scope'
 import {
   getCyclicWorktreeLineageChildIds,
   isValidResolvedWorktreeLineageEdge
-} from '../../../../../../shared/worktree/lineage/resolved-worktree-lineage'
+} from '../../../../../../shared/resolved-worktree-lineage'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
-import { getIndexedWorktreesById } from '../listing/worktree-catalog-index'
-import '@/lib/workspace/ownership/worktree-runtime-owner-index'
-import { worktreeOwnerHostIds } from '@/lib/workspace/ownership/workspace-catalog-owner-index'
-import { selectWorktreesByRepo } from '../../../workspaces/catalog/workspace-record-fields'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import { getIndexedWorktreesById } from '../../../worktree-repo-index'
+import { worktreeOwnerHostIds } from '@/lib/worktree-runtime-owner-index'
+import { selectWorktreesByRepo } from '../../../workspace-record-selectors'
 
 type WorktreeWithEmbeddedLineage = Worktree & { lineage?: WorktreeLineage | null }
 function getProjectedLineage(get: WorktreeSliceGet, worktree: Worktree): WorktreeLineage | null {

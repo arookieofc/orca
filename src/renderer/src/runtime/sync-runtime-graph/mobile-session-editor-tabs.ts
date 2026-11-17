@@ -2,12 +2,11 @@ import type { AppState } from '@/store/types'
 import type {
   RuntimeMobileSessionFileTab,
   RuntimeMobileSessionMarkdownTab
-} from '../../../../shared/remote-runtime/session-graph/runtime-mobile-session-tab-contracts'
-import type { Tab } from '../../../../shared/workspace-layout/tab-groups/tab-types'
-import { editorRowHost } from '../../../../shared/workspace-session/session-tab-file-host'
+} from '../../../../shared/runtime-types'
+import type { Tab } from '../../../../shared/tab-types'
+import { editorRowHost } from '../../../../shared/session-tab-file-host'
 import type { MobileSessionWorktreeInputs } from './types'
 import {
-  getMobileMarkdownSourceFile,
   isFileActiveEditorSurface,
   isMobileFileDiffSource,
   isUnifiedTabActiveInActiveGroup
@@ -18,10 +17,16 @@ export function buildMobileMarkdownTab(
   file: AppState['openFiles'][number],
   unifiedTab?: Tab
 ): RuntimeMobileSessionMarkdownTab | null {
-  const sourceFile = getMobileMarkdownSourceFile(file, inputs.openFilesById)
-  if (!sourceFile) {
+  if (file.mode !== 'edit' && file.mode !== 'markdown-preview') {
     return null
   }
+  if (file.language !== 'markdown' && file.mode !== 'markdown-preview') {
+    return null
+  }
+  const sourceFile =
+    file.mode === 'markdown-preview' && file.markdownPreviewSourceFileId
+      ? (inputs.openFilesById?.get(file.markdownPreviewSourceFileId) ?? file)
+      : file
   const draftVersion = inputs.editorDraftVersionByFileId.get(sourceFile.id)
   const title = file.relativePath.split(/[\\/]/).pop() || file.relativePath || 'Markdown'
   const unifiedTabId = unifiedTab?.id
@@ -32,7 +37,7 @@ export function buildMobileMarkdownTab(
     filePath: file.filePath,
     relativePath: file.relativePath,
     language: 'markdown',
-    mode: file.mode === 'markdown-preview' ? 'markdown-preview' : 'edit',
+    mode: file.mode,
     isDirty: file.isDirty || sourceFile.isDirty,
     isActive: unifiedTabId
       ? isUnifiedTabActiveInActiveGroup(inputs, unifiedTabId)
@@ -65,7 +70,6 @@ export function buildMobileFileTab(
     language: file.language,
     mode: file.mode === 'diff' ? 'diff' : 'edit',
     ...(diffSource ? { diffSource } : {}),
-    ...(diffSource === 'staged' && file.branchOldPath ? { oldPath: file.branchOldPath } : {}),
     isDirty: file.isDirty,
     color: unifiedTab?.color ?? null,
     isPinned: unifiedTab?.isPinned === true,

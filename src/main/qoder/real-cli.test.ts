@@ -1,4 +1,3 @@
-import '../agent-hooks/server/testing/memory-agent-identity-store.test-fixture'
 import {
   cp,
   mkdtemp,
@@ -16,8 +15,8 @@ import type * as Os from 'node:os'
 import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
 import { runProcess } from '@orca/process-host'
-import { makePaneKey } from '../../shared/workspace-layout/stable-pane-id'
-import { parseQoderSessionFile } from '../ai-vault/scanners/qoder/session-scanner-qoder-parser'
+import { makePaneKey } from '../../shared/stable-pane-id'
+import { parseQoderSessionFile } from '../ai-vault/session-scanner-qoder-parser'
 
 const sandbox = vi.hoisted(() => ({ home: '' }))
 vi.mock('node:os', async (importOriginal) => {
@@ -27,7 +26,7 @@ vi.mock('node:os', async (importOriginal) => {
 vi.mock('electron', () => ({ app: { getPath: () => sandbox.home } }))
 import { qoderHookService } from './hook-service'
 import { markQoderWorkspaceTrusted } from './workspace-trust'
-import { AgentHookServer } from '../agent-hooks/server/agent-hook-server'
+import { AgentHookServer } from '../agent-hooks/server'
 
 it.skipIf(process.env.ORCA_REAL_QODER_CLI_TEST !== '1')(
   'generates and resumes a real task through managed hooks',

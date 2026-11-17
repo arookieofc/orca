@@ -2,7 +2,7 @@ import type {
   CodexUsageRange,
   CodexUsageScope,
   CodexUsageSessionRow
-} from '../../shared/agent-usage/analytics/codex-usage-types'
+} from '../../shared/codex-usage-types'
 import type { CodexUsagePersistedState } from './types'
 import { getFilteredSessions, getScopedSessionPrimaryModel } from './codex-usage-scope-filters'
 

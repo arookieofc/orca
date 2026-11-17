@@ -1,15 +1,11 @@
 import type { BrowserWindow } from 'electron'
-import { ipcMain } from 'electron'
-import { showSingleFlightOpenDialog } from '../dialogs/single-flight-open-dialog'
+import { dialog, ipcMain } from 'electron'
 
 export function registerRepoFolderPickerHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle('repos:pickFolder', async () => {
-    const result = await showSingleFlightOpenDialog(
-      {
-        properties: ['openDirectory']
-      },
-      mainWindow
-    )
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory']
+    })
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
@@ -17,12 +13,9 @@ export function registerRepoFolderPickerHandlers(mainWindow: BrowserWindow): voi
   })
 
   ipcMain.handle('repos:pickFolders', async () => {
-    const result = await showSingleFlightOpenDialog(
-      {
-        properties: ['openDirectory', 'multiSelections']
-      },
-      mainWindow
-    )
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'multiSelections']
+    })
     if (result.canceled || result.filePaths.length === 0) {
       return []
     }
@@ -31,13 +24,10 @@ export function registerRepoFolderPickerHandlers(mainWindow: BrowserWindow): voi
 
   // Clone destinations need a generic picker because they may not contain a Git repo.
   ipcMain.handle('repos:pickDirectory', async () => {
-    const result = await showSingleFlightOpenDialog(
-      {
-        // macOS creates typed partial paths when directory creation is enabled; defer creation to submit.
-        properties: ['openDirectory']
-      },
-      mainWindow
-    )
+    const result = await dialog.showOpenDialog(mainWindow, {
+      // macOS creates typed partial paths when directory creation is enabled; defer creation to submit.
+      properties: ['openDirectory']
+    })
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }

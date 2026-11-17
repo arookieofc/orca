@@ -1,9 +1,9 @@
-import { supportsHostedReviewCreation } from '../../../../../../shared/source-control/hosted-review/hosted-review-creation-providers'
-import { normalizeHostedReviewBaseRef } from '../../../../../../shared/source-control/hosted-review/hosted-review-refs'
+import { supportsHostedReviewCreation } from '../../../../../../shared/hosted-review-creation-providers'
+import { normalizeHostedReviewBaseRef } from '../../../../../../shared/hosted-review-refs'
 import type {
   HostedReviewCreationEligibility,
   HostedReviewProvider
-} from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
+} from '../../../../../../shared/hosted-review'
 
 type UnavailableHostedReviewStatus = {
   branch: string | null | undefined

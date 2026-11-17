@@ -4,8 +4,7 @@ const { gitExecFileAsyncMock } = vi.hoisted(() => ({
   gitExecFileAsyncMock: vi.fn()
 }))
 
-vi.mock('../git/command-runner/git-exec-file', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock('../github/gh-utils', () => ({
   gitExecFileAsync: gitExecFileAsyncMock
 }))
 

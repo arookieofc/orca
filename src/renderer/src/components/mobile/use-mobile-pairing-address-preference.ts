@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
-import { selectRefreshedNetworkAddress } from './pairing/mobile-network-interface-selection'
-import type { PairingNetworkInterface } from '../../../../shared/remote-runtime/pairing/pairing-address-auto-selection'
+import {
+  selectRefreshedNetworkAddress,
+  type MobileNetworkInterface
+} from '../settings/mobile-network-interface-selection'
 import {
   useMobilePairingCustomAddress,
   useMobilePairingCustomAddresses
@@ -9,7 +11,7 @@ import {
 import {
   addMobilePairingCustomAddress,
   removeMobilePairingCustomAddress
-} from '../../../../shared/remote-runtime/pairing/mobile-pairing-custom-address'
+} from '../../../../shared/mobile-pairing-custom-address'
 
 function haveSameAddresses(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((address, index) => address === right[index])
@@ -21,7 +23,7 @@ export type MobilePairingAddressChange = {
 }
 
 export function useMobilePairingAddressPreference(args: {
-  networkInterfaces: readonly PairingNetworkInterface[]
+  networkInterfaces: readonly MobileNetworkInterface[]
   onSelectionInvalidated: (change: MobilePairingAddressChange) => void
 }): {
   selectedAddress: string | undefined
@@ -30,7 +32,7 @@ export function useMobilePairingAddressPreference(args: {
   selectAddress: (address: string) => void
   selectCustomAddress: (address: string) => void
   removeCustomAddress: (address: string) => void
-  selectAddressAfterRefresh: (interfaces: readonly PairingNetworkInterface[]) => void
+  selectAddressAfterRefresh: (interfaces: readonly MobileNetworkInterface[]) => void
 } {
   const { networkInterfaces, onSelectionInvalidated } = args
   const updateSettings = useAppStore((state) => state.updateSettings)
@@ -49,7 +51,7 @@ export function useMobilePairingAddressPreference(args: {
   const pendingCustomAddressWritesRef = useRef<(string | undefined)[]>([])
 
   const selectAddressAfterRefresh = useCallback(
-    (interfaces: readonly PairingNetworkInterface[]): void => {
+    (interfaces: readonly MobileNetworkInterface[]): void => {
       const nextAddress = selectRefreshedNetworkAddress(
         selectedAddressRef.current,
         interfaces,

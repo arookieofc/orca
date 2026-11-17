@@ -1,7 +1,6 @@
 import type { ManagedPaneInternal } from './pane-manager-types'
-import './pane-layout/pane-tree-ops'
-import { equalizePaneSplitSizes } from './pane-layout/pane-tree-equalization'
-import { fitRevealedPane } from './terminal-fit/pane-reveal-fit'
+import { equalizePaneSplitSizes } from './pane-tree-ops'
+import { fitRevealedPane } from './pane-reveal-fit'
 
 // Raw reveal fits can reflow transient DOM/WebGL metric differences and corrupt inline TUIs; use fitRevealedPane.
 export function fitRevealedPanes(panes: Map<number, ManagedPaneInternal>): void {

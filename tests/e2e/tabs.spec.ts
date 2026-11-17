@@ -77,10 +77,7 @@ test.describe('Tabs', () => {
 
     // Hidden animated terminals can invalidate Playwright stability despite an enabled visible button.
     await orcaPage.getByRole('button', { name: 'New tab' }).click({ force: true })
-    const newTerminalMenuItem = orcaPage
-      .getByRole('menu')
-      .getByRole('button', { name: /New Terminal/i })
-      .first()
+    const newTerminalMenuItem = orcaPage.getByRole('menuitem', { name: /New Terminal/i }).first()
     await newTerminalMenuItem.click()
     await expect(newTerminalMenuItem).toBeHidden({ timeout: 3_000 })
 
@@ -122,10 +119,7 @@ test.describe('Tabs', () => {
     )
 
     await orcaPage.getByRole('button', { name: 'New tab' }).click({ force: true })
-    const newMarkdownMenuItem = orcaPage
-      .getByRole('menu')
-      .getByRole('button', { name: 'New Markdown' })
-      .first()
+    const newMarkdownMenuItem = orcaPage.getByRole('menuitem', { name: /New Markdown/i }).first()
     await newMarkdownMenuItem.click()
 
     // Require a newly minted id and retain its cleanup path so existing Markdown cannot satisfy or be deleted by this test.

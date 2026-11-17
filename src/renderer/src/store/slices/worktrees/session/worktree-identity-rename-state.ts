@@ -2,18 +2,16 @@ import type { AppState } from '../../../types'
 import type {
   BrowserPage,
   BrowserWorkspace
-} from '../../../../../../shared/browser/workspaces/browser-workspace-types'
-import { remapBrowserPageDocLocation } from '../../../../../../shared/browser/workspaces/browser-page-doc-location'
+} from '../../../../../../shared/browser-workspace-types'
+import { remapBrowserPageDocLocation } from '../../../../../../shared/browser-page-doc-location'
 import { splitWorktreeIdForFilesystem } from '../../../../../../shared/worktree/id'
-import { worktreeWorkspaceKey } from '../../../../../../shared/workspace/identity/workspace-scope'
-import { getWorktreeIdFromVisitKey } from '@/lib/workspace/activation/worktree-visit-recency'
+import { worktreeWorkspaceKey } from '../../../../../../shared/workspace-scope'
+import { getWorktreeIdFromVisitKey } from '@/lib/worktree-visit-recency'
 import {
   remapClosedTerminalTabSnapshotCwds,
   type ClosedTerminalTabSnapshot
-} from '../../../terminals/tabs/recently-closed-terminal-tabs'
-import '../../tabs/worktree-layout-lifecycle'
-import { renameWorktreeLayoutKeys } from '../../tabs/rename-worktree-layout'
-import { replaceRecordEntries } from '../../../record-transitions/keyed-record-transitions'
+} from '../../recently-closed-tabs'
+import { renameWorktreeLayoutKeys } from '../../tabs/worktree-layout-lifecycle'
 import { renameCombinedDiffViewOwner } from '@/components/editor/combined-diff/remember-view/combined-diff-view-cache'
 
 // Inventory non-layout worktree-keyed maps; layout migrates separately, while surviving tab/file IDs keep their keys.
@@ -29,7 +27,6 @@ const WORKTREE_ID_KEYED_MAP_KEYS = [
   'rightSidebarExplorerViewByWorktree',
   'gitStatusByWorktree',
   'gitStatusHeadByWorktree',
-  'gitStatusReadErrorByWorktree',
   'gitBranchLineTotalByWorktree',
   'gitIgnoredPathsByWorktree',
   'gitConflictOperationByWorktree',
@@ -40,8 +37,6 @@ const WORKTREE_ID_KEYED_MAP_KEYS = [
   'gitBranchCompareRequestStatusHeadByWorktree',
   'explorerDisplayRootByWorktree',
   'showDotfilesByWorktree',
-  'gitGraphFiltersByWorktree',
-  'notificationsMutedByWorktree',
   'expandedDirs',
   'defaultTerminalTabsAppliedByWorktreeId',
   'recentlyClosedTabKindsByWorktree'
@@ -217,25 +212,16 @@ export function buildWorktreeRenameState(
     s.pairedTerminalTabCloseIntentsByEnvironment
   )
   const currentSleepingAgentSessionsByPaneKey = s.sleepingAgentSessionsByPaneKey ?? {}
-  const repointedSleepingSessions = Object.entries(currentSleepingAgentSessionsByPaneKey).flatMap(
-    ([paneKey, record]) =>
-      record.worktreeId === oldWorktreeId
-        ? [[paneKey, { ...record, worktreeId: newWorktreeId }] as const]
-        : []
+  const sleepingAgentSessionsByPaneKey = Object.values(currentSleepingAgentSessionsByPaneKey).some(
+    (record) => record.worktreeId === oldWorktreeId
   )
-  const sleepingAgentSessionsByPaneKey =
-    repointedSleepingSessions.length > 0
-      ? replaceRecordEntries(currentSleepingAgentSessionsByPaneKey, repointedSleepingSessions)
-      : s.sleepingAgentSessionsByPaneKey
-  // Groups keep their ids across the rename, so their chooser marks move with them.
-  const splitLandingGroupIds = Object.values(s.splitLandingGroupIds ?? {}).includes(oldWorktreeId)
     ? Object.fromEntries(
-        Object.entries(s.splitLandingGroupIds).map(([groupId, worktreeId]) => [
-          groupId,
-          worktreeId === oldWorktreeId ? newWorktreeId : worktreeId
+        Object.entries(currentSleepingAgentSessionsByPaneKey).map(([paneKey, record]) => [
+          paneKey,
+          record.worktreeId === oldWorktreeId ? { ...record, worktreeId: newWorktreeId } : record
         ])
       )
-    : s.splitLandingGroupIds
+    : s.sleepingAgentSessionsByPaneKey
 
   return {
     ...renameWorktreeLayoutKeys(s, oldWorktreeId, newWorktreeId, withNewBrowserWorktreeId),
@@ -253,7 +239,6 @@ export function buildWorktreeRenameState(
     ...(sleepingAgentSessionsByPaneKey !== s.sleepingAgentSessionsByPaneKey
       ? { sleepingAgentSessionsByPaneKey }
       : {}),
-    ...(splitLandingGroupIds !== s.splitLandingGroupIds ? { splitLandingGroupIds } : {}),
     ...(closedTerminalTabTombstonesByTabId !== s.closedTerminalTabTombstonesByTabId
       ? { closedTerminalTabTombstonesByTabId }
       : {}),

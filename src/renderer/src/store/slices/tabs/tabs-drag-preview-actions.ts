@@ -1,6 +1,5 @@
 import type { AppState } from '../../types'
 import type { TabsSlice, TabsSliceSet } from './tabs-slice-contract'
-import { replaceRecordEntries } from '../../record-transitions/keyed-record-transitions'
 
 function previewActiveSurfacePatch(
   state: AppState,
@@ -114,19 +113,18 @@ export function createTabsDragPreviewActions(
 
         const next: Partial<AppState> = { ...surfacePatch }
         if (!groupUnchanged) {
-          next.groupsByWorktree = replaceRecordEntries(state.groupsByWorktree, [
-            [
-              worktreeId,
-              groups.map((group) =>
-                group.id === groupId ? { ...group, activeTabId: tabId } : group
-              )
-            ]
-          ])
+          next.groupsByWorktree = {
+            ...state.groupsByWorktree,
+            [worktreeId]: groups.map((group) =>
+              group.id === groupId ? { ...group, activeTabId: tabId } : group
+            )
+          }
         }
         if (!focusUnchanged) {
-          next.activeGroupIdByWorktree = replaceRecordEntries(state.activeGroupIdByWorktree, [
-            [worktreeId, activeGroupId]
-          ])
+          next.activeGroupIdByWorktree = {
+            ...state.activeGroupIdByWorktree,
+            [worktreeId]: activeGroupId
+          }
         }
         return next
       })
@@ -143,21 +141,25 @@ export function createTabsDragPreviewActions(
 
         const next: Partial<AppState> = {}
         if (!groupsUnchanged) {
-          next.groupsByWorktree = replaceRecordEntries(state.groupsByWorktree, [
-            [
-              worktreeId,
-              groups.map((group) => ({
-                ...group,
-                activeTabId: snapshot.activeTabIdByGroup[group.id] ?? null
-              }))
-            ]
-          ])
+          next.groupsByWorktree = {
+            ...state.groupsByWorktree,
+            [worktreeId]: groups.map((group) => ({
+              ...group,
+              activeTabId: snapshot.activeTabIdByGroup[group.id] ?? null
+            }))
+          }
         }
         if (!focusUnchanged) {
-          // A null snapshot group deletes the entry.
-          next.activeGroupIdByWorktree = replaceRecordEntries(state.activeGroupIdByWorktree, [
-            [worktreeId, snapshot.activeGroupId]
-          ])
+          if (snapshot.activeGroupId === null) {
+            const nextActiveGroupIdByWorktree = { ...state.activeGroupIdByWorktree }
+            delete nextActiveGroupIdByWorktree[worktreeId]
+            next.activeGroupIdByWorktree = nextActiveGroupIdByWorktree
+          } else {
+            next.activeGroupIdByWorktree = {
+              ...state.activeGroupIdByWorktree,
+              [worktreeId]: snapshot.activeGroupId
+            }
+          }
         }
 
         const restoredGroupId = snapshot.activeGroupId
@@ -192,14 +194,12 @@ export function createTabsDragPreviewActions(
           return state
         }
         return {
-          groupsByWorktree: replaceRecordEntries(state.groupsByWorktree, [
-            [
-              worktreeId,
-              groups.map((group) =>
-                group.id === sourceGroupId ? { ...group, activeTabId: preDragActiveTabId } : group
-              )
-            ]
-          ])
+          groupsByWorktree: {
+            ...state.groupsByWorktree,
+            [worktreeId]: groups.map((group) =>
+              group.id === sourceGroupId ? { ...group, activeTabId: preDragActiveTabId } : group
+            )
+          }
         }
       })
     }

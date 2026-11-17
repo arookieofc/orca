@@ -1,14 +1,13 @@
-import { gitLabApiFor } from '@/runtime/repository-gitlab/gitlab-owner-api'
+import { gitLabApiFor } from '@/runtime/gitlab-owner-api'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
-import { getCommentBodySubmitState } from '@/lib/source-control/review/comments/comment-body-submit-state'
+import { getCommentBodySubmitState } from '@/lib/comment-body-submit-state'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
-import type { GitLabWorkItem } from '../../../../shared/gitlab/gitlab-types'
+import type { GitLabWorkItem } from '../../../../shared/gitlab-types'
 import { showGitLabMutationError } from '../gitlab-item-dialog-parts'
 import type { GitLabDialogRepoSelector } from './gitlab-item-dialog-types'
 import type { GitLabItemDialogState } from './use-gitlab-item-dialog-state'
-import { codeHostErrorText } from '@/lib/source-control/remote/code-host-error-copy'
 
 export function useGitLabPrimaryActions(
   item: GitLabWorkItem | null,
@@ -18,7 +17,6 @@ export function useGitLabPrimaryActions(
   handleRefresh: () => void
 ) {
   const {
-    claimDetailsOwner,
     commentDraft,
     mountedRef,
     setActionInFlight,
@@ -30,7 +28,6 @@ export function useGitLabPrimaryActions(
       return
     }
     setActionInFlight('close')
-    const ownsResult = claimDetailsOwner()
     try {
       const res = await gitLabApiFor(repoSelector).closeMR({ ...repoSelector, iid: item.number })
       if (res.ok) {
@@ -41,10 +38,11 @@ export function useGitLabPrimaryActions(
               value0: item.number
             })
           )
+          handleRefresh()
         }
       } else {
         if (mountedRef.current) {
-          toast.error(codeHostErrorText(res))
+          toast.error(res.error)
         }
       }
     } catch (error) {
@@ -52,21 +50,17 @@ export function useGitLabPrimaryActions(
         showGitLabMutationError(error)
       }
     } finally {
-      // Only while this MR is still shown: a switched-to item keeps its own read and busy state.
-      if (ownsResult()) {
+      if (mountedRef.current) {
         setActionInFlight(null)
-        // Why: a failed response doesn't prove the host kept the old state; reread on every attempted write.
-        handleRefresh()
       }
     }
-  }, [claimDetailsOwner, handleRefresh, item, mountedRef, repoSelector, setActionInFlight])
+  }, [handleRefresh, item, mountedRef, repoSelector, setActionInFlight])
 
   const handleReopen = useCallback(async (): Promise<void> => {
     if (!item || !repoSelector || item.type !== 'mr') {
       return
     }
     setActionInFlight('reopen')
-    const ownsResult = claimDetailsOwner()
     try {
       const res = await gitLabApiFor(repoSelector).reopenMR({ ...repoSelector, iid: item.number })
       if (res.ok) {
@@ -77,10 +71,11 @@ export function useGitLabPrimaryActions(
               value0: item.number
             })
           )
+          handleRefresh()
         }
       } else {
         if (mountedRef.current) {
-          toast.error(codeHostErrorText(res))
+          toast.error(res.error)
         }
       }
     } catch (error) {
@@ -88,19 +83,17 @@ export function useGitLabPrimaryActions(
         showGitLabMutationError(error)
       }
     } finally {
-      if (ownsResult()) {
+      if (mountedRef.current) {
         setActionInFlight(null)
-        handleRefresh()
       }
     }
-  }, [claimDetailsOwner, handleRefresh, item, mountedRef, repoSelector, setActionInFlight])
+  }, [handleRefresh, item, mountedRef, repoSelector, setActionInFlight])
 
   const handleMerge = useCallback(async (): Promise<void> => {
     if (!item || !repoSelector || item.type !== 'mr') {
       return
     }
     setActionInFlight('merge')
-    const ownsResult = claimDetailsOwner()
     try {
       const res = await gitLabApiFor(repoSelector).mergeMR({ ...repoSelector, iid: item.number })
       if (res.ok) {
@@ -111,10 +104,11 @@ export function useGitLabPrimaryActions(
               value0: item.number
             })
           )
+          handleRefresh()
         }
       } else {
         if (mountedRef.current) {
-          toast.error(codeHostErrorText(res))
+          toast.error(res.error)
         }
       }
     } catch (error) {
@@ -122,12 +116,11 @@ export function useGitLabPrimaryActions(
         showGitLabMutationError(error)
       }
     } finally {
-      if (ownsResult()) {
+      if (mountedRef.current) {
         setActionInFlight(null)
-        handleRefresh()
       }
     }
-  }, [claimDetailsOwner, handleRefresh, item, mountedRef, repoSelector, setActionInFlight])
+  }, [handleRefresh, item, mountedRef, repoSelector, setActionInFlight])
 
   const handleSubmitComment = useCallback(async (): Promise<void> => {
     const bodyState = getCommentBodySubmitState(commentDraft)
@@ -144,7 +137,6 @@ export function useGitLabPrimaryActions(
       return
     }
     setCommentSubmitting(true)
-    const ownsResult = claimDetailsOwner()
     try {
       const res =
         item.type === 'mr'
@@ -164,13 +156,11 @@ export function useGitLabPrimaryActions(
             current.itemId === itemId ? { itemId, value: '' } : current
           )
           useAppStore.getState().recordFeatureInteraction('gitlab-tasks')
-          if (ownsResult()) {
-            handleRefresh()
-          }
+          handleRefresh()
         }
       } else {
         if (mountedRef.current) {
-          toast.error(codeHostErrorText(res))
+          toast.error(res.error)
         }
       }
     } catch (error) {
@@ -178,12 +168,11 @@ export function useGitLabPrimaryActions(
         showGitLabMutationError(error)
       }
     } finally {
-      if (ownsResult()) {
+      if (mountedRef.current) {
         setCommentSubmitting(false)
       }
     }
   }, [
-    claimDetailsOwner,
     commentDraft,
     handleRefresh,
     item,

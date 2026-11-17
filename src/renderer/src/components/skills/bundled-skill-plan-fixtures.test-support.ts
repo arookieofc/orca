@@ -3,7 +3,7 @@ import type {
   BundledSkillOp,
   BundledSkillPlan,
   BundledSkillPlanEntry
-} from '../../../../shared/skills/bundled/bundled-skill-plan'
+} from '../../../../shared/bundled-skill-plan'
 
 const DIGEST = 'a'.repeat(64)
 

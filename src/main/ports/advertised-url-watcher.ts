@@ -17,7 +17,7 @@ import {
   lookupBestAdvertisedUrl,
   shouldEvictAdvertisedUrlAfterScan
 } from './advertised-url-reconciliation'
-import { ownRetainedString } from '../../shared/text/own-retained-string'
+import { ownRetainedString } from '../../shared/own-retained-string'
 
 export const MAX_ADVERTISED_URL_SCAN_SNAPSHOTS = 512
 export type HostKind = 'custom' | 'loopback' | 'private-ip' | 'public-ip'
@@ -234,26 +234,12 @@ export class AdvertisedUrlWatcher {
     observations: readonly AdvertisedUrlListenerObservation[]
   ): void {
     const observedByPort = observedListenersByPort(observations)
-    this.reconcileObservedWorkspaces(new Map(worktreeIds.map((id) => [id, observedByPort])))
-  }
-
-  reconcileWorkspaces(
-    observations: ReadonlyMap<string, readonly AdvertisedUrlListenerObservation[]>
-  ): void {
-    this.reconcileObservedWorkspaces(
-      new Map([...observations].map(([id, listeners]) => [id, observedListenersByPort(listeners)]))
-    )
-  }
-
-  private reconcileObservedWorkspaces(
-    observations: ReadonlyMap<string, Map<number, number | undefined>>
-  ): void {
+    const worktreeSet = new Set(worktreeIds)
     const removedEvents: AdvertisedUrlChangeEvent[] = []
 
     for (const [key, entry] of this.cache) {
       const worktreeId = worktreeIdFromCacheKey(key, entry.port)
-      const observedByPort = observations.get(worktreeId)
-      if (!observedByPort) {
+      if (!worktreeSet.has(worktreeId)) {
         continue
       }
       const current = observedByPort.has(entry.port)
@@ -278,7 +264,7 @@ export class AdvertisedUrlWatcher {
       }
     }
 
-    for (const [worktreeId, observedByPort] of observations) {
+    for (const worktreeId of worktreeSet) {
       this.scanSnapshots.delete(worktreeId)
       this.scanSnapshots.set(worktreeId, new Map(observedByPort))
       while (this.scanSnapshots.size > MAX_ADVERTISED_URL_SCAN_SNAPSHOTS) {

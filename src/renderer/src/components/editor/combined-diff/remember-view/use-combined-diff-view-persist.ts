@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type React from 'react'
-import type { DiffSection } from '../../diff/sections/diff-section-types'
+import type { DiffSection } from '../../diff-section-types'
 import {
   readCombinedDiffViewMemory,
   rememberCombinedDiffView,
@@ -16,6 +16,7 @@ export function useCombinedDiffViewPersist({
   sectionHeights,
   sections,
   loadedIndicesRef,
+  sideBySide,
   viewStateKey
 }: {
   combinedGitStatusSignature: string
@@ -26,6 +27,7 @@ export function useCombinedDiffViewPersist({
   sectionHeights: Record<number, number>
   sections: DiffSection[]
   loadedIndicesRef: React.RefObject<Set<number>>
+  sideBySide: boolean
   viewStateKey: string
 }): void {
   useEffect(() => {
@@ -44,7 +46,8 @@ export function useCombinedDiffViewPersist({
         sectionHeights,
         loadedIndices: Array.from(loadedIndicesRef.current).filter(
           (index) => !sections[index]?.loading
-        )
+        ),
+        sideBySide
       }
     })
   }, [
@@ -56,6 +59,7 @@ export function useCombinedDiffViewPersist({
     scrollContainerRef,
     sectionHeights,
     sections,
+    sideBySide,
     viewStateKey
   ])
 }

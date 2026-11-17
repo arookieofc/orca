@@ -2,13 +2,12 @@ import React from 'react'
 import { Copy, RefreshCw, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
-import { useTranslate } from '@/i18n/use-translate'
-import { useAppStore } from '@/store/index'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host/execution-host'
+import { useAppStore } from '@/store'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import { findLocalToolchainBlock, type LocalToolchainFailureKind } from './repo-scan-failure'
-import { selectDetectedWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
+import { selectDetectedWorktreesByRepo } from '@/store/workspace-record-selectors'
 
 const FIXES: Record<
   LocalToolchainFailureKind,
@@ -43,7 +42,6 @@ const FIXES: Record<
 }
 
 export function LocalGitToolchainScanBanner(): React.JSX.Element | null {
-  const t = useTranslate()
   const repos = useAppStore((s) => s.repos)
   const detectedByRepo = useAppStore((s) => selectDetectedWorktreesByRepo(s))
   const block = findLocalToolchainBlock(repos, detectedByRepo)
@@ -95,18 +93,15 @@ export function LocalGitToolchainScanBanner(): React.JSX.Element | null {
   const fix = FIXES[block.kind]
   const affected =
     block.repos.length === 1
-      ? t(
+      ? translate(
           'auto.components.sidebar.LocalGitToolchainScanBanner.affectedOne',
           'Worktree scan paused for {{value0}}',
           { value0: block.repos[0].displayName }
         )
-      : t(
-          'auto.components.sidebar.LocalGitToolchainScanBanner.affectedProjects',
-          'Worktree scan paused for {{count}} projects',
-          {
-            count: block.repos.length,
-            defaultValue_one: 'Worktree scan paused for {{count}} project'
-          }
+      : translate(
+          'auto.components.sidebar.LocalGitToolchainScanBanner.affectedMany',
+          'Worktree scan paused for {{value0}} projects',
+          { value0: block.repos.length }
         )
 
   return (
@@ -134,7 +129,7 @@ export function LocalGitToolchainScanBanner(): React.JSX.Element | null {
                   .writeClipboardText(fix.command)
                   .then(() =>
                     toast.success(
-                      t(
+                      translate(
                         'auto.components.sidebar.LocalGitToolchainScanBanner.copied',
                         'Command copied'
                       )
@@ -143,7 +138,10 @@ export function LocalGitToolchainScanBanner(): React.JSX.Element | null {
               }
             >
               <Copy aria-hidden="true" />
-              {t('auto.components.sidebar.LocalGitToolchainScanBanner.copyCommand', 'Copy command')}
+              {translate(
+                'auto.components.sidebar.LocalGitToolchainScanBanner.copyCommand',
+                'Copy command'
+              )}
             </Button>
             <Button
               type="button"
@@ -153,7 +151,7 @@ export function LocalGitToolchainScanBanner(): React.JSX.Element | null {
               onClick={() => void rescan()}
             >
               <RefreshCw className={cn(pending && 'animate-spin')} aria-hidden="true" />
-              {t('auto.components.sidebar.LocalGitToolchainScanBanner.retry', 'Retry now')}
+              {translate('auto.components.sidebar.LocalGitToolchainScanBanner.retry', 'Retry now')}
             </Button>
           </div>
         </div>

@@ -1,10 +1,9 @@
-import type * as UIZoomLevelModule from '../../../shared/app-lifecycle/windows/ui-zoom-level'
 import type * as ReactModule from 'react'
 import { vi } from 'vitest'
 import type {
   AgentStatusClearIpcPayload,
   MigrationUnsupportedPtyEntry
-} from '../../../shared/agent-status/contracts/agent-status-ipc-payload'
+} from '../../../shared/agent-status-types'
 import type { AgentStatusSetData } from './ipc-events-agent-status-store-test-fixtures'
 
 export function buildWindowApi(args: {
@@ -24,7 +23,6 @@ export function buildWindowApi(args: {
     api: {
       repos: { onChanged: () => () => {} },
       automations: { onChanged: () => () => {} },
-      workspaceCleanup: { onRunFinished: () => () => {} },
       worktrees: {
         onChanged: () => () => {},
         onBaseStatus: () => () => {},
@@ -51,7 +49,6 @@ export function buildWindowApi(args: {
         onRequestTerminalCreate: () => () => {},
         onPublishAgentLaunchTab: () => () => {},
         onRevealTerminalPane: () => () => {},
-        onApplyAgentPaneActivity: () => () => {},
         onAgentLaunchPaneVerdict: () => () => {},
         onLaunchRecipe: () => () => {},
         onRequestTerminalTabMount: () => () => {},
@@ -128,7 +125,6 @@ export function buildWindowApi(args: {
         onCredentialRequest: () => () => {},
         onCredentialResolved: () => () => {},
         onPortForwardsChanged: () => () => {},
-        onTargetRemoved: () => () => {},
         onDetectedPortsChanged: () => () => {},
         ...args.ssh
       },
@@ -161,19 +157,22 @@ export function stubReactSyncEffect(): void {
 }
 
 export function stubAuxiliaryModules(): void {
-  vi.doMock('@/app-shell/chrome/ui-zoom', () => ({ applyUIZoom: vi.fn() }))
-  vi.doMock('../lib/workspace/activation/worktree-activation', () => ({
+  vi.doMock('@/lib/ui-zoom', () => ({ applyUIZoom: vi.fn() }))
+  vi.doMock('@/lib/worktree-activation', () => ({
     activateAndRevealWorktree: vi.fn(),
     ensureWorktreeHasInitialTerminal: vi.fn()
   }))
-  vi.doMock('@/components/sidebar/worktree-list/listing/visible-worktrees', () => ({
+  vi.doMock('@/components/sidebar/visible-worktrees', () => ({
     getVisibleWorktreeIds: () => []
   }))
-  vi.doMock('../../../shared/app-lifecycle/windows/ui-zoom-level', async (importOriginal) => ({
-    ...(await importOriginal<typeof UIZoomLevelModule>()),
-    zoomLevelToPercent: vi.fn(() => 100),
-    UI_ZOOM_MIN: -3,
-    UI_ZOOM_MAX: 3
+  vi.doMock('@/lib/editor-font-zoom', () => ({
+    nextEditorFontZoomLevel: vi.fn(() => 0),
+    computeEditorFontSize: vi.fn(() => 13)
   }))
-  vi.doMock('@/app-shell/chrome/zoom-events', () => ({ dispatchZoomLevelChanged: vi.fn() }))
+  vi.doMock('@/components/settings/SettingsConstants', () => ({
+    zoomLevelToPercent: vi.fn(() => 100),
+    ZOOM_MIN: -3,
+    ZOOM_MAX: 3
+  }))
+  vi.doMock('@/lib/zoom-events', () => ({ dispatchZoomLevelChanged: vi.fn() }))
 }

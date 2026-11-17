@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store'
 import {
   resolveMobilePairingConnectionMode,
   type MobilePairingConnectionMode
-} from '../../../../shared/remote-runtime/pairing/mobile-pairing-connection-mode'
+} from '../../../../shared/mobile-pairing-connection-mode'
 
 /** Resolve persisted mode and sign-in consistently across MobilePage and MobilePane. */
 export function useMobilePairingConnectionMode(): [
@@ -15,13 +15,8 @@ export function useMobilePairingConnectionMode(): [
   const [connectionMode, setConnectionMode] = useState<MobilePairingConnectionMode>(() =>
     resolveMobilePairingConnectionMode(savedConnectionMode, { signedIn })
   )
-  const [resolvedFrom, setResolvedFrom] = useState({ savedConnectionMode, signedIn })
-  if (
-    resolvedFrom.savedConnectionMode !== savedConnectionMode ||
-    resolvedFrom.signedIn !== signedIn
-  ) {
-    setResolvedFrom({ savedConnectionMode, signedIn })
+  useEffect(() => {
     setConnectionMode(resolveMobilePairingConnectionMode(savedConnectionMode, { signedIn }))
-  }
+  }, [savedConnectionMode, signedIn])
   return [connectionMode, setConnectionMode]
 }

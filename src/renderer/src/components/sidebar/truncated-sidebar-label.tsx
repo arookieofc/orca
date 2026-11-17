@@ -1,6 +1,6 @@
 import React, { useCallback, useLayoutEffect, useState } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 
 export function isSidebarLabelTruncated(
   element: Pick<HTMLElement, 'clientWidth' | 'scrollWidth'>

@@ -9,7 +9,7 @@ import {
   type LocalFileSink
 } from './local-file-sink'
 import { getDaemonLogFilePath, getTraceFilePath } from './logs-directory'
-import { DAEMON_LOG_MAX_FILES } from '../daemon/observability/daemon-file-log'
+import { DAEMON_LOG_MAX_FILES } from '../daemon/daemon-file-log'
 import {
   collectBundle as _collectBundle,
   type CollectBundleOptions,
@@ -23,8 +23,7 @@ import {
   type UploadBundleResult
 } from './diagnostic-bundle-upload'
 import { setActiveSink, startSpan } from './tracer'
-import { setSecurePathHardeningReporter } from '../../shared/secure-storage/secure-path-hardening-report'
-import { withTimeout } from '../../shared/concurrency/promise-timeout-fallback'
+import { setSecurePathHardeningReporter } from '../../shared/secure-path-hardening-report'
 
 const CI_ENV_VARS = [
   'CI',
@@ -97,8 +96,6 @@ export function resolveObservabilityConsent(): ObservabilityConsent {
 
 export { getTraceFilePath } from './logs-directory'
 
-const SHUTDOWN_FLUSH_TIMEOUT_MS = 500
-
 let sink: LocalFileSink | null = null
 let consent: ObservabilityConsent | null = null
 
@@ -142,9 +139,13 @@ function installSecurePathHardeningReporter(): void {
   })
 }
 
-/** For exits that bypass shutdown. */
-export function closeObservabilityOnExit(): void {
-  sink?.close()
+/** Flush for exits that bypass shutdown. */
+export function flushObservability(): void {
+  try {
+    sink?.flush()
+  } catch {
+    // Nothing is left to report to.
+  }
 }
 
 export async function shutdownObservability(): Promise<void> {
@@ -152,9 +153,7 @@ export async function shutdownObservability(): Promise<void> {
   // Stop new tracer writes before closing and flushing the sink.
   setActiveSink(null)
   if (sink) {
-    // Keep an orderly quit's in-flight batch; a stalled disk costs quit this long, never a hang.
-    await withTimeout(sink.flushAsync(), SHUTDOWN_FLUSH_TIMEOUT_MS, undefined)
-    sink?.close()
+    sink.close()
     sink = null
   }
   consent = null
@@ -182,30 +181,15 @@ export function getDiagnosticsStatus(): DiagnosticsStatus {
 }
 
 /** Never include install_id: bundles use independent submission IDs. */
-export async function collectDiagnosticBundle(
+export function collectDiagnosticBundle(
   meta: Pick<
     CollectBundleOptions,
     'appVersion' | 'platform' | 'arch' | 'osRelease' | 'orcaChannel' | 'lookbackMinutes'
-  > & { nativeHangCaptureId?: string }
-): Promise<CollectedBundle> {
+  >
+): CollectedBundle {
   // Flush before collection so the bundle includes the user’s latest action.
-  await sink?.flushAsync()
-  const { nativeHangCaptureId, ...bundleMeta } = meta
-  let nativeHangRecord: Record<string, unknown> | undefined
-  if (process.platform === 'darwin' && resolveObservabilityConsent().localFileEnabled) {
-    const [captures, paths] = await Promise.all([
-      import('../hang-watchdog/native-hang-capture-store'),
-      import('../persistence/loading-store/user-data-path')
-    ])
-    const capture = await captures.readNativeHangCapture(
-      captures.nativeHangCaptureDirectory(paths.getCanonicalUserDataPath()),
-      nativeHangCaptureId
-    )
-    nativeHangRecord = capture
-      ? { type: 'native-hang-capture', status: 'complete', ...capture.artifact }
-      : nativeHangCaptureId
-        ? { type: 'native-hang-capture', status: 'unavailable', captureId: nativeHangCaptureId }
-        : undefined
+  if (sink) {
+    sink.flush()
   }
   return _collectBundle({
     traceFilePath: getTraceFilePath(),
@@ -213,8 +197,7 @@ export async function collectDiagnosticBundle(
     // The daemon writes a separate file; collection does not glob the directory.
     daemonLogFilePath: getDaemonLogFilePath(),
     daemonLogMaxFiles: DAEMON_LOG_MAX_FILES,
-    ...bundleMeta,
-    nativeHangRecord
+    ...meta
   })
 }
 

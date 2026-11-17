@@ -4,12 +4,9 @@ import {
   buildJsonlFileCheckpoint,
   resolveJsonlFileCheckpoint,
   type JsonlFileReader
-} from '../usage/source-input/jsonl/jsonl-file-checkpoint'
+} from '../usage/jsonl-file-checkpoint'
 
-export {
-  MIN_RESUMABLE_PREFIX_BYTES,
-  isResumablePrefixLength
-} from '../usage/source-input/jsonl/jsonl-file-checkpoint'
+export { MIN_RESUMABLE_PREFIX_BYTES, isResumablePrefixLength } from '../usage/jsonl-file-checkpoint'
 
 export async function buildCodexRolloutResumeState(
   filePath: string,

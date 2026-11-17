@@ -1,7 +1,3 @@
-import {
-  editorCloseTarget,
-  editorTabNeedsSavePrompt
-} from '@/store/slices/editor/tabs/editor-tab-close-target'
 import { useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '../store'
@@ -10,18 +6,17 @@ import {
   ORCA_EDITOR_SAVE_AND_CLOSE_EVENT,
   type EditorRequestFileCloseDetail,
   type EditorSaveAndCloseDetail
-} from './editor/autosave/editor-autosave'
+} from './editor/editor-autosave'
 import {
   EDITOR_NOT_UTF8_SAVE_MESSAGE,
   EDITOR_STALE_SAVE_MESSAGE
-} from './editor/save/queue/editor-save-disk-precondition'
-import { discardEditorFileChangesAndClose } from './editor/save/flush/discard-editor-file-changes'
+} from './editor/editor-save-disk-precondition'
+import { discardEditorFileChangesAndClose } from './editor/discard-editor-file-changes'
 import { translate } from '@/i18n/i18n'
 import type { TerminalEditorCloseQueueController } from './use-terminal-editor-close-queue'
 
 export type TerminalEditorCloseDialogActionsInput = Pick<
   TerminalEditorCloseQueueController,
-  | 'queuedEditorCloseTabId'
   | 'advanceEditorCloseQueue'
   | 'closedReactionsRef'
   | 'inFlightSaveFileIdRef'
@@ -41,7 +36,6 @@ export function useTerminalEditorCloseDialogActions(
 ) {
   const {
     advanceEditorCloseQueue,
-    queuedEditorCloseTabId,
     closedReactionsRef,
     inFlightSaveFileIdRef,
     isClosingRef,
@@ -60,7 +54,6 @@ export function useTerminalEditorCloseDialogActions(
     }
     isClosingRef.current = true
     const fileId = saveDialogFileId
-    const tabId = queuedEditorCloseTabId(fileId)
     const file = useAppStore.getState().openFiles.find((candidate) => candidate.id === fileId)
     if (!file) {
       settleQueuedClose(fileId)
@@ -74,7 +67,6 @@ export function useTerminalEditorCloseDialogActions(
     const notClosed = new Promise<false>((resolve) => {
       const detail: EditorSaveAndCloseDetail = {
         fileId,
-        tabId,
         onNotClosed: (reason) => {
           notClosedReason = reason
           resolve(false)
@@ -86,7 +78,7 @@ export function useTerminalEditorCloseDialogActions(
     let closed = false
     try {
       // Why the race: a refused save keeps the tab open, so don't wait out the timeout for it.
-      closed = await Promise.race([waitForFileClosed(fileId, 10_000, tabId), notClosed])
+      closed = await Promise.race([waitForFileClosed(fileId, 10_000), notClosed])
     } finally {
       if (inFlightSaveFileIdRef.current === fileId) {
         inFlightSaveFileIdRef.current = null
@@ -121,7 +113,6 @@ export function useTerminalEditorCloseDialogActions(
     releaseCloseDialogGuardAfterDebounce()
   }, [
     advanceEditorCloseQueue,
-    queuedEditorCloseTabId,
     inFlightSaveFileIdRef,
     isClosingRef,
     releaseCloseDialogGuardAfterDebounce,
@@ -138,22 +129,12 @@ export function useTerminalEditorCloseDialogActions(
     isClosingRef.current = true
     const fileId = saveDialogFileId
     setSaveDialogFileId(null)
-    const tabId = queuedEditorCloseTabId(fileId)
-    const state = useAppStore.getState()
-    const tab = tabId ? editorCloseTarget(state, tabId).tab : undefined
-    if (tabId && (!tab || !editorTabNeedsSavePrompt(state, tab))) {
-      if (tab) {
-        state.closeUnifiedTab(tab.id)
-      }
-    } else {
-      await discardEditorFileChangesAndClose(fileId, tabId)
-    }
+    await discardEditorFileChangesAndClose(fileId)
     settleQueuedClose(fileId)
     advanceEditorCloseQueue()
     releaseCloseDialogGuardAfterDebounce()
   }, [
     advanceEditorCloseQueue,
-    queuedEditorCloseTabId,
     isClosingRef,
     releaseCloseDialogGuardAfterDebounce,
     saveDialogFileId,
@@ -168,9 +149,6 @@ export function useTerminalEditorCloseDialogActions(
     isClosingRef.current = true
     pendingEditorCloseQueueRef.current = []
     closedReactionsRef.current.clear()
-    if (windowCloseAfterDirtyRef.current) {
-      window.api.ui.cancelWindowClose()
-    }
     windowCloseAfterDirtyRef.current = null
     setSaveDialogFileId(null)
     releaseCloseDialogGuardAfterDebounce()
@@ -194,7 +172,7 @@ export function useTerminalEditorCloseDialogActions(
       if (onClosed) {
         closedReactionsRef.current.set(fileId, onClosed)
       }
-      queueEditorCloseRequests([customEvent.detail.tabId ?? fileId])
+      queueEditorCloseRequests([fileId])
     }
     window.addEventListener(
       ORCA_EDITOR_REQUEST_FILE_CLOSE_EVENT,

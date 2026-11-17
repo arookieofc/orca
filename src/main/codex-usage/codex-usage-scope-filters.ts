@@ -1,12 +1,6 @@
-import type {
-  CodexUsageRange,
-  CodexUsageScope
-} from '../../shared/agent-usage/analytics/codex-usage-types'
+import type { CodexUsageRange, CodexUsageScope } from '../../shared/codex-usage-types'
 import type { CodexUsagePersistedState } from './types'
-import {
-  filterUsageDaily,
-  filterUsageSessions
-} from '../usage/reporting/range-query/usage-scope-filters'
+import { filterUsageDaily, filterUsageSessions } from '../usage/usage-scope-filters'
 
 export type ScopedCodexUsageModelRow = {
   modelKey: string

@@ -1,16 +1,15 @@
 import { canConnectSshStatus } from '@/ssh/ssh-connection-recoverability'
-import { useAppStore } from '../../store/index'
+import type { DirectSshAuthority, SshConnectionState } from '../../../../shared/ssh-types'
+import { useAppStore } from '../../store'
 import { directSshAuthoritiesEqual } from '../../store/slices/worktrees/listing/direct-ssh-authority'
-import { directSshAuthorityFromConnectionState } from '../direct-ssh-state-routing'
-import type { DirectSshConnectedStateOrigin } from '../direct-ssh-state-routing'
+import {
+  directSshAuthorityFromConnectionState,
+  type DirectSshConnectedStateOrigin
+} from '../direct-ssh-state-routing'
 import { hydrateDirectSshInitialState } from './direct-ssh-initial-state-hydration'
-import { syncSshConfigTargetsPassively } from '../../runtime/hosts/ssh/ssh-config-passive-sync'
+import { syncSshConfigTargetsPassively } from '../../lib/ssh-config-passive-sync'
 import { applySshManagedServerTransition } from './ssh-managed-server-state-effects'
 import { createDirectSshUnrestoredForwardSync } from './direct-ssh-unrestored-forward-sync'
-import type {
-  DirectSshAuthority,
-  SshConnectionState
-} from '../../../../shared/remote-runtime/ssh/ssh-types'
 
 type AuthorityDeadline = { timer: ReturnType<typeof setTimeout>; settle: () => void }
 
@@ -79,13 +78,6 @@ export function registerDirectSshStateIpcBridge(unsubs: (() => void)[]): () => v
   unsubs.push(
     window.api.ssh.onCredentialResolved(({ requestId }) => {
       useAppStore.getState().removeSshCredentialRequest(requestId)
-    })
-  )
-
-  unsubs.push(
-    window.api.ssh.onTargetRemoved(({ targetId }) => {
-      // Stop deferred reconnects and drop live state whichever client removed the target.
-      useAppStore.getState().clearRemovedSshTargetState(targetId)
     })
   )
 

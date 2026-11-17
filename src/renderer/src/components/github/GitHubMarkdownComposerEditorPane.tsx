@@ -1,7 +1,7 @@
 import React, { useRef } from 'react'
 import type { Editor } from '@tiptap/react'
 import { EditorContent } from '@tiptap/react'
-import { RichMarkdownTableControls } from '@/components/editor/rich-markdown/tables/RichMarkdownTableControls'
+import { RichMarkdownTableControls } from '@/components/editor/RichMarkdownTableControls'
 
 export function GitHubMarkdownComposerEditorPane({
   disabled,

@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import {
   cancelManagedRuntimeInstall,
   installManagedRuntime,
   removeManagedRuntime
-} from '@/runtime/hosts/installation/managed-runtime-install-status'
-import type { ManagedRuntimeInstallObservation } from '@/runtime/hosts/installation/use-managed-runtime-install'
+} from '@/runtime/managed-runtime-install-status'
+import type { ManagedRuntimeInstallObservation } from '@/runtime/use-managed-runtime-install'
 import { LoadingSpinner } from '../LoadingSpinner'
 import { Button } from '../ui/button'
 import { Progress } from '../ui/progress'
@@ -26,15 +26,11 @@ export function ManagedRuntimeInstallRow(props: {
   children: (line: React.ReactNode, actions: React.ReactNode) => React.ReactNode
   /** A sign-in runs the installed server, so Install and Remove wait for it; Cancel does not. */
   signInRunning?: boolean
-  buttonSize?: 'xs' | 'default'
-  /** False leaves out the ⋯ Reinstall/Remove menu, for rows that only prompt an install. */
-  menu?: boolean
 }): React.JSX.Element {
-  const t = useTranslate()
   const { observation, agentLabel } = props
   // A click holds its button until the host answers, so a double click starts nothing twice.
   const [pending, setPending] = useState<'install' | 'cancel' | 'remove' | null>(null)
-  const view = managedRuntimeInstallView(observation.snapshot, agentLabel, pending === 'cancel', t)
+  const view = managedRuntimeInstallView(observation.snapshot, agentLabel, pending === 'cancel')
   const [refusal, setRefusal] = useState<string | null>(null)
   const { subject } = observation
   const act = (kind: 'install' | 'cancel' | 'remove', request: () => Promise<void>): void => {
@@ -46,11 +42,11 @@ export function ManagedRuntimeInstallRow(props: {
           cause instanceof Error
             ? cause.message
             : kind === 'cancel'
-              ? t(
+              ? translate(
                   'components.managed-runtime.cancelFailed',
                   "Couldn't cancel the installation. Try again."
                 )
-              : t('components.managed-runtime.failed', 'Installation failed. Try again.')
+              : translate('components.managed-runtime.failed', 'Installation failed. Try again.')
         )
       )
       .finally(() => setPending(null))
@@ -75,7 +71,7 @@ export function ManagedRuntimeInstallRow(props: {
           <Progress
             value={view.progress}
             className="h-1 w-44"
-            aria-label={t('components.managed-runtime.progress', '{{agent}} download', {
+            aria-label={translate('components.managed-runtime.progress', '{{agent}} download', {
               agent: agentLabel
             })}
           />
@@ -125,14 +121,14 @@ export function ManagedRuntimeInstallRow(props: {
         <>
           {button ? (
             <Button
-              size={props.buttonSize ?? 'xs'}
+              size="xs"
               disabled={button.kind === 'cancel' ? pending !== null : held}
               onClick={() => act(button.kind, primary(button))}
             >
               {button.label}
             </Button>
           ) : null}
-          {props.menu !== false && (install || remove) ? (
+          {install || remove ? (
             <ManagedRuntimeActionsMenu
               agentLabel={agentLabel}
               host={subject.target}

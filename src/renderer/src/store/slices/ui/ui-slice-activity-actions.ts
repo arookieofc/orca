@@ -1,6 +1,5 @@
 import type { StoredAgentAttentionUnread } from '@/attention/agent-attention-contract'
 import { emitAgentSubjectReads } from '@/attention/agent-subject-read-actions'
-import { linkRecordWrite } from '@/store/record-transitions/keyed-record-transitions'
 import type { UISlice, UISliceGet, UISliceSet } from './ui-slice-contract'
 import {
   collectAcknowledgedAgentNotificationId,
@@ -41,10 +40,9 @@ export function createUiActivityActions(set: UISliceSet, _get: UISliceGet): Acti
           }
           const prev = s.acknowledgedAgentsByPaneKey[key] ?? 0
           let stamp = now
-          const liveEntry = s.agentStatusByPaneKey.get(key)
+          const liveEntry = s.agentStatusByPaneKey?.[key]
           if (liveEntry) {
             collectAcknowledgedAgentNotificationId({
-              state: s,
               ids: notificationIdsToDismiss,
               worktreeId: resolvePaneKeyWorktreeIdFromTabs(s, key) ?? liveEntry.worktreeId,
               paneKey: key,
@@ -52,6 +50,17 @@ export function createUiActivityActions(set: UISliceSet, _get: UISliceGet): Acti
               previousAckAt: prev
             })
             stamp = Math.max(stamp, latestAgentTurnTimestamp(liveEntry))
+          }
+          const retained = s.retainedAgentsByPaneKey?.[key]
+          if (retained) {
+            collectAcknowledgedAgentNotificationId({
+              ids: notificationIdsToDismiss,
+              worktreeId: retained.worktreeId,
+              paneKey: key,
+              stateStartedAt: retained.entry.stateStartedAt,
+              previousAckAt: prev
+            })
+            stamp = Math.max(stamp, latestAgentTurnTimestamp(retained.entry))
           }
           for (const unsupported of migrationUnsupported) {
             if (unsupported.paneKey === key) {
@@ -74,16 +83,7 @@ export function createUiActivityActions(set: UISliceSet, _get: UISliceGet): Acti
           return s
         }
         return {
-          ...(next
-            ? {
-                // Card unread readers skip acknowledgements of panes they do not show.
-                acknowledgedAgentsByPaneKey: linkRecordWrite(
-                  next,
-                  s.acknowledgedAgentsByPaneKey,
-                  paneKeys
-                )
-              }
-            : {}),
+          ...(next ? { acknowledgedAgentsByPaneKey: next } : {}),
           ...(nextUnreadCompletions ? { unreadAgentCompletionPanes: nextUnreadCompletions } : {}),
           ...(nextManual ? { manuallyUnreadTurnsByPaneKey: nextManual } : {})
         }
@@ -105,7 +105,9 @@ export function createUiActivityActions(set: UISliceSet, _get: UISliceGet): Acti
             next ??= { ...s.acknowledgedAgentsByPaneKey }
             delete next[key]
           }
-          const turnTimestamp = s.agentStatusByPaneKey.get(key)?.stateStartedAt
+          const turnTimestamp =
+            s.agentStatusByPaneKey?.[key]?.stateStartedAt ??
+            s.retainedAgentsByPaneKey?.[key]?.entry.stateStartedAt
           if (
             turnTimestamp !== undefined &&
             s.manuallyUnreadTurnsByPaneKey[key] !== turnTimestamp
@@ -118,16 +120,7 @@ export function createUiActivityActions(set: UISliceSet, _get: UISliceGet): Acti
           return s
         }
         return {
-          ...(next
-            ? {
-                // Card unread readers skip acknowledgements of panes they do not show.
-                acknowledgedAgentsByPaneKey: linkRecordWrite(
-                  next,
-                  s.acknowledgedAgentsByPaneKey,
-                  paneKeys
-                )
-              }
-            : {}),
+          ...(next ? { acknowledgedAgentsByPaneKey: next } : {}),
           ...(nextManual ? { manuallyUnreadTurnsByPaneKey: nextManual } : {})
         }
       }),

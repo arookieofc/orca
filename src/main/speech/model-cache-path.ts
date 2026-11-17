@@ -59,7 +59,7 @@ export function getSpeechModelCacheDirCandidates(
     .filter((modelsDir) => !hasNonAsciiCharacters(modelsDir))
     .map((modelsDir) => ({ modelsDir, migrationSourceDir: requestedModelsDir }))
 
-  // Native speech libraries may open paths with ANSI Windows APIs; retain the requested path if shared caches fail.
+  // sherpa-onnx 1.12.x needs ASCII Windows paths; retain the requested path if shared caches fail.
   return [...candidates, { modelsDir: requestedModelsDir, migrationSourceDir: null }]
 }
 

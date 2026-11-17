@@ -1,6 +1,6 @@
 import { Plus, Minus, X, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 export function BulkActionBar({
   selectedCount,
@@ -19,7 +19,6 @@ export function BulkActionBar({
   onClear: () => void
   isExecuting: boolean
 }) {
-  const t = useTranslate()
   return (
     <div className="absolute bottom-0 left-0 right-0 p-2 bg-background/95 backdrop-blur-sm border-t border-border shadow-lg animate-in slide-in-from-bottom-2 z-10">
       <div className="flex items-center gap-2 justify-between bg-accent/30 p-1.5 pr-2 rounded-md border border-border/50">
@@ -28,11 +27,8 @@ export function BulkActionBar({
             <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
           ) : (
             <span className="tabular-nums">
-              {t(
-                'auto.components.right.sidebar.BulkActionBar.selectedCount',
-                '{{count}} selected',
-                { count: selectedCount, defaultValue_one: '{{count}} selected' }
-              )}
+              {selectedCount}{' '}
+              {translate('auto.components.right.sidebar.BulkActionBar.60ed678138', 'selected')}
             </span>
           )}
         </div>
@@ -47,9 +43,8 @@ export function BulkActionBar({
               disabled={isExecuting}
             >
               <Plus className="mr-1 size-3" />
-              {t('auto.components.right.sidebar.BulkActionBar.stageCount', 'Stage ({{count}})', {
-                count: stageableCount
-              })}
+              {translate('auto.components.right.sidebar.BulkActionBar.ef5f5bd06e', 'Stage (')}
+              {stageableCount})
             </Button>
           )}
           {unstageableCount > 0 && (
@@ -62,13 +57,8 @@ export function BulkActionBar({
               disabled={isExecuting}
             >
               <Minus className="mr-1 size-3" />
-              {t(
-                'auto.components.right.sidebar.BulkActionBar.unstageCount',
-                'Unstage ({{count}})',
-                {
-                  count: unstageableCount
-                }
-              )}
+              {translate('auto.components.right.sidebar.BulkActionBar.79a9f5f712', 'Unstage (')}
+              {unstageableCount})
             </Button>
           )}
           <Button

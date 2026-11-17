@@ -1,4 +1,4 @@
-import { nativeChatCommandLanguage } from './native-chat-command-language'
+import { nativeChatCommandLanguage } from '../native-chat-command-language'
 import { isNativeChatFileCountPath } from './native-chat-edit-patch-files'
 import { nativeChatToolCategory } from './native-chat-tool-icon'
 import {
@@ -7,7 +7,7 @@ import {
   nativeChatToolInputText
 } from './native-chat-tool-input-text'
 import { createToolInputDisplay, summarizeToolInput } from './native-chat-tool-summary'
-import type { NativeChatToolCallBlock, NativeChatToolResultBlock } from '../native-chat-types'
+import type { NativeChatToolCallBlock, NativeChatToolResultBlock } from '../../native-chat-types'
 
 /** Shared desktop/mobile tool verbs; desktop translates the English record. */
 export const NATIVE_CHAT_TOOL_ROW_VERB_COPY = {
@@ -45,8 +45,6 @@ export type NativeChatToolLineLabel = {
   title: string
   command: boolean
   filePath: string | null
-  /** The whole command a command row ran; null when its input names none. */
-  fullCommand: string | null
   /** The whole command, when the row had to shorten it. */
   commandDetail: string | null
   /** Grammar of `commandDetail`; null when the row holds no command text. */
@@ -81,7 +79,6 @@ export function nativeChatToolLineLabel(
     (call.state === 'completed' || result !== undefined)
   const failed = call.state === 'failed' || result?.isError === true
   const phase = { running, completed, failed }
-  let fullCommand: string | null = null
   let commandDetail: string | null = null
   let commandLanguage: string | null = null
   let verb: NativeChatToolRowVerb | null = null
@@ -96,7 +93,7 @@ export function nativeChatToolLineLabel(
       : null
 
   if (command) {
-    fullCommand = nativeChatFullCommand(call.input)
+    const fullCommand = nativeChatFullCommand(call.input)
     target = fullCommand === null ? target : summarizeToolInput(fullCommand)
     title = fullCommand ?? target
     if (fullCommand !== null) {
@@ -143,5 +140,5 @@ export function nativeChatToolLineLabel(
       })
     }
   }
-  return { verb, target, title, command, filePath, fullCommand, commandDetail, commandLanguage }
+  return { verb, target, title, command, filePath, commandDetail, commandLanguage }
 }

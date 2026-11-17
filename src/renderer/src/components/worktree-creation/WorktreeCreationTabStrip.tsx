@@ -1,6 +1,6 @@
 import React from 'react'
 import { AlertTriangle, GitBranch, X } from 'lucide-react'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 /** Match real tab chrome for same-frame creation handoff; name/cancel live here, status in the body. */
 export default function WorktreeCreationTabStrip({
@@ -14,7 +14,6 @@ export default function WorktreeCreationTabStrip({
   reserveCollapsedSidebarHeaderSpace: boolean
   onCancel: () => void
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div className="flex h-[36px] shrink-0 items-stretch border-b border-border bg-card">
       {reserveCollapsedSidebarHeaderSpace ? (
@@ -39,8 +38,11 @@ export default function WorktreeCreationTabStrip({
         <span className="truncate font-medium text-foreground">{title}</span>
         <button
           type="button"
-          title={t('auto.components.worktree.creation.WorktreeCreationPanel.532aea14ce', 'Cancel')}
-          aria-label={t(
+          title={translate(
+            'auto.components.worktree.creation.WorktreeCreationPanel.532aea14ce',
+            'Cancel'
+          )}
+          aria-label={translate(
             'auto.components.worktree.creation.WorktreeCreationPanel.a3346fc6ed',
             'Cancel worktree creation'
           )}

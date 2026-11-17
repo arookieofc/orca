@@ -1,26 +1,25 @@
 import {
   buildMobileProjectSectionCatalog,
   type MobileProjectSectionCatalog
-} from '../../../../shared/sidebar-list/catalog/mobile-project-sections-contract'
-import type { ProjectHostSetupProjection } from '../../../../shared/project/host-setup/project-host-setup-projection'
-import { getProjectHostSetupProjectionFromState } from '@/store/projects/project-host-setup-selector'
+} from '../../../../shared/mobile-project-sections-contract'
+import type { ProjectHostSetupProjection } from '../../../../shared/project-host-setup-projection'
+import { getProjectHostSetupProjectionFromState } from '@/store/project-host-setup-selector'
 import type { AppState } from '@/store/types'
 
 type CatalogSource = {
   repos: AppState['repos']
   projection: ProjectHostSetupProjection
   projectOrderBy: AppState['projectOrderBy']
-  projectGroups: AppState['projectGroups']
   catalog: MobileProjectSectionCatalog
 }
 
 let cachedCatalogSource: CatalogSource | null = null
 
-/** What the sidebar groups Project headers by: state.repos in its order, the selector's projection and project groups. */
+/** What the sidebar groups Project headers by: state.repos in its order and the selector's projection. */
 export function getProjectSectionCatalogFromState(
   state: Pick<
     AppState,
-    'repos' | 'projects' | 'projectHostSetups' | 'projectOrderBy' | 'projectGroups'
+    'repos' | 'endpointProjects' | 'endpointProjectHostSetups' | 'projectOrderBy'
   >
 ): MobileProjectSectionCatalog | null {
   // Why: graph publication must not fail on a store slice that holds no repo catalog.
@@ -33,22 +32,15 @@ export function getProjectSectionCatalogFromState(
     cached &&
     cached.repos === state.repos &&
     cached.projection === projection &&
-    cached.projectOrderBy === state.projectOrderBy &&
-    cached.projectGroups === state.projectGroups
+    cached.projectOrderBy === state.projectOrderBy
   ) {
     return cached.catalog
   }
-  const catalog = buildMobileProjectSectionCatalog(
-    state.repos,
-    projection,
-    state.projectOrderBy,
-    state.projectGroups
-  )
+  const catalog = buildMobileProjectSectionCatalog(state.repos, projection, state.projectOrderBy)
   cachedCatalogSource = {
     repos: state.repos,
     projection,
     projectOrderBy: state.projectOrderBy,
-    projectGroups: state.projectGroups,
     catalog
   }
   return catalog

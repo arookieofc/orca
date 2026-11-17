@@ -1,9 +1,8 @@
-import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
-import type { ProjectExecutionRuntimeResolution } from '../../../../shared/execution-host/project-execution-runtime'
-import type { SkillDiscoveryTarget } from '../../../../shared/skills/discovery/skills'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { ProjectExecutionRuntimeResolution } from '../../../../shared/project-execution-runtime'
+import type { SkillDiscoveryTarget } from '../../../../shared/skills'
 import { translate } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
-import type { LocalAgentRuntime } from '../../lib/skills/runtime/skill-runtime-command'
+import type { LocalAgentRuntime } from '../settings/CliSkillRuntimeSetup'
 
 const LOCAL_DISMISS_STORAGE_KEY_PREFIX = 'orca.linearTicketsSkill.setupDismissed'
 
@@ -26,8 +25,7 @@ export function getLinearPromptAgentRuntime(
   settings: LinearAgentSkillPromptSettings | null | undefined,
   currentPlatform: NodeJS.Platform,
   remote: boolean,
-  projectRuntime?: ProjectExecutionRuntimeResolution,
-  t: Translate = translate
+  projectRuntime?: ProjectExecutionRuntimeResolution
 ): LocalAgentRuntime {
   if (remote) {
     // This prompt opens a local terminal; remote hosts need separate skill setup even when local discovery uses WSL.
@@ -36,7 +34,7 @@ export function getLinearPromptAgentRuntime(
       label: currentPlatform === 'win32' ? 'Windows' : 'This device'
     }
   }
-  const resolvedProjectRuntime = getProjectAgentRuntime(projectRuntime, currentPlatform, t)
+  const resolvedProjectRuntime = getProjectAgentRuntime(projectRuntime, currentPlatform)
   if (resolvedProjectRuntime) {
     return resolvedProjectRuntime
   }
@@ -48,7 +46,7 @@ export function getLinearPromptAgentRuntime(
       wslDistro: selectedDistro,
       label: selectedDistro
         ? `WSL ${selectedDistro}`
-        : t('auto.components.sidebar.LinearAgentSkillSetupPrompt.wslLabel', 'WSL default')
+        : translate('auto.components.sidebar.LinearAgentSkillSetupPrompt.wslLabel', 'WSL default')
     }
   }
   return {
@@ -59,18 +57,17 @@ export function getLinearPromptAgentRuntime(
 
 function getProjectAgentRuntime(
   projectRuntime: ProjectExecutionRuntimeResolution | undefined,
-  currentPlatform: NodeJS.Platform,
-  t?: Translate
+  currentPlatform: NodeJS.Platform
 ): LocalAgentRuntime | null {
   if (!projectRuntime) {
     return null
   }
   if (projectRuntime.status === 'repair-required') {
     // Repair-required WSL projects still own their runtime; do not mix their skill state with Windows.
-    return getWslAgentRuntime(projectRuntime.repair.preferredRuntime.distro, t)
+    return getWslAgentRuntime(projectRuntime.repair.preferredRuntime.distro)
   }
   if (projectRuntime.runtime.kind === 'wsl') {
-    return getWslAgentRuntime(projectRuntime.runtime.distro, t)
+    return getWslAgentRuntime(projectRuntime.runtime.distro)
   }
   return {
     runtime: 'host',
@@ -78,13 +75,13 @@ function getProjectAgentRuntime(
   }
 }
 
-function getWslAgentRuntime(distro: string | null, t: Translate = translate): LocalAgentRuntime {
+function getWslAgentRuntime(distro: string | null): LocalAgentRuntime {
   return {
     runtime: 'wsl',
     wslDistro: distro,
     label: distro
       ? `WSL ${distro}`
-      : t('auto.components.sidebar.LinearAgentSkillSetupPrompt.wslLabel', 'WSL default')
+      : translate('auto.components.sidebar.LinearAgentSkillSetupPrompt.wslLabel', 'WSL default')
   }
 }
 

@@ -2,7 +2,7 @@ import { useAppStore } from '../store'
 import {
   captureNativeChatComposerFocusIntent,
   type NativeChatComposerFocusIntent
-} from '@/components/native-chat/composer/focus/native-chat-composer-focus-intent'
+} from '@/components/native-chat/use-native-chat-composer-reveal-focus'
 
 /** Where a new-agent-tab shortcut was pressed: the pane it targets and the focus it may take. */
 export type AgentTabLaunchContext = {

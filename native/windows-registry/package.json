@@ -16,7 +16,6 @@
   "main": "index.js",
   "types": "index.d.ts",
   "dependencies": {
-    "node-addon-api": "^8.9.2"
-  },
-  "gypfile": false
+    "node-addon-api": "^8.5.0"
+  }
 }

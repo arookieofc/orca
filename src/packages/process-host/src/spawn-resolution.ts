@@ -2,8 +2,6 @@ import type { SpawnOptions as NodeSpawnOptions } from 'node:child_process'
 import { buildWindowsCmdShimCommandLine, isCmdInterpretedProgram } from './windows-command-line'
 import { resolveWindowsCmdShim } from './windows-cmd-shim-resolution'
 import type { ProcessSpec } from './process-spec'
-import { assertWslDistroAllowed } from './wsl-distro-allowlist'
-import { assertWslNotLatchedAbsent } from './wsl-not-installed-latch'
 
 export type ResolvedSpawn = {
   file: string
@@ -14,8 +12,6 @@ export type ResolvedSpawn = {
 /** Host-independent for Windows tests; recognized shim I/O failures fall back to cmd.exe. */
 export function resolveSpawn(spec: ProcessSpec, platform: NodeJS.Platform): ResolvedSpawn {
   const args = spec.args ?? []
-  assertWslNotLatchedAbsent(spec.program)
-  assertWslDistroAllowed(spec.program, args)
   const base: NodeSpawnOptions = {
     cwd: spec.cwd,
     env: spec.env,

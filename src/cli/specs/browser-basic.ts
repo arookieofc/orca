@@ -1,9 +1,8 @@
-import type { CommandSpec } from '../discovery/command-spec'
-import { CLI_GLOBAL_FLAGS as GLOBAL_FLAGS } from '../../shared/cli/cli-argument-boundary'
-import { withBrowserPageTarget } from './browser-page-target'
-import { BROWSER_WAIT_DEFAULT_TIMEOUT_MS } from '../../shared/browser/automation/browser-wait-timeout'
+import type { CommandSpec } from '../args'
+import { GLOBAL_FLAGS } from '../args'
+import { BROWSER_WAIT_DEFAULT_TIMEOUT_MS } from '../../shared/browser-wait-timeout'
 
-export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget([
+export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['browser', 'identity', 'get'],
     summary: 'Show the browser identity configured on this Orca host',
@@ -21,39 +20,19 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget(
     path: ['open-url'],
     summary: 'Open a URL on the paired client that hosts this terminal',
     usage: 'orca open-url --url <url> [--worktree <selector>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'url', 'worktree'],
-    notes: ['`orca <http(s) url>` is shorthand, so headless terminals can use orca as BROWSER.']
+    allowedFlags: [...GLOBAL_FLAGS, 'url', 'worktree']
   },
   {
     path: ['snapshot'],
     summary: 'Capture an accessibility snapshot of the active browser tab',
-    usage:
-      'orca snapshot [--interactive] [--compact] [--depth <n>] [--selector <css>] [--urls] [--delta | --full] [--worktree <selector>] [--json]',
-    allowedFlags: [
-      ...GLOBAL_FLAGS,
-      'interactive',
-      'compact',
-      'depth',
-      'selector',
-      'urls',
-      'delta',
-      'full',
-      'worktree'
-    ],
-    notes: [
-      'Without flags the snapshot is the whole accessibility tree, including page text.',
-      'Each page keeps one --delta baseline: a navigation, a large change or different flags return the whole tree again and replace it.'
-    ]
+    usage: 'orca snapshot [--worktree <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'worktree']
   },
   {
     path: ['screenshot'],
-    summary: 'Save a viewport screenshot of the active browser tab and print its path',
-    usage:
-      'orca screenshot [--format <png|jpeg>] [--if-changed] [--annotate] [--worktree <selector>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'format', 'if-changed', 'annotate', 'worktree'],
-    notes: [
-      "In Orca's desktop browser the image is in CSS pixels, so its x/y match page coordinates for `orca mouse`."
-    ]
+    summary: 'Capture a viewport screenshot of the active browser tab',
+    usage: 'orca screenshot [--format <png|jpeg>] [--worktree <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'format', 'worktree']
   },
   {
     path: ['click'],
@@ -64,10 +43,8 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget(
   {
     path: ['fill'],
     summary: 'Clear and fill a browser input by ref',
-    usage:
-      'orca fill --element <ref> (--value <text> | --value-stdin) [--worktree <selector>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'element', 'value', 'value-stdin', 'worktree'],
-    notes: ['--value-stdin drops one trailing newline and rejects empty input.']
+    usage: 'orca fill --element <ref> --value <text> [--worktree <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'element', 'value', 'worktree']
   },
   {
     path: ['type'],
@@ -175,7 +152,7 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget(
   },
   {
     path: ['full-screenshot'],
-    summary: 'Save a full-page screenshot (beyond viewport) and print its path',
+    summary: 'Capture a full-page screenshot (beyond viewport)',
     usage: 'orca full-screenshot [--format <png|jpeg>] [--worktree <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'format', 'worktree']
   },
@@ -193,7 +170,7 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget(
   },
   {
     path: ['upload'],
-    summary: 'Upload files to a file input, or to the one a picker button opens',
+    summary: 'Upload files to a file input element',
     usage: 'orca upload --element <ref> --files <path,...> [--worktree <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'element', 'files', 'worktree']
   },
@@ -207,12 +184,6 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget(
     path: ['tab', 'show'],
     summary: 'Show one browser tab by page id',
     usage: 'orca tab show --page <id> [--worktree <selector>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'page', 'worktree']
-  },
-  {
-    path: ['tab', 'annotations'],
-    summary: "Show the notes the user left on a browser tab and hasn't sent yet",
-    usage: 'orca tab annotations [--page <id>] [--worktree <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'page', 'worktree']
   },
   {
@@ -230,9 +201,8 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget(
   {
     path: ['tab', 'create'],
     summary: 'Create a new browser tab in the current worktree',
-    usage:
-      'orca tab create [--url <url>] [--worktree <selector>] [--profile <id>] [--split <right|left|down|up>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'url', 'worktree', 'profile', 'split']
+    usage: 'orca tab create [--url <url>] [--worktree <selector>] [--profile <id>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'url', 'worktree', 'profile']
   },
   {
     path: ['tab', 'profile', 'list'],
@@ -290,4 +260,4 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget(
     usage: 'orca exec --command "<agent-browser command>" [--worktree <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'command', 'worktree']
   }
-])
+]

@@ -2,12 +2,12 @@ import { useMemo } from 'react'
 import type {
   HostedReviewCreationEligibility,
   HostedReviewInfo
-} from '../../../../../../shared/source-control/hosted-review/hosted-review-contracts'
+} from '../../../../../../shared/hosted-review'
 import {
   hasPositiveHostedReviewNumberLink,
   hasResolvableHostedReviewPushTargetLink,
   resolveHostedReviewPushTargetForActions
-} from '../../../../../../shared/source-control/hosted-review/hosted-review-push-target'
+} from '../../../../../../shared/hosted-review-push-target'
 import { buildSourceControlManualReviewUrlFromContext } from './manual-review-url'
 import type { SourceControlWorktreeContext } from '../listing/use-worktree-context'
 

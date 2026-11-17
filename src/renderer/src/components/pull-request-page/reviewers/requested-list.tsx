@@ -3,8 +3,8 @@ import { LoaderCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ReviewerAvatar } from '@/components/github/work-item-state-presentation'
-import { useTranslate } from '@/i18n/use-translate'
-import type { getGitHubPRReviewerRows } from '../../../../../shared/github/pull-requests/pr-reviewer-display'
+import { translate } from '@/i18n/i18n'
+import type { getGitHubPRReviewerRows } from '../../../../../shared/github/pr-reviewer-display'
 
 export function ReviewerRequestedList({
   reviewers,
@@ -23,19 +23,18 @@ export function ReviewerRequestedList({
   canRequestReview: boolean
   onRemove: (login: string) => void
 }): React.JSX.Element {
-  const t = useTranslate()
   if (loading && !hasReviewerMetadata) {
     return (
       <div className="flex items-center gap-2 py-1 text-[12px] text-muted-foreground">
         <LoaderCircle className="size-3.5 animate-spin" />
-        {t('auto.components.PullRequestPage.acbd110867', 'Loading reviewers')}
+        {translate('auto.components.PullRequestPage.acbd110867', 'Loading reviewers')}
       </div>
     )
   }
   if (reviewers.length === 0) {
     return (
       <div className="py-1 text-[12px] text-muted-foreground">
-        {t('auto.components.PullRequestPage.d10b6d5209', 'No reviewers requested.')}
+        {translate('auto.components.PullRequestPage.d10b6d5209', 'No reviewers requested.')}
       </div>
     )
   }
@@ -66,7 +65,7 @@ export function ReviewerRequestedList({
                     size="icon-xs"
                     className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
                     disabled={submitting || !canRequestReview}
-                    aria-label={t(
+                    aria-label={translate(
                       'auto.components.PullRequestPage.ae9a38fd4a',
                       'Remove reviewer {{value0}}',
                       { value0: reviewer.login }
@@ -79,7 +78,7 @@ export function ReviewerRequestedList({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {t('auto.components.PullRequestPage.7f964a365a', 'Remove reviewer')}
+                  {translate('auto.components.PullRequestPage.7f964a365a', 'Remove reviewer')}
                 </TooltipContent>
               </Tooltip>
             ) : null}

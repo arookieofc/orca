@@ -2,7 +2,7 @@ import WebSocket from 'ws'
 import {
   encodeServeSimTouchFrame,
   type ServeSimTouchFrame
-} from '../../shared/emulator/emulator-touch-frame'
+} from '../../shared/emulator-touch-frame'
 
 export type EmulatorGesturePoint = ServeSimTouchFrame
 
@@ -24,8 +24,8 @@ export async function sendEmulatorGestureSequence(
       if (index >= points.length) {
         cleanup()
         timer = setTimeout(() => {
-          resolve()
           ws.close()
+          resolve()
         }, 50)
         return
       }
@@ -40,7 +40,9 @@ export async function sendEmulatorGestureSequence(
     })
     ws.on('close', () => {
       cleanup()
-      reject(new Error('Emulator gesture stream closed before sequence completion'))
+      if (index < points.length) {
+        reject(new Error('Emulator gesture stream closed before all points were sent'))
+      }
     })
   })
 }

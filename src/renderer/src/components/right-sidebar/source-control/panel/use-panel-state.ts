@@ -16,11 +16,12 @@ export function useSourceControlPanelState() {
     activeWorktreeId,
     activeWorktreeInstanceId,
     branchSummary,
-    conflictOperation,
+    conflictOperationsByWorktree,
     isBranchVisible,
     isFolder,
     repositoryHuge,
     settings,
+    worktreeMap,
     worktreePath
   } = context
 
@@ -36,8 +37,8 @@ export function useSourceControlPanelState() {
   })
   const operationState = useSourceControlWorktreeOperationState({
     activeWorktreeId,
-    activeWorktreeInstanceId,
-    conflictOperation
+    conflictOperationsByWorktree,
+    worktreeMap
   })
   useSourceControlBranchLineTotalGate({
     activeWorktreeId,

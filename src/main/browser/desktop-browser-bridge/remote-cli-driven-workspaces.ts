@@ -1,7 +1,5 @@
 // SSH-driven workspaces lose programmatic clipboard reads until quit; user paste still works.
-import { webContents } from 'electron'
-import { parseChromeExtensionUrl } from '../../../shared/browser/extensions/browser-extension-url'
-import { browserManager } from '../guest-lifecycle/manager/browser-manager'
+import { browserManager } from '../browser-manager'
 
 const drivenWorkspaceIds = new Set<string>()
 
@@ -18,17 +16,12 @@ export function isRemoteCliDrivenGuest(webContentsId: number | undefined): boole
     webContentsId === undefined
       ? null
       : browserManager.getOwningTabIdForGuestWebContentsId(webContentsId)
-  // Unknown guests may belong to a host-driven workspace; deny all but extension pages.
+  // Unknown guests may belong to a host-driven workspace; deny access.
   if (!pageId) {
-    return !isUnownedExtensionPage(webContentsId)
+    return true
   }
   const workspaceId = browserManager.getWorktreeIdForTab(pageId)
   return workspaceId !== undefined && drivenWorkspaceIds.has(workspaceId)
-}
-
-function isUnownedExtensionPage(webContentsId: number | undefined): boolean {
-  const contents = webContentsId === undefined ? undefined : webContents.fromId(webContentsId)
-  return Boolean(contents && !contents.isDestroyed() && parseChromeExtensionUrl(contents.getURL()))
 }
 
 export function resetRemoteCliDrivenWorkspacesForTests(): void {

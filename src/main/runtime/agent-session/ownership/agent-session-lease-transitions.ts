@@ -1,25 +1,24 @@
-import { acquiredAccountAcrossLease } from '../../../../shared/agent-session/lifecycle/accounts/agent-session-acquired-account'
 /** Pure transitions applied by the store in one durable transaction.
  * Writer admission requires reservation, observed process identity and provider-handle proof at one fence. */
 
-import { agentSessionRefusalError } from '../../../../shared/agent-session/failures/agent-session-wire-refusals'
+import { agentSessionRefusalError } from '../../../../shared/agent-session-wire-refusals'
 import {
   adjudicateAgentSessionRestart,
   evaluateAgentSessionAcquisition,
   type AgentSessionOwnerProbe
-} from '../../../../shared/agent-session/lifecycle/leases/agent-session-lease-adjudication'
+} from '../../../../shared/agent-session-lease-adjudication'
 import {
   appendAgentSessionProviderHandleLink,
   type AgentSessionProviderHandleLink
-} from '../../../../shared/agent-session/lifecycle/provider-handles/agent-session-provider-handle'
-import { agentSessionProviderHandleBelongsTo } from '../../../../shared/agent-session/lifecycle/provider-handles/agent-session-provider-handle-encoding'
-import { nextAgentSessionFence } from '../../../../shared/agent-session/lifecycle/leases/agent-session-next-fence'
-import type { AgentSessionDeathEvidence } from '../../../../shared/agent-session/lifecycle/leases/agent-session-death-evidence'
+} from '../../../../shared/agent-session-provider-handle'
+import { agentSessionProviderHandleBelongsTo } from '../../../../shared/agent-session-provider-handle-encoding'
+import { nextAgentSessionFence } from '../../../../shared/agent-session-next-fence'
 import type {
+  AgentSessionDeathEvidence,
   AgentSessionLease,
   AgentSessionProcessIdentity,
   AgentSessionRecord
-} from '../../../../shared/agent-session/lifecycle/agent-session-record'
+} from '../../../../shared/agent-session-record'
 
 export type AgentSessionReservation = {
   spawnToken: string
@@ -33,13 +32,7 @@ export function withLease(
   record: AgentSessionRecord,
   lease: AgentSessionLease
 ): AgentSessionRecord {
-  const acquiredAccount = acquiredAccountAcrossLease(record, lease)
-  return {
-    ...record,
-    lease,
-    ...(acquiredAccount === undefined ? {} : { acquiredAccount }),
-    updatedAt: lease.lastRenewedAt
-  }
+  return { ...record, lease, updatedAt: lease.lastRenewedAt }
 }
 
 export function assertFence(lease: AgentSessionLease, fence: number): void {

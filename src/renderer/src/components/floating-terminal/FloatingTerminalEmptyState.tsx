@@ -2,7 +2,7 @@ import { FileText, Globe, Minus, TerminalSquare } from 'lucide-react'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { Button } from '@/components/ui/button'
 import type { ShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 type FloatingTerminalEmptyStateProps = {
   onNewTerminal: () => void
@@ -33,7 +33,6 @@ export function FloatingTerminalEmptyState({
   openMarkdownShortcut,
   closeShortcut
 }: FloatingTerminalEmptyStateProps): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div
       className="absolute inset-0 flex items-center justify-center"
@@ -51,7 +50,7 @@ export function FloatingTerminalEmptyState({
         >
           <TerminalSquare className="size-3.5 opacity-90" />
           <span className="truncate text-left leading-none">
-            {t(
+            {translate(
               'auto.components.floating.terminal.FloatingTerminalPanel.3215fc73e9',
               'New Terminal'
             )}
@@ -67,7 +66,7 @@ export function FloatingTerminalEmptyState({
         >
           <FileText className="size-3.5 opacity-90" />
           <span className="truncate text-left leading-none">
-            {t(
+            {translate(
               'auto.components.floating.terminal.FloatingTerminalPanel.629528690b',
               'New Markdown Note'
             )}
@@ -82,7 +81,7 @@ export function FloatingTerminalEmptyState({
         >
           <FileText className="size-3.5 opacity-90" />
           <span className="truncate text-left leading-none">
-            {t(
+            {translate(
               'auto.components.floating.terminal.FloatingTerminalPanel.88ffb502e5',
               'Open Markdown Note'
             )}
@@ -98,7 +97,7 @@ export function FloatingTerminalEmptyState({
           >
             <Globe className="size-3.5 opacity-90" />
             <span className="truncate text-left leading-none">
-              {t(
+              {translate(
                 'auto.components.floating.terminal.FloatingTerminalPanel.8b07759314',
                 'New Browser'
               )}
@@ -114,7 +113,10 @@ export function FloatingTerminalEmptyState({
         >
           <Minus className="size-3.5 opacity-90" />
           <span className="truncate text-left leading-none">
-            {t('auto.components.floating.terminal.FloatingTerminalPanel.fc1042e92b', 'Minimize')}
+            {translate(
+              'auto.components.floating.terminal.FloatingTerminalPanel.fc1042e92b',
+              'Minimize'
+            )}
           </span>
           <FloatingEmptyStateShortcut shortcut={closeShortcut} />
         </Button>

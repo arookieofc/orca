@@ -2,12 +2,12 @@ import type { OrcaRuntimeService } from '../../../orca-runtime'
 import {
   TerminalStreamOpcode,
   encodeTerminalStreamJson
-} from '../../../../../shared/terminal/stream/terminal-stream-protocol'
+} from '../../../../../shared/terminal-stream-protocol'
 import {
   MOBILE_SNAPSHOT_BYTE_BUDGET,
   MOBILE_SUBSCRIBE_SCROLLBACK_ROWS
-} from '../../../terminal/output/mobile-scrollback-limits'
-import { terminalStreamByteLengthExceeds } from '../../terminal/terminal-stream-byte-length'
+} from '../../../scrollback-limits'
+import { terminalStreamByteLengthExceeds } from '../../terminal-stream-byte-length'
 import {
   iterateTerminalStreamTextPayloads,
   requestedSnapshotScrollbackCandidates
@@ -97,7 +97,6 @@ type SnapshotVariableMeta = Pick<
   | 'kittyKeyboardFlags'
   | 'alternateScreen'
   | 'terminalOwner'
-  | 'lastTitle'
 >
 
 type TerminalBufferSource = Pick<OrcaRuntimeService, 'serializeTerminalBuffer'>
@@ -118,7 +117,6 @@ export type MobileSnapshotByteBudget = {
     | 'kittyKeyboardFlags'
     | 'alternateScreen'
     | 'terminalOwner'
-    | 'lastTitle'
     | 'truncatedByByteBudget'
   >
 }
@@ -159,7 +157,6 @@ function budgetedPublication(
     kittyKeyboardFlags: serialized.kittyKeyboardFlags,
     alternateScreen: serialized.alternateScreen,
     terminalOwner: serialized.terminalOwner,
-    lastTitle: serialized.lastTitle,
     data
   }
 }
@@ -198,23 +195,13 @@ function publishedCandidate<T extends SnapshotVariableMeta & { cols: number; row
 export async function serializeBudgetedMobileSnapshot(
   runtime: TerminalBufferSource,
   ptyId: string,
-  snapshotByteBudget?: MobileSnapshotByteBudget,
-  /** Rows to try first; only a WSL-moved pane asks for more than the default. */
-  firstRows = MOBILE_SUBSCRIBE_SCROLLBACK_ROWS
+  snapshotByteBudget?: MobileSnapshotByteBudget
 ): Promise<SerializedSnapshot> {
   if (isTerminalSnapshotForcedUnavailable()) {
     return null
   }
   // Include history for desktop too; screen-only snapshots lost it on remount/reconnect (#20158).
-  const candidates = [
-    ...(firstRows > MOBILE_SUBSCRIBE_SCROLLBACK_ROWS ? [firstRows, 2000] : []),
-    MOBILE_SUBSCRIBE_SCROLLBACK_ROWS,
-    500,
-    250,
-    100,
-    25,
-    0
-  ]
+  const candidates = [MOBILE_SUBSCRIBE_SCROLLBACK_ROWS, 500, 250, 100, 25, 0]
   for (const rows of candidates) {
     const serialized = await runtime.serializeTerminalBuffer(ptyId, { scrollbackRows: rows })
     if (!serialized) {

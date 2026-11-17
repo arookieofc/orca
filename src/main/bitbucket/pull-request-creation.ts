@@ -1,13 +1,10 @@
-import type { ExecutionHostId } from '../../shared/execution-host/execution-host'
+import type { ExecutionHostId } from '../../shared/execution-host'
 import { hostedReviewSshConnectionId } from '../source-control/hosted-review-execution-host'
-import type {
-  CreateHostedReviewInput,
-  CreateHostedReviewResult
-} from '../../shared/source-control/hosted-review/hosted-review-contracts'
+import type { CreateHostedReviewInput, CreateHostedReviewResult } from '../../shared/hosted-review'
 import {
   normalizeHostedReviewBaseRef,
   normalizeHostedReviewHeadRef
-} from '../../shared/source-control/hosted-review/hosted-review-refs'
+} from '../../shared/hosted-review-refs'
 import {
   HostedReviewApiRequestError,
   requestHostedReviewJson
@@ -49,8 +46,7 @@ function classifyCreateError(error: unknown): CreateHostedReviewResult {
       ok: false,
       code: 'auth_required',
       error:
-        'Create PR failed: Bitbucket is not authenticated. Next step: connect Bitbucket in Settings > Integrations, or set ORCA_BITBUCKET_* in this environment.',
-      reason: 'auth_required'
+        'Create PR failed: Bitbucket is not authenticated. Next step: connect Bitbucket in Settings > Integrations, or set ORCA_BITBUCKET_* in this environment.'
     }
   }
   // Duplicate branches return HTTP 400, so inspect the message.
@@ -58,16 +54,14 @@ function classifyCreateError(error: unknown): CreateHostedReviewResult {
     return {
       ok: false,
       code: 'already_exists',
-      error: 'A pull request already exists for this branch.',
-      reason: 'existing_review'
+      error: 'A pull request already exists for this branch.'
     }
   }
   if (error instanceof HostedReviewApiRequestError && error.timedOut) {
     return {
       ok: false,
       code: 'unknown_completion',
-      error: 'PR creation may have completed. Refreshing branch review state...',
-      reason: 'creation_unconfirmed'
+      error: 'PR creation may have completed. Refreshing branch review state...'
     }
   }
   if (status === 400 || status === 422) {
@@ -75,8 +69,7 @@ function classifyCreateError(error: unknown): CreateHostedReviewResult {
       ok: false,
       code: 'validation',
       error:
-        'Create PR failed: Bitbucket rejected the pull request. Check the base branch and branch state, then try again.',
-      reason: 'rejected'
+        'Create PR failed: Bitbucket rejected the pull request. Check the base branch and branch state, then try again.'
     }
   }
   if (status === 404) {
@@ -84,15 +77,13 @@ function classifyCreateError(error: unknown): CreateHostedReviewResult {
       ok: false,
       code: 'validation',
       error:
-        'Create PR failed: Bitbucket could not find the repository. Check that the credential has write access to it.',
-      reason: 'repository_not_found'
+        'Create PR failed: Bitbucket could not find the repository. Check that the credential has write access to it.'
     }
   }
   return {
     ok: false,
     code: 'unknown',
-    error: 'Create PR failed: Bitbucket could not create the pull request. Try again in a moment.',
-    reason: 'create_failed'
+    error: 'Create PR failed: Bitbucket could not create the pull request. Try again in a moment.'
   }
 }
 
@@ -122,8 +113,7 @@ export async function createBitbucketPullRequest(
     return {
       ok: false,
       code: 'unsupported_provider',
-      error: 'Creating reviews for this provider is not supported yet.',
-      reason: 'provider_not_supported'
+      error: 'Creating reviews for this provider is not supported yet.'
     }
   }
 
@@ -136,8 +126,7 @@ export async function createBitbucketPullRequest(
       ok: false,
       code: 'auth_required',
       error:
-        'Create PR failed: Bitbucket is not connected. Next step: connect Bitbucket in Settings > Integrations.',
-      reason: 'auth_required'
+        'Create PR failed: Bitbucket is not connected. Next step: connect Bitbucket in Settings > Integrations.'
     }
   }
 
@@ -150,8 +139,7 @@ export async function createBitbucketPullRequest(
     return {
       ok: false,
       code: 'unsupported_provider',
-      error: 'Creating pull requests requires a Bitbucket remote.',
-      reason: 'unsupported_provider'
+      error: 'Creating pull requests requires a Bitbucket remote.'
     }
   }
 
@@ -162,16 +150,14 @@ export async function createBitbucketPullRequest(
     return {
       ok: false,
       code: 'validation',
-      error: 'Create PR failed: base branch, head branch, and title are required.',
-      reason: 'base_head_title_required'
+      error: 'Create PR failed: base branch, head branch, and title are required.'
     }
   }
   if (head.toLowerCase() === base.toLowerCase()) {
     return {
       ok: false,
       code: 'validation',
-      error: 'Create PR failed: choose a different base branch before creating a pull request.',
-      reason: 'same_base_branch'
+      error: 'Create PR failed: choose a different base branch before creating a pull request.'
     }
   }
   // Ignore saved draft defaults because Bitbucket's composer has no control to clear them.
@@ -214,8 +200,7 @@ export async function createBitbucketPullRequest(
       : {
           ok: false,
           code: 'unknown_completion',
-          error: 'PR creation may have completed. Refreshing branch review state...',
-          reason: 'creation_unconfirmed'
+          error: 'PR creation may have completed. Refreshing branch review state...'
         }
   } catch (error) {
     const classified = classifyCreateError(error)
@@ -231,7 +216,6 @@ export async function createBitbucketPullRequest(
           ok: false,
           code: 'already_exists',
           error: 'A pull request already exists for this branch.',
-          reason: 'existing_review',
           existingReview: existing
         }
       }

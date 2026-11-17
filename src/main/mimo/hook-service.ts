@@ -1,4 +1,4 @@
-import { getAppEnvironment } from '../../shared/app-lifecycle/app-environment'
+import { getAppEnvironment } from '../../shared/app-environment'
 import { isAbsolute, join } from 'node:path'
 import { homedir } from 'node:os'
 import {
@@ -13,19 +13,15 @@ import {
   statSync,
   writeFileSync
 } from 'node:fs'
-import { getOpenCodeFamilyPluginSource } from '../opencode/status-hooks/plugin-source/status-plugin-module-source'
-import { sourceOverlayDirName } from '../opencode/status-hooks/overlay-dir-names'
+import { getOpenCodeFamilyPluginSource } from '../opencode/hook-service'
+import { sourceOverlayDirName } from '../opencode/overlay-dir-names'
 import {
   clearOpenCodeOverlayManifestEntries,
   readOpenCodeOverlayManifest,
   writeOpenCodeOverlayManifest,
   type OpenCodeOverlayManifest
-} from '../opencode/status-hooks/opencode-overlay-manifest'
-import {
-  isSafeDescendCandidate,
-  mirrorEntry,
-  safeRemoveOverlay
-} from '../pty/scrollback/overlay-mirror'
+} from '../opencode/opencode-overlay-manifest'
+import { isSafeDescendCandidate, mirrorEntry, safeRemoveOverlay } from '../pty/overlay-mirror'
 
 const ORCA_MIMOCODE_PLUGIN_FILE = 'orca-mimocode-status.js'
 const MIMOCODE_HOOKS_DIR = 'mimocode-hooks'

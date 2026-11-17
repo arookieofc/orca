@@ -1,24 +1,38 @@
 import {
   AGENT_JOURNAL_THREAD_SCOPE,
   type AgentJournalTurnLifecycle
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
-import { agentJournalSubmissionKey } from '../../../shared/agent-session/journal/agent-session-journal-item-key'
-import { agentJournalTurnBody } from '../../../shared/agent-session/lifecycle/records/agent-session-turn-record'
-import { agentJournalTurnRowReservedBytes } from './agent-journal-turn-row-revision'
-import { providerTimelineRequest } from './provider-timeline-context'
+} from '../../../shared/agent-session-journal-types'
+import { agentJournalSubmissionKey } from '../../../shared/agent-session-journal-item-key'
+import {
+  agentJournalTurnBody,
+  readAgentJournalTurn
+} from '../../../shared/agent-session-turn-record'
+import type { StructuredAgentSessionTransitionJournal } from '../agent-session-wire/structured-agent-session-transition'
+import {
+  agentJournalTurnRowReservedBytes,
+  resolveAgentJournalTurnRowWrite
+} from './agent-journal-turn-row-revision'
 import type {
   ProviderTimelineDecidedEvent,
   ProviderTimelineDecision,
   ProviderTimelineDecisionInput,
-  ProviderTimelineItemWrite
+  ProviderTimelineItemWrite,
+  ProviderTimelineResolvedWrite
 } from './provider-timeline-decision'
-import { providerKey, type ProviderTimelineTurnRef } from './provider-timeline-rows'
-import type { ProviderTimelineTurnEnd } from './provider-timeline-settlement'
+import {
+  providerKey,
+  providerTimelineTurnRowState,
+  type ProviderTimelineTurnRef
+} from './provider-timeline-rows'
+import {
+  providerTimelineSettlement,
+  runningProviderTimelineTurns,
+  type ProviderTimelineTurnEnd
+} from './provider-timeline-settlement'
 import type {
   ProviderTimelineOpenTurn,
   ProviderTimelinePendingInput
 } from './provider-timeline-state'
-import type { ProviderTimelineSettlementResolution } from './provider-timeline-writer-resolution'
 
 const TURN_ROW_RESERVED_BYTES = 64 * 1024
 
@@ -26,7 +40,7 @@ export function decideTurnOpen(
   input: ProviderTimelineDecisionInput,
   event: Extract<ProviderTimelineDecidedEvent, { type: 'turn.open' }>
 ): ProviderTimelineDecision {
-  const { state, context } = input
+  const { state, journal, context } = input
   const open = state.open
   // New turns supersede open work, including externally stopped turns awaiting provider end.
   const superseded = open ?? state.stopped
@@ -36,11 +50,11 @@ export function decideTurnOpen(
   const turn = context.rows.turn(
     event.turn === undefined ? context.rows.minted('t', input.serial()) : providerKey(event.turn)
   )
-  if (open?.itemId === turn.itemId) {
+  const held = journal ? providerTimelineTurnRowState(journal, turn.itemId) : 'absent'
+  if (open?.itemId === turn.itemId || held === 'running') {
     return { dropped: 'turn-duplicate' }
   }
-  // This producer already ended it; the writer refuses reopening any other settled turn.
-  if (state.latest?.itemId === turn.itemId) {
+  if (held === 'settled') {
     return { dropped: 'turn-settled' }
   }
   const pending = state.opener(turn.itemId)
@@ -51,17 +65,24 @@ export function decideTurnOpen(
     startedAt: event.at,
     ...(pending ? { requestedAt: pending.requestedAt } : {})
   }
-  const opened: ProviderTimelineOpenTurn = { ...turn, running }
+  const write: ProviderTimelineResolvedWrite = {
+    identity: turn.identity,
+    body: agentJournalTurnBody(running)
+  }
   return {
     ...(superseded
       ? {
           settle: {
             what: 'turn-superseded',
-            resolution: turnSettlement(input, superseded, {
-              state: 'interrupted',
-              completedAt: event.at,
-              outcome: 'superseded'
-            })
+            resolve: (journal) =>
+              providerTimelineSettlement(
+                journal,
+                { turnItemId: superseded.itemId },
+                {
+                  turns: [superseded],
+                  end: { state: 'interrupted', completedAt: event.at, outcome: 'superseded' }
+                }
+              )
           }
         }
       : {}),
@@ -71,21 +92,8 @@ export function decideTurnOpen(
         lifecycle: true,
         // Stamp turn start rather than append latency.
         options: { turnScope: AGENT_JOURNAL_THREAD_SCOPE, lifecycle: true, observedAt: event.at },
-        resolution: {
-          kind: 'turn-open',
-          identity: turn.identity,
-          body: agentJournalTurnBody(running)
-        },
-        // Another writer already ended this turn; later events must not reopen it.
-        onResolved: (outcome) => {
-          if (
-            outcome.kind === 'dropped' &&
-            outcome.reason === 'turn-settled' &&
-            state.open === opened
-          ) {
-            state.endTurn(turn)
-          }
-        }
+        // Never regress an existing turn to running.
+        resolve: (at) => (at.itemBody(turn.itemId) === null ? write : null)
       }
     ],
     commit: (next) => {
@@ -95,23 +103,8 @@ export function decideTurnOpen(
       if (pending) {
         next.inputs = next.inputs.filter((each) => each !== pending)
       }
-      next.open = opened
+      next.open = { ...turn, running }
     }
-  }
-}
-
-function turnSettlement(
-  input: ProviderTimelineDecisionInput,
-  turn: ProviderTimelineTurnRef,
-  end?: ProviderTimelineTurnEnd
-): ProviderTimelineSettlementResolution {
-  return {
-    kind: 'timeline-settlement',
-    scope: { turnItemId: turn.itemId },
-    ...(end ? { ending: { turns: [turn.identity], end } } : {}),
-    keep: input.state
-      .liveRequests(turn.itemId)
-      .map((request) => providerTimelineRequest(input.context, request))
   }
 }
 
@@ -119,7 +112,7 @@ export function decideTurnEnd(
   input: ProviderTimelineDecisionInput,
   event: Extract<ProviderTimelineDecidedEvent, { type: 'turn.end' }>
 ): ProviderTimelineDecision {
-  const { state } = input
+  const { state, journal } = input
   const turn =
     event.turn === undefined
       ? (state.open ?? state.stopped)
@@ -127,7 +120,15 @@ export function decideTurnEnd(
   if (!turn) {
     return { dropped: 'no-turn' }
   }
-  // Known ended turns still need residual-work settlement; the writer rewrites only running rows.
+  // Known ended turns still need residual-work settlement without rewriting the turn.
+  const known =
+    state.open?.itemId === turn.itemId ||
+    state.latest?.itemId === turn.itemId ||
+    !journal ||
+    providerTimelineTurnRowState(journal, turn.itemId) !== 'absent'
+  if (!known) {
+    return { dropped: 'turn-unknown' }
+  }
   const end: ProviderTimelineTurnEnd = {
     state: event.state,
     completedAt: event.at,
@@ -136,21 +137,26 @@ export function decideTurnEnd(
   }
   return {
     ends: { turnItemId: turn.itemId, current: !state.open || state.open.itemId === turn.itemId },
-    settle: { what: 'turn-end', resolution: turnSettlement(input, turn, end) },
+    settle: {
+      what: 'turn-end',
+      resolve: (journal) =>
+        providerTimelineSettlement(journal, { turnItemId: turn.itemId }, { turns: [turn], end })
+    },
     commit: (next) => next.endTurn(turn)
   }
 }
 
 /** External settlement ends text/prompts; calls wait for provider end, a newer turn or session end. */
 export function decideTurnSettled(
-  input: ProviderTimelineDecisionInput,
   event: Extract<ProviderTimelineDecidedEvent, { type: 'turn.settled' }>
 ): ProviderTimelineDecision {
   const { turn } = event
   return {
     ends: { turnItemId: turn.itemId, current: true },
-    // Live requests end by their own answer or withdrawal, which Stop sends first.
-    settle: { what: 'turn-settled', resolution: turnSettlement(input, turn) },
+    settle: {
+      what: 'turn-settled',
+      resolve: (journal) => providerTimelineSettlement(journal, { turnItemId: turn.itemId })
+    },
     commit: (next) => next.stopTurn(turn)
   }
 }
@@ -175,17 +181,22 @@ function decideOpener(
   message: Omit<ProviderTimelinePendingInput, 'turnItemId'>,
   named: string | undefined
 ): ProviderTimelineDecision {
-  const { state, context } = input
+  const { state, journal, context } = input
   const open = state.open
   const turn = named === undefined ? null : context.rows.turn(providerKey(named))
   if (turn && turn.itemId !== open?.itemId) {
-    // A turn that already opened ignores its waiting opener.
+    if (journal && providerTimelineTurnRowState(journal, turn.itemId) !== 'absent') {
+      return {}
+    }
     return { commit: (next) => next.wait({ ...message, turnItemId: turn.itemId }) }
   }
   if (!open) {
     return { commit: (next) => next.wait(message) }
   }
-  if (open.running.userItemId !== open.itemId) {
+  const opener =
+    (journal && readAgentJournalTurn(journal.itemBody(open.itemId) ?? undefined)?.userItemId) ??
+    open.running.userItemId
+  if (opener !== open.itemId) {
     return {}
   }
   const running = { ...open.running, ...message }
@@ -195,7 +206,7 @@ function decideOpener(
         reservedBytes: TURN_ROW_RESERVED_BYTES,
         lifecycle: true,
         options: { turnScope: AGENT_JOURNAL_THREAD_SCOPE, lifecycle: true },
-        resolution: { kind: 'turn-opener', identity: open.identity, message }
+        resolve: (at) => reviseOpener(at, open, message)
       }
     ],
     commit: (next) => {
@@ -206,6 +217,30 @@ function decideOpener(
   }
 }
 
+/** Set openers only on running, unclaimed turns; preserve all other journal fields. */
+function reviseOpener(
+  journal: StructuredAgentSessionTransitionJournal,
+  open: ProviderTimelineOpenTurn,
+  message: Omit<ProviderTimelinePendingInput, 'turnItemId'>
+): ProviderTimelineResolvedWrite | null {
+  const row = readAgentJournalTurn(journal.itemBody(open.itemId) ?? undefined)
+  if (row?.state !== 'running' || row.userItemId !== open.itemId) {
+    return null
+  }
+  const target = { identity: open.identity }
+  const write = {
+    lifecycle: agentJournalTurnBody({ ...row, ...message }),
+    // Recheck in revision even though the snapshot already showed running.
+    onlyWhileRunning: true as const
+  }
+  return resolveAgentJournalTurnRowWrite(
+    journal,
+    target,
+    write,
+    agentJournalTurnRowReservedBytes(target, write)
+  )
+}
+
 export function decideSessionEnd(
   _input: ProviderTimelineDecisionInput,
   event: Extract<ProviderTimelineDecidedEvent, { type: 'session.ended' }>
@@ -214,16 +249,12 @@ export function decideSessionEnd(
     settle: {
       what: 'session-end',
       recovered: true,
-      resolution: {
-        kind: 'timeline-settlement',
-        scope: 'session',
-        ending: {
-          turns: 'running',
+      resolve: (journal) =>
+        providerTimelineSettlement(journal, 'session', {
+          turns: runningProviderTimelineTurns(journal),
           end: event.verdict,
           ...(event.endedAt !== undefined ? { lostAt: event.endedAt } : {})
-        },
-        keep: []
-      }
+        })
     },
     commit: (next) => next.endSession()
   }
@@ -243,7 +274,13 @@ export function decideContextUsage(
     reservedBytes: agentJournalTurnRowReservedBytes(target, write),
     lifecycle: true,
     options: { turnScope: AGENT_JOURNAL_THREAD_SCOPE },
-    resolution: { kind: 'turn-row', target, write }
+    resolve: (journal) =>
+      resolveAgentJournalTurnRowWrite(
+        journal,
+        target,
+        write,
+        agentJournalTurnRowReservedBytes(target, write)
+      )
   }
   return { writes: [usage] }
 }

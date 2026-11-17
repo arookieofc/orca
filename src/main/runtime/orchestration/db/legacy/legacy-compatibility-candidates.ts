@@ -2,7 +2,7 @@ import type {
   DispatchContextRow,
   LegacyCompatibilityPrincipalRow,
   LegacyPrincipalRole
-} from '../orchestration-records'
+} from '../../types'
 import { OrchestrationError } from '../../orchestration-error'
 import { LEGACY_CONTRACT_VERSION } from '../contract-constants'
 import { isEquivalentPaneKey } from '../pane-key-match'

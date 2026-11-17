@@ -1,27 +1,22 @@
 import { useMemo } from 'react'
 import { Globe } from 'lucide-react'
 import { toast } from 'sonner'
-import { useTranslate } from '@/i18n/use-translate'
-import { useAppStore } from '@/store/index'
-import { useRepoById } from '@/store/repos/use-repository-catalog'
-import { useWorktreeById } from '@/store/workspaces/selection/use-selected-worktree'
-import {
-  prepareBrowserHistoryEntries,
-  rankBrowserTopSites
-} from '@/lib/browser/history/browser-history-match'
+import { translate } from '@/i18n/i18n'
+import { useAppStore } from '@/store'
+import { useRepoById, useWorktreeById } from '@/store/selectors'
+import { prepareBrowserHistoryEntries, rankBrowserTopSites } from '@/lib/browser-history-match'
 import { BrowserFavicon } from '@/components/browser-favicon'
-import type { BrowserHistoryEntry } from '../../../../../shared/browser/workspaces/browser-workspace-types'
-import type { Repo } from '../../../../../shared/repository/repo-types'
+import type { BrowserHistoryEntry } from '../../../../../shared/browser-workspace-types'
+import type { Repo } from '../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
-import type { WorkspaceLinkedItemRow } from '../../sidebar/workspace-card/review/workspace-hover-attachments'
+import type { WorkspaceLinkedItemRow } from '../../sidebar/workspace-hover-attachments'
 import { BrowserNewTabTile } from './browser-new-tab-tile'
 import { useBrowserNewTabLinkedItems } from './use-browser-new-tab-linked-items'
 import { useBrowserNewTabServers, type BrowserNewTabServers } from './use-browser-new-tab-servers'
 import { BrowserNewTabWorkspaceCard } from './browser-new-tab-workspace-card'
-import { BrowserImportHintButton } from '../assemble-chrome/profile-routing/BrowserImportHintButton'
-import { resolveWorktreeDisplayName } from '@/lib/workspace/display/worktree-default-display-name'
-import { useWorktreeRuntimeTarget } from '@/runtime/rpc/targets/use-worktree-runtime-target'
-import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import { resolveWorktreeDisplayName } from '@/lib/worktree-default-display-name'
+import { useWorktreeRuntimeTarget } from '@/runtime/use-worktree-runtime-target'
+import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
 
 const SUGGESTED_TILE_LIMIT = 8
 const NO_LINKED_ITEMS: WorkspaceLinkedItemRow[] = []
@@ -36,15 +31,12 @@ type BrowserNewTabServerContext = {
 export function BrowserNewTabPage({
   worktreeId,
   onOpenUrl,
-  serversElsewhere = false,
-  importProfileId
+  serversElsewhere = false
 }: {
   worktreeId: string
   onOpenUrl: (url: string) => void
   /** This tab's page runs on another machine than the workspace's ports, so they open on theirs. */
   serversElsewhere?: boolean
-  /** Local session profile to import logins into; omitted where the session isn't local. */
-  importProfileId?: string | null
 }): React.JSX.Element {
   const worktree = useWorktreeById(worktreeId)
   const repo = useRepoById(worktree?.repoId ?? null) ?? undefined
@@ -60,14 +52,12 @@ export function BrowserNewTabPage({
       repo={repo}
       servers={servers}
       onOpenUrl={onOpenUrl}
-      importProfileId={importProfileId}
     />
   ) : (
     <BrowserNewTabPageLayout
       linkedItems={NO_LINKED_ITEMS}
       servers={servers}
       onOpenUrl={onOpenUrl}
-      importProfileId={importProfileId}
     />
   )
 }
@@ -76,14 +66,12 @@ function BrowserNewTabWorktreePage({
   worktree,
   repo,
   servers,
-  onOpenUrl,
-  importProfileId
+  onOpenUrl
 }: {
   worktree: Worktree
   repo: Repo | undefined
   servers: BrowserNewTabServerContext
   onOpenUrl: (url: string) => void
-  importProfileId?: string | null
 }): React.JSX.Element {
   const linkedItems = useBrowserNewTabLinkedItems(worktree, repo)
   return (
@@ -92,7 +80,6 @@ function BrowserNewTabWorktreePage({
       linkedItems={linkedItems}
       servers={servers}
       onOpenUrl={onOpenUrl}
-      importProfileId={importProfileId}
     />
   )
 }
@@ -101,16 +88,13 @@ function BrowserNewTabPageLayout({
   workspaceName,
   linkedItems,
   servers: { servers, runtimeTarget, openInPlace },
-  onOpenUrl,
-  importProfileId
+  onOpenUrl
 }: {
   workspaceName?: string
   linkedItems: WorkspaceLinkedItemRow[]
   servers: BrowserNewTabServerContext
   onOpenUrl: (url: string) => void
-  importProfileId?: string | null
 }): React.JSX.Element {
-  const t = useTranslate()
   const browserUrlHistory = useAppStore((s) => s.browserUrlHistory)
   const removeBrowserHistoryEntry = useAppStore((s) => s.removeBrowserHistoryEntry)
   const restoreBrowserHistory = useAppStore((s) => s.restoreBrowserHistory)
@@ -133,26 +117,18 @@ function BrowserNewTabPageLayout({
       return
     }
     toast(
-      t('browser.newTab.removedFromHistory', 'Removed “{{title}}” from history', {
+      translate('browser.newTab.removedFromHistory', 'Removed “{{title}}” from history', {
         title: suggestionLabel(removed)
       }),
       {
         action: {
-          label: t('browser.newTab.undo', 'Undo'),
+          label: translate('browser.newTab.undo', 'Undo'),
           onClick: () =>
             restoreBrowserHistory({ browserUrlHistory: [removed], workspaceDocHistory: [] })
         }
       }
     )
   }
-
-  // empty:hidden drops the row (and its flex gap) once the hint is hidden.
-  const importRow =
-    importProfileId === undefined ? null : (
-      <div className="flex justify-center empty:hidden">
-        <BrowserImportHintButton profileId={importProfileId} />
-      </div>
-    )
 
   if (!hasWorkspaceRows && suggested.length === 0) {
     return (
@@ -162,16 +138,15 @@ function BrowserNewTabPageLayout({
             <Globe className="size-5" />
           </div>
           <p className="text-base font-semibold text-foreground">
-            {t('auto.components.browser.pane.BrowserPane.366bf5d62c', 'New Tab')}
+            {translate('auto.components.browser.pane.BrowserPane.366bf5d62c', 'New Tab')}
           </p>
           <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-            {t(
+            {translate(
               'browser.newTab.emptyHint',
               'Search or enter an address above. Sites you visit, dev servers running in this workspace, and its PR and issue will show up here.'
             )}
           </p>
         </div>
-        {importRow}
       </BrowserNewTabScroller>
     )
   }
@@ -180,7 +155,7 @@ function BrowserNewTabPageLayout({
     <BrowserNewTabScroller>
       {hasWorkspaceRows ? (
         <BrowserNewTabSection
-          label={t('browser.newTab.thisWorkspace', 'This workspace')}
+          label={translate('browser.newTab.thisWorkspace', 'This workspace')}
           detail={workspaceName}
         >
           <BrowserNewTabWorkspaceCard
@@ -193,7 +168,7 @@ function BrowserNewTabPageLayout({
         </BrowserNewTabSection>
       ) : null}
       {suggested.length > 0 ? (
-        <BrowserNewTabSection label={t('browser.newTab.suggested', 'Suggested')}>
+        <BrowserNewTabSection label={translate('browser.newTab.suggested', 'Suggested')}>
           <BrowserNewTabTileGrid>
             {suggested.map((entry) => (
               <BrowserNewTabTile
@@ -209,13 +184,12 @@ function BrowserNewTabPageLayout({
                 tooltip={entry.title.trim() ? `${entry.title} · ${entry.url}` : entry.url}
                 onOpen={() => onOpenUrl(entry.url)}
                 onRemove={() => removeSuggestion(entry)}
-                removeLabel={t('browser.newTab.removeSuggestion', 'Remove from history')}
+                removeLabel={translate('browser.newTab.removeSuggestion', 'Remove from history')}
               />
             ))}
           </BrowserNewTabTileGrid>
         </BrowserNewTabSection>
       ) : null}
-      {importRow}
     </BrowserNewTabScroller>
   )
 }

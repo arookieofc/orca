@@ -1,7 +1,6 @@
-import { translate } from '@/i18n/i18n'
-import { gitLabApiFor } from '@/runtime/repository-gitlab/gitlab-owner-api'
+import { gitLabApiFor } from '@/runtime/gitlab-owner-api'
 import { useEffect } from 'react'
-import type { GitLabWorkItem, GitLabWorkItemDetails } from '../../../../shared/gitlab/gitlab-types'
+import type { GitLabWorkItem, GitLabWorkItemDetails } from '../../../../shared/gitlab-types'
 import type { GitLabDialogRepoSelector } from './gitlab-item-dialog-types'
 import type { GitLabItemDialogState } from './use-gitlab-item-dialog-state'
 
@@ -29,13 +28,7 @@ export function useGitLabItemDetailsEffect(
           return
         }
         if (!data) {
-          // Main returns null for any failed read, not only a missing item.
-          setError(
-            translate(
-              'auto.components.GitLabItemDialog.itemLoadFailed',
-              'Could not load this item. Refresh to try again.'
-            )
-          )
+          setError('Item not found.')
           return
         }
         setDetails(data as GitLabWorkItemDetails)
@@ -57,14 +50,11 @@ export function useGitLabItemDetailsEffect(
 }
 
 export function useGitLabItemScopeResetEffect(
-  detailsOwner: string | null,
+  itemId: string | null,
   state: GitLabItemDialogState
 ): void {
   const {
-    setActionInFlight,
     setBodyDraft,
-    setCommentSubmitting,
-    setDetailsSaving,
     setEditingDetails,
     setExpandedJobId,
     setInlineCommentBody,
@@ -83,12 +73,8 @@ export function useGitLabItemScopeResetEffect(
     setTitleDraft
   } = state
   // Reset item-scoped provider state here; render already resets the top-level draft before paint.
-  // Busy flags too: a write for the previous target no longer releases them once the target changes.
   useEffect(() => {
     setEditingDetails(false)
-    setDetailsSaving(false)
-    setActionInFlight(null)
-    setCommentSubmitting(false)
     setTitleDraft('')
     setBodyDraft('')
     setLabelDraft('')
@@ -106,11 +92,8 @@ export function useGitLabItemScopeResetEffect(
     setJobTraceById({})
     setRetryingJobId(null)
   }, [
-    detailsOwner,
-    setActionInFlight,
+    itemId,
     setBodyDraft,
-    setCommentSubmitting,
-    setDetailsSaving,
     setEditingDetails,
     setExpandedJobId,
     setInlineCommentBody,

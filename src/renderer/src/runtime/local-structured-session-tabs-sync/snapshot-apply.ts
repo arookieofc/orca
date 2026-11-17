@@ -1,26 +1,19 @@
 import type {
   RuntimeMobileSessionTabsRemovedResult,
   RuntimeMobileSessionTabsResult
-} from '../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
+} from '../../../../shared/runtime-types'
 import { markStructuredAgentSessionLaunchesPublished } from '../../lib/agent-session/launch/structured-agent-session-launch-publication'
-import type { WorktreeRuntimeOwnerState } from '../../lib/workspace/ownership/worktree-runtime-owner-state'
-import { getExecutionHostIdForWorktree } from '../../lib/workspace/ownership/worktree-runtime-owner'
-import { applyWebSessionTabsSnapshot } from '../web-session-tabs-sync/snapshots/snapshot-api'
-import { applyWebSessionTabsStorePatch } from '../web-session-tabs-sync/snapshots/store-patch'
-import { receivedAgentSenderPublications } from '../web-session-tabs-sync/tracking/received-agent-sender-publications'
+import type { WorktreeRuntimeOwnerState } from '../../lib/worktree-runtime-owner-state'
+import { getExecutionHostIdForWorktree } from '../../lib/worktree-runtime-owner'
+import { applyWebSessionTabsSnapshot } from '../web-session-tabs-sync/snapshot-api'
+import { applyWebSessionTabsStorePatch } from '../web-session-tabs-sync/store-patch'
 import type { WebSessionTabsSyncState } from '../web-session-tabs-sync/state'
 import {
   admitRetiredValueUnderAuthority,
   noteRetiredValue,
   sameSessionTabsPublicationLineage
-} from '../web-session-tabs-sync/tracking/publisher-identity-fences'
-import { isKnownStructuredSessionWorktree } from '../native-chat/local-sessions/local-structured-session-tab-retirement'
-import { structuralValuesEqual } from '../../../../shared/collections/structural-value-equality'
-import {
-  selectDetectedWorktreesByRepo,
-  selectFolderWorkspaces,
-  selectWorktreesByRepo
-} from '../../store/workspaces/catalog/workspace-record-fields'
+} from '../web-session-tabs-sync/publisher-identity-fences'
+import { knownStructuredSessionWorktreeIds } from '../local-structured-session-tab-retirement'
 import {
   localStructuredSessionEpochHistoryByWorktree,
   localStructuredSessionVersionByWorktree
@@ -30,19 +23,19 @@ import { projectLocalStructuredSessionTabs } from './snapshot-projection'
 import {
   hostSnapshotAffirmsAgentSessions,
   hostSnapshotAffirmsWorktreeContents
-} from '../web-session-tabs-sync/hydration/host-session-snapshot-authority'
+} from '../host-session-snapshot-authority'
 import { retireAbsentStructuredAgentSessionLaunchCancellationTombstones } from '../../lib/agent-session/launch/structured-agent-session-launch-registry'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host/execution-host'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import {
   beginStructuredAgentSessionAuthoritativeInventory,
   startStructuredAgentLaunchCancellationCleanup
-} from '../../lib/agent-session/launch/structured-agent-session-launch-cancellation'
-import { suppressCancelledStructuredSessionTabs } from '../native-chat/tab-retirement/structured-agent-session-tab-retirement'
-import { LOCAL_STRUCTURED_SESSION_OWNER } from '../native-chat/local-sessions/local-structured-session-owner'
-import { closeStructuredAgentSession } from '../native-chat/requests/structured-agent-session-close'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/workspace-layout/layout-owner-switch'
+} from '../../lib/launch-cancel-tombstones-compat/structured-agent-session-launch-cancellation'
+import { suppressCancelledStructuredSessionTabs } from '../structured-agent-session-tab-retirement'
+import { LOCAL_STRUCTURED_SESSION_OWNER } from '../local-structured-session-owner'
+import { closeStructuredAgentSession } from '../structured-agent-session-close'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 import { useAppStore } from '../../store'
-import { framesDrawWorkspace } from '../workspace-layout/frames/workspace-layout-frame-drawn-workspaces'
+import { framesDrawWorkspace } from '../workspace-layout-frame-drawn-workspaces'
 import { drawnChatLabelChanges, type DrawnChatLabel } from './frame-drawn-chat-tabs'
 
 /** The host saying it no longer publishes this worktree at all, rather than publishing an empty one. */
@@ -67,20 +60,6 @@ export type StructuredSessionSnapshotApplyOptions = {
   framesDraw?: (worktreeId: string) => boolean
   /** Collects host titles for drawn chat tabs, applied as content after the store patch. */
   onDrawnChatLabel?: (change: DrawnChatLabel) => void
-  /** Stream frames: one that repeats the last applied frame at a newer version only advances the cursor. */
-  skipVersionOnlyRepeats?: boolean
-}
-
-function differsOnlyInVersion(
-  applied: RuntimeMobileSessionTabsResult | undefined,
-  next: RuntimeMobileSessionTabsResult
-): boolean {
-  if (!applied) {
-    return false
-  }
-  const { snapshotVersion: _applied, ...appliedContent } = applied
-  const { snapshotVersion: _next, ...nextContent } = next
-  return structuralValuesEqual(appliedContent, nextContent)
 }
 
 export function applyStructuredSessionTabSnapshots(
@@ -91,28 +70,18 @@ export function applyStructuredSessionTabSnapshots(
   const acceptedAgentSessions: { worktreeId: string; sessionId: string }[] = []
   const drawnChatLabels: DrawnChatLabel[] = []
   const settleStructuredSessionMirror = applyWebSessionTabsStorePatch(
-    (state, changedAgentPaneKeys) =>
-      applyLocalStructuredSessionTabSnapshots(
-        state,
-        snapshots,
-        owner,
-        undefined,
-        {
-          ...options,
-          onAcceptedAgentSession: (worktreeId, sessionId) => {
-            acceptedAgentSessions.push({ worktreeId, sessionId })
-            options.onAcceptedAgentSession?.(worktreeId, sessionId)
-          },
-          // Switch point: main places the listed chats' tabs; its frames draw them.
-          framesDraw: ORCA_LAYOUT_OWNER_IS_MAIN ? framesDrawWorkspace(state) : undefined,
-          onDrawnChatLabel: (change) => drawnChatLabels.push(change)
+    (state) =>
+      applyLocalStructuredSessionTabSnapshots(state, snapshots, owner, undefined, {
+        ...options,
+        onAcceptedAgentSession: (worktreeId, sessionId) => {
+          acceptedAgentSessions.push({ worktreeId, sessionId })
+          options.onAcceptedAgentSession?.(worktreeId, sessionId)
         },
-        changedAgentPaneKeys
-      ),
-    { frames: [] },
-    undefined,
-    false,
-    snapshots.map(({ worktree }) => worktree)
+        // Switch point: main places the listed chats' tabs; its frames draw them.
+        framesDraw: ORCA_LAYOUT_OWNER_IS_MAIN ? framesDrawWorkspace(state) : undefined,
+        onDrawnChatLabel: (change) => drawnChatLabels.push(change)
+      }),
+    { frames: [] }
   )
   settleStructuredSessionMirror()
   const { setTabLabel } = useAppStore.getState()
@@ -146,17 +115,9 @@ export function applyLocalStructuredSessionTabSnapshots<
   snapshots: readonly RuntimeMobileSessionTabsResult[],
   owner = LOCAL_STRUCTURED_SESSION_OWNER,
   now = Date.now(),
-  options: StructuredSessionSnapshotApplyOptions = {},
-  changedAgentPaneKeys?: Set<string>
+  options: StructuredSessionSnapshotApplyOptions = {}
 ): State {
   let next = state
-  let registriesGrew = false
-  // Received sender scopes apply before any tab check below can drop their frame.
-  const received = next.agentSenderPublicationsByHost ?? {}
-  const publications = receivedAgentSenderPublications(received, 'local', snapshots)
-  if (publications !== received) {
-    next = { ...next, agentSenderPublicationsByHost: publications }
-  }
   for (const snapshot of snapshots) {
     // Local inventory must not rewrite paired/SSH panes; execution hosts own their tabs.
     if (getExecutionHostIdForWorktree(next, snapshot.worktree) !== 'local') {
@@ -181,7 +142,6 @@ export function applyLocalStructuredSessionTabSnapshots<
       )
     ) {
       options.onRetiredEpochDrop?.(snapshot.worktree, snapshot.publicationEpoch)
-      registriesGrew = true
       continue
     }
     if (
@@ -199,36 +159,28 @@ export function applyLocalStructuredSessionTabSnapshots<
         options.onAcceptedAgentSession?.(snapshot.worktree, tab.sessionId)
       }
     }
-    const versionOnlyRepeat =
-      options.skipVersionOnlyRepeats === true &&
-      prior?.publicationEpoch === snapshot.publicationEpoch &&
-      differsOnlyInVersion(prior.applied, effectiveSnapshot)
-    const drawn = !versionOnlyRepeat && options.framesDraw?.(snapshot.worktree) === true
-    if (!versionOnlyRepeat) {
-      // Runs for a drawn workspace too: its tab-id, focus and close-intent ledgers still follow the host.
-      const patch = applyWebSessionTabsSnapshot(
-        next,
-        projectLocalStructuredSessionTabs(effectiveSnapshot),
-        owner,
-        now,
-        {
-          contentScope: 'agent-session',
-          preserveLocalLayout: true,
-          terminalPtyMode: 'local'
-        },
-        changedAgentPaneKeys
-      )
-      if (drawn) {
-        // Main's frames own this workspace's tabs, so the patch (tab structure only here) is dropped.
-        for (const change of drawnChatLabelChanges(
-          next.unifiedTabsByWorktree[snapshot.worktree] ?? [],
-          effectiveSnapshot
-        )) {
-          options.onDrawnChatLabel?.(change)
-        }
-      } else {
-        next = patch === next ? next : ({ ...next, ...patch } as State)
+    // Runs for a drawn workspace too: its tab-id, focus and close-intent ledgers still follow the host.
+    const patch = applyWebSessionTabsSnapshot(
+      next,
+      projectLocalStructuredSessionTabs(effectiveSnapshot),
+      owner,
+      now,
+      {
+        contentScope: 'agent-session',
+        preserveLocalLayout: true,
+        terminalPtyMode: 'local'
       }
+    )
+    if (options.framesDraw?.(snapshot.worktree)) {
+      // Main's frames own this workspace's tabs, so the patch (tab structure only here) is dropped.
+      for (const change of drawnChatLabelChanges(
+        next.unifiedTabsByWorktree[snapshot.worktree] ?? [],
+        effectiveSnapshot
+      )) {
+        options.onDrawnChatLabel?.(change)
+      }
+    } else {
+      next = patch === next ? next : ({ ...next, ...patch } as State)
     }
     if (isWorktreeRetraction(effectiveSnapshot)) {
       // Retraction removes rows but is not a publication: recording it would retire this consumer/publisher renderer’s lifetime epoch. Retain version cursor against pre-close replies; rebuilt entries mint fresh epochs. Preserve retired tombstones but clear current so the next lineage cannot retire our lifetime epoch one cycle later. Clearing all history would admit dead-epoch stragglers across lineages.
@@ -239,53 +191,25 @@ export function applyLocalStructuredSessionTabSnapshots<
           retired: history.retired
         })
       }
-      if (prior?.applied) {
-        localStructuredSessionVersionByWorktree.set(snapshot.worktree, {
-          publicationEpoch: prior.publicationEpoch,
-          snapshotVersion: prior.snapshotVersion
-        })
-      }
       continue
     }
-    registriesGrew ||= !prior
     localStructuredSessionVersionByWorktree.set(snapshot.worktree, {
       publicationEpoch: snapshot.publicationEpoch,
-      snapshotVersion: snapshot.snapshotVersion,
-      ...(options.skipVersionOnlyRepeats && !drawn ? { applied: effectiveSnapshot } : {})
+      snapshotVersion: snapshot.snapshotVersion
     })
     localStructuredSessionEpochHistoryByWorktree.set(
       snapshot.worktree,
       noteRetiredValue(epochHistory, snapshot.publicationEpoch, 8)
     )
   }
-  releaseCursorsOfRemovedWorktrees(next, registriesGrew)
-  return next
-}
-
-let sweptMembership: readonly unknown[] = []
-
-// Deleted worktrees must release publisher cursors instead of retaining them for renderer lifetime.
-// Sweep only when membership or the registries changed: unchanged ones leave nothing to release.
-function releaseCursorsOfRemovedWorktrees(
-  state: WebSessionTabsSyncState & WorktreeRuntimeOwnerState,
-  registriesGrew: boolean
-): void {
-  const membership = [
-    state.unifiedTabsByWorktree,
-    selectWorktreesByRepo(state),
-    selectDetectedWorktreesByRepo(state),
-    selectFolderWorkspaces(state)
-  ]
-  if (!registriesGrew && membership.every((input, index) => input === sweptMembership[index])) {
-    return
-  }
-  sweptMembership = membership
-  const isKnown = isKnownStructuredSessionWorktree(state)
+  // Deleted worktrees must release publisher cursors instead of retaining them for renderer lifetime.
+  const knownWorktreeIds = knownStructuredSessionWorktreeIds(next)
   for (const worktreeId of localStructuredSessionVersionByWorktree.keys()) {
-    if (!isKnown(worktreeId)) {
+    if (!knownWorktreeIds.has(worktreeId)) {
       localStructuredSessionVersionByWorktree.delete(worktreeId)
       localStructuredSessionEpochHistoryByWorktree.delete(worktreeId)
     }
   }
-  forgetRetiredEpochRepairsOutside(isKnown)
+  forgetRetiredEpochRepairsOutside(knownWorktreeIds)
+  return next
 }

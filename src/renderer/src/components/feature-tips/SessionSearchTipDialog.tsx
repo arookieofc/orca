@@ -1,15 +1,13 @@
 import { useRef, type JSX } from 'react'
-import type { AiVaultSearchStatus } from '../../../../shared/ai-vault/search/ai-vault-search-types'
-import type { FeatureTip } from '../../../../shared/feature-education/feature-tips'
+import type { AiVaultSearchStatus } from '../../../../shared/ai-vault-search-types'
+import type { FeatureTip } from '../../../../shared/feature-tips'
 import {
   sessionSearchStatusDetails,
   sessionSearchStatusMessage
-} from '@/components/session-search/session-search-status'
+} from '@/components/settings/session-history-status-copy'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
-import { useIntlLocale, useTranslate, type Translate } from '@/i18n/use-translate'
 import { FeatureTipActions } from './FeatureTipActions'
-import { getLocalizedFeatureTipCopy } from './feature-tip-localized-copy'
 import {
   FeatureTipDialogFrame,
   FeatureTipEyebrow,
@@ -20,45 +18,38 @@ import type { SessionSearchTipStage } from './use-session-search-tip-setup'
 
 function stageCopy(
   tip: FeatureTip,
-  stage: SessionSearchTipStage,
-  t: Translate = translate
+  stage: SessionSearchTipStage
 ): { title: string; description: string; cta: string } {
   switch (stage) {
-    case 'offer': {
-      const offer = getLocalizedFeatureTipCopy(tip)
-      return { title: offer.title, description: offer.description, cta: offer.ctaLabel }
-    }
+    case 'offer':
+      return { title: tip.title, description: tip.description, cta: tip.ctaLabel }
     case 'indexing':
       return {
-        title: t('featureTips.sessionSearch.indexingTitle', 'Indexing your agent sessions'),
-        description: t(
+        title: translate('featureTips.sessionSearch.indexingTitle', 'Indexing your agent sessions'),
+        description: translate(
           'featureTips.sessionSearch.indexingDescription',
           'Orca is reading your past agent transcripts so you can search them. This can take a few minutes.'
         ),
-        cta: t('featureTips.sessionSearch.continueInBackground', 'Continue in background')
+        cta: translate('featureTips.sessionSearch.continueInBackground', 'Continue in background')
       }
     case 'ready':
       return {
-        title: t('featureTips.sessionSearch.readyTitle', 'Session search is ready'),
-        description: t(
+        title: translate('featureTips.sessionSearch.readyTitle', 'Session search is ready'),
+        description: translate(
           'featureTips.sessionSearch.readyDescription',
           'Every agent session on this computer can now be found by what was said in it.'
         ),
-        cta: t('featureTips.sessionSearch.startSearching', 'Start searching')
+        cta: translate('featureTips.sessionSearch.startSearching', 'Start searching')
       }
   }
 }
 
-function progressMessage(
-  status: AiVaultSearchStatus | null,
-  t: Translate = translate,
-  intlLocale?: string
-): string {
+function progressMessage(status: AiVaultSearchStatus | null): string {
   // Why: right after turning on, the indexer may not have started; the shared copy would call that unavailable.
   if (!status?.enabled || status.phase === 'idle' || status.phase === 'closed') {
-    return t('featureTips.sessionSearch.progressStarting', 'Finding your sessions…')
+    return translate('featureTips.sessionSearch.progressStarting', 'Finding your sessions…')
   }
-  return sessionSearchStatusMessage(status, t, intlLocale)
+  return sessionSearchStatusMessage(status)
 }
 
 function IndexProgress({
@@ -68,8 +59,6 @@ function IndexProgress({
   indexing: boolean
   status: AiVaultSearchStatus | null
 }): JSX.Element {
-  const t = useTranslate()
-  const intlLocale = useIntlLocale()
   return (
     <span className="block space-y-2" role="status" aria-live="polite">
       {indexing ? (
@@ -79,9 +68,9 @@ function IndexProgress({
         </span>
       ) : null}
       <span className="block text-xs font-medium tabular-nums text-foreground">
-        {progressMessage(status, t, intlLocale)}
+        {progressMessage(status)}
       </span>
-      {sessionSearchStatusDetails(status, t).map((line) => (
+      {sessionSearchStatusDetails(status).map((line) => (
         <span key={line} className="block text-xs text-muted-foreground">
           {line}
         </span>
@@ -109,9 +98,8 @@ export function SessionSearchTipDialog({
   stage: SessionSearchTipStage
   status: AiVaultSearchStatus | null
 }): JSX.Element {
-  const t = useTranslate()
   const primaryButtonRef = useRef<HTMLButtonElement>(null)
-  const copy = stageCopy(tip, stage, t)
+  const copy = stageCopy(tip, stage)
 
   return (
     <FeatureTipDialogFrame
@@ -125,7 +113,7 @@ export function SessionSearchTipDialog({
     >
       <DialogHeader className="gap-4 text-left">
         <div>
-          <FeatureTipEyebrow label={getLocalizedFeatureTipCopy(tip).eyebrow} />
+          <FeatureTipEyebrow label={tip.eyebrow} />
           <DialogTitle className="text-2xl font-semibold leading-tight tracking-tight md:text-[1.75rem]">
             {copy.title}
           </DialogTitle>
@@ -133,7 +121,7 @@ export function SessionSearchTipDialog({
             <span className="block">{copy.description}</span>
             {stage === 'offer' ? (
               <span className="block">
-                {t(
+                {translate(
                   'featureTips.sessionSearch.agentsInstruction',
                   'Your agents can search it too. Ask one to “find the session where we fixed the login timeout.”'
                 )}
@@ -142,9 +130,13 @@ export function SessionSearchTipDialog({
               <IndexProgress indexing={stage === 'indexing'} status={status} />
             )}
             <FeatureTipSettingsLine
-              text={t(
-                'featureTips.sessionSearch.changeInSettings',
-                'Change or turn it off anytime in <link>Settings → Agent Session Search</link>.'
+              lead={translate(
+                'featureTips.sessionSearch.consentInstruction',
+                'Change or turn it off anytime in'
+              )}
+              link={translate(
+                'featureTips.sessionSearch.settingsLink',
+                'Settings → Agent Session Search'
               )}
               onClick={onSettingsClick}
             />

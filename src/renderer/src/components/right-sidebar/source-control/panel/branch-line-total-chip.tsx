@@ -1,27 +1,25 @@
 import React, { useMemo } from 'react'
-import type { GitBranchLineTotal } from '../../../../../../shared/git/status/git-status-types'
+import type { GitBranchLineTotal } from '../../../../../../shared/git-status-types'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
-import { translate } from '@/i18n/i18n'
-import { useIntlLocale, useTranslate, type Translate } from '@/i18n/use-translate'
-import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
+import { getIntlLocale, translate } from '@/i18n/i18n'
 
 // Use raw digits for accessibility; some screen-reader locales split grouped numbers into separate values.
-function buildAccessibleLabel(added: number, removed: number, t: Translate = translate): string {
+function buildAccessibleLabel(added: number, removed: number): string {
   if (added > 0 && removed > 0) {
-    return t(
+    return translate(
       'auto.components.right.sidebar.source.control.branch.line.total.chip.daa8e8e59b',
       '{{value0}} lines added, {{value1}} lines deleted',
       { value0: added, value1: removed }
     )
   }
   if (added > 0) {
-    return t(
+    return translate(
       'auto.components.right.sidebar.source.control.branch.line.total.chip.8a9b97b666',
       '{{value0}} lines added',
       { value0: added }
     )
   }
-  return t(
+  return translate(
     'auto.components.right.sidebar.source.control.branch.line.total.chip.52c366d88d',
     '{{value0}} lines deleted',
     { value0: removed }
@@ -29,26 +27,16 @@ function buildAccessibleLabel(added: number, removed: number, t: Translate = tra
 }
 
 // Expose the split in the label because the unfocusable chip's hover panel is inaccessible to keyboard users.
-function appendTestSplitToLabel(
-  label: string,
-  testAdded: number,
-  testRemoved: number,
-  t: Translate = translate
-): string {
-  return t(
+function appendTestSplitToLabel(label: string, testAdded: number, testRemoved: number): string {
+  return translate(
     'auto.components.right.sidebar.source.control.branch.line.total.chip.4c1f70ba92',
     '{{value0}} — test code: {{value1}} lines added, {{value2}} lines deleted',
     { value0: label, value1: testAdded, value2: testRemoved }
   )
 }
 
-function appendGeneratedSplitToLabel(
-  label: string,
-  added: number,
-  removed: number,
-  t: Translate = translate
-): string {
-  return t(
+function appendGeneratedSplitToLabel(label: string, added: number, removed: number): string {
+  return translate(
     'auto.components.right.sidebar.source.control.branch.line.total.chip.7f3e1a9c24',
     '{{value0}} — generated: {{value1}} lines added, {{value2}} lines deleted',
     { value0: label, value1: added, value2: removed }
@@ -85,18 +73,17 @@ function CodeBreakdownPanel({
   rows: LineTotalSplitRow[]
   locale: string
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div className="min-w-[14rem]" data-testid="source-control-branch-line-total-breakdown">
       <div className="border-b border-border/60 px-3 py-2.5">
         <div className="text-sm font-semibold text-popover-foreground">
-          {t(
+          {translate(
             'auto.components.right.sidebar.source.control.branch.line.total.chip.a1b2c3d4e5',
             'Code breakdown'
           )}
         </div>
         <div className="mt-0.5 text-xs text-muted-foreground">
-          {t(
+          {translate(
             'auto.components.right.sidebar.source.control.branch.line.total.chip.b2c3d4e5f6',
             'Lines of code'
           )}
@@ -121,9 +108,6 @@ export const SourceControlBranchLineTotalChip = React.memo(
   }: {
     branchLineTotal: GitBranchLineTotal | null | undefined
   }): React.JSX.Element | null {
-    const intlLocale = useIntlLocale()
-    const t = useTranslate()
-    const languageRevision = useUiLanguageRevision()
     const added = branchLineTotal?.added ?? 0
     const removed = branchLineTotal?.removed ?? 0
     const hasAdded = added > 0
@@ -136,7 +120,7 @@ export const SourceControlBranchLineTotalChip = React.memo(
     const generatedAdded = generatedTotal?.added
     const generatedRemoved = generatedTotal?.removed
     // Memoize locale-formatted counts so unchanged status polls do not rebuild strings.
-    const locale = intlLocale
+    const locale = getIntlLocale()
     const addedText = useMemo(() => added.toLocaleString(locale), [added, locale])
     const removedText = useMemo(() => removed.toLocaleString(locale), [removed, locale])
     const accessibleLabel = useMemo(() => {
@@ -168,16 +152,16 @@ export const SourceControlBranchLineTotalChip = React.memo(
           // Call the remainder Source only with both splits; an omitted bucket may still be included.
           label:
             hasTest && hasGenerated
-              ? t(
+              ? translate(
                   'auto.components.right.sidebar.source.control.branch.line.total.chip.c8d5b21e07',
                   'Source'
                 )
               : hasTest
-                ? t(
+                ? translate(
                     'auto.components.right.sidebar.source.control.branch.line.total.chip.9e4a3c5081',
                     'Non-test'
                   )
-                : t(
+                : translate(
                     'auto.components.right.sidebar.source.control.branch.line.total.chip.3d7e9b1042',
                     'Non-generated'
                   ),
@@ -188,7 +172,7 @@ export const SourceControlBranchLineTotalChip = React.memo(
       if (hasTest) {
         rows.push({
           key: 'test',
-          label: t(
+          label: translate(
             'auto.components.right.sidebar.source.control.branch.line.total.chip.6b2d0f14a7',
             'Tests'
           ),
@@ -200,7 +184,7 @@ export const SourceControlBranchLineTotalChip = React.memo(
       if (hasGenerated && (generatedAdded > 0 || generatedRemoved > 0)) {
         rows.push({
           key: 'generated',
-          label: t(
+          label: translate(
             'auto.components.right.sidebar.source.control.branch.line.total.chip.7a04c6f8b3',
             'Generated'
           ),
@@ -209,17 +193,7 @@ export const SourceControlBranchLineTotalChip = React.memo(
         })
       }
       return rows
-      // oxlint-disable-next-line react-hooks/exhaustive-deps -- translate() reads the UI language implicitly.
-    }, [
-      added,
-      removed,
-      testAdded,
-      testRemoved,
-      generatedAdded,
-      generatedRemoved,
-      languageRevision,
-      t
-    ])
+    }, [added, removed, testAdded, testRemoved, generatedAdded, generatedRemoved])
 
     if (!hasAdded && !hasRemoved) {
       return null

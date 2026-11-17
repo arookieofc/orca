@@ -1,23 +1,20 @@
 import { app } from 'electron'
-import { installBestEffortSocketTypeOfService } from '../network/best-effort-socket-type-of-service'
-import { guardExternalOpensInE2E } from './testing/e2e-external-open-guard'
-import { quitProcess } from './quit/process-quit-request'
-import { existsSync, mkdirSync } from 'node:fs'
+import { quitProcess } from './process-quit-request'
+import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { getVersionManagerBinPaths } from '../codex-cli/command'
-import { isWindowsFnmDefaultAliasDir } from '../../shared/shell/command-resolution/fnm-default-alias-dirs'
-import { getMainE2EConfig } from './testing/e2e-config'
-import { DISABLED_CHROMIUM_FEATURES } from './chromium-policy/disabled-chromium-features'
-import { readHttp1CompatibilityMarker } from './network-compatibility/http1-compatibility-marker'
-import { checkServeUserDataPath } from './serve-launch/serve-user-data-path-guard'
-import { stampRuntimeSourceEnv } from '../../shared/remote-runtime/host-catalog/runtime-source-env'
-import { isLinuxWaylandSession } from '../../shared/app-lifecycle/launch/linux-wayland-session'
+import { getMainE2EConfig } from '../e2e-config'
+import { DISABLED_CHROMIUM_FEATURES } from './disabled-chromium-features'
+import { readHttp1CompatibilityMarker } from './http1-compatibility-marker'
+import { checkServeUserDataPath } from './serve-user-data-path-guard'
+import { stampRuntimeSourceEnv } from '../../shared/runtime-source-env'
+import { isLinuxWaylandSession } from '../../shared/linux-wayland-session'
 import {
   hasMissingProfileStateDatabaseWithRetainedAuthority,
   readActiveProfileId,
   readPersistedHttp1CompatibilityMode
-} from './network-compatibility/http1-compatibility-profile-state'
+} from './http1-compatibility-profile-state'
 
 const DEV_PARENT_SHUTDOWN_GRACE_MS = 3000
 const HTTP1_COMPATIBILITY_ENV_VAR = 'ORCA_DISABLE_HTTP2'
@@ -72,7 +69,6 @@ export function shouldDisableHttp2ForElectronNetworking(
 export function configureElectronNetworkCompatibility(
   options: NetworkCompatibilityOptions = {}
 ): void {
-  installBestEffortSocketTypeOfService()
   if (!shouldDisableHttp2ForElectronNetworking(options)) {
     return
   }
@@ -123,26 +119,12 @@ export function resetDevParentShutdownRequestForTests(): void {
   devParentShutdownRequested = false
 }
 
-function resolvePackagedHome(): string {
-  try {
-    return homedir()
-  } catch (error) {
-    // Unmapped uids with no HOME make homedir() throw; keep seeding system dirs.
-    console.warn('[startup] Could not resolve the home directory:', error)
-    return ''
-  }
-}
-
 export function patchPackagedProcessPath(): void {
   if (!app.isPackaged) {
     return
   }
 
-  const home = resolvePackagedHome()
-  // #23214: desktop-launched AppImages can lack HOME, so spawned CLIs like gh miss their config.
-  if (process.platform !== 'win32' && !process.env.HOME && home) {
-    process.env.HOME = home
-  }
+  const home = process.env.HOME ?? ''
   // #18234: append generic user bins; prepending ~/.local/bin made a gh/mise wrapper recursively shadow system gh. Shell hydration owns user ordering.
   const isGenericUserBinDir = (path: string): boolean =>
     process.platform !== 'win32' &&
@@ -160,8 +142,7 @@ export function patchPackagedProcessPath(): void {
       appendPaths.push('/snap/bin', '/home/linuxbrew/.linuxbrew/bin')
     }
 
-    // A launch with no inherited PATH otherwise cannot reach package-manager CLIs (#23214).
-    appendPaths.push('/nix/var/nix/profiles/default/bin', '/usr/bin', '/bin')
+    appendPaths.push('/nix/var/nix/profiles/default/bin')
 
     if (home) {
       appendPaths.push(
@@ -174,22 +155,10 @@ export function patchPackagedProcessPath(): void {
         join(home, '.grok/bin')
       )
     }
-
-    if (process.platform === 'darwin' && existsSync('/opt/local/bin/port')) {
-      // MacPorts is rare, so gate on default-prefix `port`; last so it only fills gaps, never re-ranks seeded dirs.
-      appendPaths.push('/opt/local/bin', '/opt/local/sbin')
-    }
   }
 
   // env-node shebangs require runtime shims; exclude generic user bins so arbitrary wrappers cannot shadow system tools.
-  // An empty home would seed cwd-relative entries like `.volta/bin`.
-  for (const path of home ? getVersionManagerBinPaths({ homePath: home }) : []) {
-    if (isWindowsFnmDefaultAliasDir(path)) {
-      appendPaths.push(path)
-    } else if (!isGenericUserBinDir(path)) {
-      prependPaths.push(path)
-    }
-  }
+  prependPaths.push(...getVersionManagerBinPaths().filter((path) => !isGenericUserBinDir(path)))
 
   const pathKey = process.platform === 'win32' && process.env.Path !== undefined ? 'Path' : 'PATH'
   const currentPath = process.env[pathKey] ?? ''
@@ -217,7 +186,6 @@ export function configureDevUserDataPath(isDev: boolean): void {
     mkdirSync(e2eHomeDir, { recursive: true, mode: 0o700 })
     app.setPath('home', e2eHomeDir)
     app.setPath('userData', e2eConfig.userDataDir)
-    guardExternalOpensInE2E()
     return
   }
 

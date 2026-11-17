@@ -3,9 +3,8 @@ import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { Button } from '@/components/ui/button'
 import { TabsContent } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
-import type { GitLabMRApprovalState, GitLabWorkItem } from '../../../../shared/gitlab/gitlab-types'
+import { cn } from '@/lib/utils'
+import type { GitLabWorkItem } from '../../../../shared/gitlab-types'
 import {
   dedupeGitLabUsers,
   gitLabUserKey,
@@ -24,30 +23,7 @@ type Props = {
   reviewActions: GitLabReviewActions
 }
 
-function formatGitLabApprovalSummary(
-  approvalState: GitLabMRApprovalState,
-  t: Translate = translate
-): string {
-  const count = approvalState.approvalsLeft ?? 0
-  if (approvalState.approvalsLeft === 0) {
-    return t('auto.components.GitLabItemDialog.22511537d2', 'Approved')
-  }
-  const required = approvalState.approvalsRequired
-  if (typeof required === 'number') {
-    return t(
-      'auto.components.GitLabItemDialog.approvalsRemainingOfRequired',
-      '{{count}} approvals remaining of {{required}} required',
-      { count, required, defaultValue_one: '{{count}} approval remaining of {{required}} required' }
-    )
-  }
-  return t('auto.components.GitLabItemDialog.approvalsRemaining', '{{count}} approvals remaining', {
-    count,
-    defaultValue_one: '{{count}} approval remaining'
-  })
-}
-
 export function GitLabDescriptionTab({ item, state, detailsEditing, reviewActions }: Props) {
-  const t = useTranslate()
   const {
     bodyDraft,
     details,
@@ -86,16 +62,32 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
 
   return (
     <TabsContent value="description" className="mt-0">
-      {details && isMR ? (
+      {!loading && details && isMR ? (
         <div className="mb-4 rounded-md border border-border/50 bg-muted/20 p-3">
           <div className="flex items-center justify-between gap-2">
             <div>
               <div className="text-xs font-medium text-foreground">
-                {t('auto.components.GitLabItemDialog.4f9313984d', 'Reviewers')}
+                {translate('auto.components.GitLabItemDialog.4f9313984d', 'Reviewers')}
               </div>
               {approvalState ? (
                 <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {formatGitLabApprovalSummary(approvalState, t)}
+                  {approvalState.approvalsLeft === 0
+                    ? translate('auto.components.GitLabItemDialog.22511537d2', 'Approved')
+                    : translate(
+                        'auto.components.GitLabItemDialog.40c56b95e2',
+                        '{{value0}} approval{{value1}} remaining',
+                        {
+                          value0: approvalState.approvalsLeft ?? 0,
+                          value1: approvalState.approvalsLeft === 1 ? '' : 's'
+                        }
+                      )}
+                  {typeof approvalState.approvalsRequired === 'number'
+                    ? translate(
+                        'auto.components.GitLabItemDialog.00f3bab87b',
+                        ' of {{value0}} required',
+                        { value0: approvalState.approvalsRequired }
+                      )
+                    : ''}
                 </div>
               ) : null}
             </div>
@@ -107,7 +99,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
               onClick={() => void loadGitLabReviewerOptions()}
             >
               {reviewerOptionsLoading ? <LoaderCircle className="size-3 animate-spin" /> : null}
-              {t('auto.components.GitLabItemDialog.cb55b0390f', 'Manage')}
+              {translate('auto.components.GitLabItemDialog.cb55b0390f', 'Manage')}
             </Button>
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -129,7 +121,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
                       )
                     }
                     className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-                    aria-label={t(
+                    aria-label={translate(
                       'auto.components.GitLabItemDialog.1b19cdc510',
                       'Remove reviewer {{value0}}',
                       { value0: reviewer.username }
@@ -141,7 +133,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
               ))
             ) : (
               <span className="text-[11px] text-muted-foreground">
-                {t('auto.components.GitLabItemDialog.474b50d988', 'No reviewers.')}
+                {translate('auto.components.GitLabItemDialog.474b50d988', 'No reviewers.')}
               </span>
             )}
           </div>
@@ -154,7 +146,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
                 className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
               >
                 <option value="">
-                  {t('auto.components.GitLabItemDialog.05939e977d', 'Add reviewer')}
+                  {translate('auto.components.GitLabItemDialog.05939e977d', 'Add reviewer')}
                 </option>
                 {reviewerOptionRows.map((reviewer) => (
                   <option key={gitLabUserKey(reviewer)} value={gitLabUserKey(reviewer)}>
@@ -176,7 +168,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
                 }}
               >
                 {reviewerUpdating ? <LoaderCircle className="size-3 animate-spin" /> : null}
-                {t('auto.components.GitLabItemDialog.7a2117129a', 'Add')}
+                {translate('auto.components.GitLabItemDialog.7a2117129a', 'Add')}
               </Button>
             </div>
           ) : null}
@@ -190,10 +182,12 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
                   <span className="min-w-0 truncate">{rule.name}</span>
                   <span>
                     {rule.approved
-                      ? t('auto.components.GitLabItemDialog.22511537d2', 'Approved')
-                      : t('auto.components.GitLabItemDialog.6de8ce0cc6', '{{value0}} required', {
-                          value0: rule.approvalsRequired
-                        })}
+                      ? translate('auto.components.GitLabItemDialog.22511537d2', 'Approved')
+                      : translate(
+                          'auto.components.GitLabItemDialog.6de8ce0cc6',
+                          '{{value0}} required',
+                          { value0: rule.approvalsRequired }
+                        )}
                   </span>
                 </div>
               ))}
@@ -209,7 +203,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              {t('auto.components.GitLabItemDialog.89f3f19368', 'Title')}
+              {translate('auto.components.GitLabItemDialog.89f3f19368', 'Title')}
             </label>
             <input
               value={titleDraft}
@@ -220,7 +214,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              {t('auto.components.GitLabItemDialog.908d8d2a73', 'Description')}
+              {translate('auto.components.GitLabItemDialog.908d8d2a73', 'Description')}
             </label>
             <textarea
               value={bodyDraft}
@@ -232,13 +226,13 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              {t('auto.components.GitLabItemDialog.dde24ade55', 'Labels')}
+              {translate('auto.components.GitLabItemDialog.dde24ade55', 'Labels')}
             </label>
             <input
               value={labelDraft}
               onChange={(event) => setLabelDraft(event.target.value)}
               disabled={detailsSaving}
-              placeholder={t('auto.components.GitLabItemDialog.3c0b6ccca7', 'bug, backend')}
+              placeholder={translate('auto.components.GitLabItemDialog.3c0b6ccca7', 'bug, backend')}
               className="h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-sm shadow-xs focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50"
             />
             {labelOptionsLoading || labelSuggestionOptions.length > 0 ? (
@@ -246,7 +240,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
                 {labelOptionsLoading ? (
                   <span className="inline-flex h-6 items-center gap-1 rounded-full border border-border/50 px-2 text-[11px] text-muted-foreground">
                     <LoaderCircle className="size-3 animate-spin" />
-                    {t('auto.components.GitLabItemDialog.717b706849', 'Loading labels')}
+                    {translate('auto.components.GitLabItemDialog.717b706849', 'Loading labels')}
                   </span>
                 ) : null}
                 {labelSuggestionOptions.map((label) => {
@@ -283,7 +277,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
               onClick={handleCancelDetailsEdit}
             >
               <X className="size-3.5" />
-              {t('auto.components.GitLabItemDialog.f72fad3b16', 'Cancel')}
+              {translate('auto.components.GitLabItemDialog.f72fad3b16', 'Cancel')}
             </Button>
             <Button
               type="button"
@@ -296,7 +290,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
               ) : (
                 <Check className="size-3.5" />
               )}
-              {t('auto.components.GitLabItemDialog.93f79a3fc1', 'Save')}
+              {translate('auto.components.GitLabItemDialog.93f79a3fc1', 'Save')}
             </Button>
           </div>
         </div>
@@ -312,7 +306,7 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
                 className="gap-1.5"
               >
                 <Pencil className="size-3.5" />
-                {t('auto.components.GitLabItemDialog.da4174b00f', 'Edit')}
+                {translate('auto.components.GitLabItemDialog.da4174b00f', 'Edit')}
               </Button>
             </div>
           ) : null}
@@ -334,12 +328,12 @@ export function GitLabDescriptionTab({ item, state, detailsEditing, reviewAction
                 className="gap-1.5"
               >
                 <Pencil className="size-3.5" />
-                {t('auto.components.GitLabItemDialog.da4174b00f', 'Edit')}
+                {translate('auto.components.GitLabItemDialog.da4174b00f', 'Edit')}
               </Button>
             </div>
           ) : null}
           <p className="text-sm text-muted-foreground">
-            {t('auto.components.GitLabItemDialog.14423484db', 'No description.')}
+            {translate('auto.components.GitLabItemDialog.14423484db', 'No description.')}
           </p>
         </div>
       )}

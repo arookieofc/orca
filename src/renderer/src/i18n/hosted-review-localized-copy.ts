@@ -1,10 +1,9 @@
-import type { HostedReviewProvider } from '../../../shared/source-control/hosted-review/hosted-review-contracts'
+import type { HostedReviewProvider } from '../../../shared/hosted-review'
 import {
   resolveHostedReviewCreationProvider,
   type HostedReviewCreationProvider
-} from '../../../shared/source-control/hosted-review/hosted-review-creation-providers'
+} from '../../../shared/hosted-review-creation-providers'
 import { translate } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
 
 export type SupportedHostedReviewCopyProvider = HostedReviewCreationProvider
 
@@ -22,45 +21,44 @@ export function resolveSupportedHostedReviewCopyProvider(
 }
 
 export function localizedHostedReviewCopy(
-  provider: SupportedHostedReviewCopyProvider,
-  t: Translate = translate
+  provider: SupportedHostedReviewCopyProvider
 ): LocalizedHostedReviewCopy {
   if (provider === 'gitlab') {
     return {
-      shortLabel: t('auto.i18n.hostedReview.copy.c4e8f1a2b9', 'MR'),
-      reviewLabel: t('auto.i18n.hostedReview.copy.b3d7e0f1a8', 'merge request'),
-      titleLabel: t('auto.i18n.hostedReview.copy.a2c6d9e0f7', 'Merge Request'),
-      providerName: t('auto.i18n.hostedReview.copy.91b5c8d7e6', 'GitLab')
+      shortLabel: translate('auto.i18n.hostedReview.copy.c4e8f1a2b9', 'MR'),
+      reviewLabel: translate('auto.i18n.hostedReview.copy.b3d7e0f1a8', 'merge request'),
+      titleLabel: translate('auto.i18n.hostedReview.copy.a2c6d9e0f7', 'Merge Request'),
+      providerName: translate('auto.i18n.hostedReview.copy.91b5c8d7e6', 'GitLab')
     }
   }
   if (provider === 'azure-devops') {
     return {
-      shortLabel: t('auto.i18n.hostedReview.copy.f0a4b8c2d1', 'PR'),
-      reviewLabel: t('auto.i18n.hostedReview.copy.e9f3a7b1c0', 'pull request'),
-      titleLabel: t('auto.i18n.hostedReview.copy.d8e2f6a0b9', 'Pull Request'),
+      shortLabel: translate('auto.i18n.hostedReview.copy.f0a4b8c2d1', 'PR'),
+      reviewLabel: translate('auto.i18n.hostedReview.copy.e9f3a7b1c0', 'pull request'),
+      titleLabel: translate('auto.i18n.hostedReview.copy.d8e2f6a0b9', 'Pull Request'),
       providerName: 'Azure DevOps'
     }
   }
   if (provider === 'gitea') {
     return {
-      shortLabel: t('auto.i18n.hostedReview.copy.f0a4b8c2d1', 'PR'),
-      reviewLabel: t('auto.i18n.hostedReview.copy.e9f3a7b1c0', 'pull request'),
-      titleLabel: t('auto.i18n.hostedReview.copy.d8e2f6a0b9', 'Pull Request'),
+      shortLabel: translate('auto.i18n.hostedReview.copy.f0a4b8c2d1', 'PR'),
+      reviewLabel: translate('auto.i18n.hostedReview.copy.e9f3a7b1c0', 'pull request'),
+      titleLabel: translate('auto.i18n.hostedReview.copy.d8e2f6a0b9', 'Pull Request'),
       providerName: 'Gitea'
     }
   }
   if (provider === 'bitbucket') {
     return {
-      shortLabel: t('auto.i18n.hostedReview.copy.f0a4b8c2d1', 'PR'),
-      reviewLabel: t('auto.i18n.hostedReview.copy.e9f3a7b1c0', 'pull request'),
-      titleLabel: t('auto.i18n.hostedReview.copy.d8e2f6a0b9', 'Pull Request'),
+      shortLabel: translate('auto.i18n.hostedReview.copy.f0a4b8c2d1', 'PR'),
+      reviewLabel: translate('auto.i18n.hostedReview.copy.e9f3a7b1c0', 'pull request'),
+      titleLabel: translate('auto.i18n.hostedReview.copy.d8e2f6a0b9', 'Pull Request'),
       providerName: 'Bitbucket'
     }
   }
   return {
-    shortLabel: t('auto.i18n.hostedReview.copy.f0a4b8c2d1', 'PR'),
-    reviewLabel: t('auto.i18n.hostedReview.copy.e9f3a7b1c0', 'pull request'),
-    titleLabel: t('auto.i18n.hostedReview.copy.d8e2f6a0b9', 'Pull Request'),
-    providerName: t('auto.i18n.hostedReview.copy.c7d1e5f9a8', 'GitHub')
+    shortLabel: translate('auto.i18n.hostedReview.copy.f0a4b8c2d1', 'PR'),
+    reviewLabel: translate('auto.i18n.hostedReview.copy.e9f3a7b1c0', 'pull request'),
+    titleLabel: translate('auto.i18n.hostedReview.copy.d8e2f6a0b9', 'Pull Request'),
+    providerName: translate('auto.i18n.hostedReview.copy.c7d1e5f9a8', 'GitHub')
   }
 }

@@ -1,10 +1,7 @@
 import { stat } from 'node:fs/promises'
 import type { Event as WatcherEvent } from '@parcel/watcher'
-import type {
-  FsChangeEvent,
-  FsChangedPayload
-} from '../../../../shared/file-watch/filesystem-change-event'
-import { watchBatchFlushDelayMs } from '../../../../shared/file-watch/filesystem-watch-batch-window'
+import type { FsChangeEvent, FsChangedPayload } from '../../../../shared/filesystem-entry-types'
+import { watchBatchFlushDelayMs } from '../../../../shared/filesystem-watch-batch-window'
 import { MAX_BATCHED_WATCHER_EVENTS, queueWatcherEvents } from './filesystem-watcher-event-batch'
 // Filter high-churn events at source; Explorer display filters only hide rows.
 import { WATCHER_IGNORE_DIRS, buildParcelWatcherIgnoreOptions } from './filesystem-watcher-ignore'
@@ -17,16 +14,14 @@ import {
   trackDetachedLocalUnsubscribe
 } from './filesystem-watcher-listener-lifecycle'
 import { cancelLocalBatchFlush, createDebouncedBatch } from './filesystem-watcher-batch-control'
-import { mapWithConcurrency } from '../../../../shared/concurrency/map-with-concurrency'
-import { PrioritySemaphore } from '../../../../shared/concurrency/priority-semaphore'
+import { mapWithConcurrency } from '../../../../shared/map-with-concurrency'
 import {
   notifyLocalWatcherEvents,
   notifyLocalWatcherInterrupted
 } from './local-watcher-event-observers'
 
-// All local and WSL roots in main share this budget; watcher children have separate pools.
+// Match the watcher subprocess stat budget.
 const DIRECTORY_STAT_CONCURRENCY = 8
-const directoryStatSlots = new PrioritySemaphore(DIRECTORY_STAT_CONCURRENCY)
 
 // delete→create retains both for subtree/parent refresh; create→delete cancels within the window.
 function coalesceEvents(
@@ -72,23 +67,10 @@ function coalesceEvents(
   return result
 }
 
-async function tryStatIsDirectory(
-  filePath: string,
-  root: WatchedRoot
-): Promise<boolean | undefined> {
-  const signal = root.batch.statAbortController.signal
+async function tryStatIsDirectory(filePath: string): Promise<boolean | undefined> {
   try {
-    const release = await directoryStatSlots.acquire(0, signal)
-    try {
-      // Cancellation can race with a slot grant before this continuation resumes.
-      signal.throwIfAborted()
-      if (root.listeners.size === 0) {
-        return undefined
-      }
-      return (await stat(filePath)).isDirectory()
-    } finally {
-      release()
-    }
+    const s = await stat(filePath)
+    return s.isDirectory()
   } catch {
     // Failed stat leaves the renderer's conservative file-event default.
     return undefined
@@ -149,9 +131,9 @@ async function flushBatch(root: WatchedRoot): Promise<void> {
       async (evt) => {
         // Deleted paths cannot be statted; let the renderer infer from dirCache.
         const isDirectory =
-          root.batch.cancelled || root.listeners.size === 0 || evt.type === 'delete'
+          root.batch.cancelled || evt.type === 'delete'
             ? undefined
-            : await tryStatIsDirectory(evt.path, root)
+            : await tryStatIsDirectory(evt.path)
 
         return {
           kind: evt.type,

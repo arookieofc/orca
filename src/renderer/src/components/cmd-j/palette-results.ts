@@ -1,11 +1,7 @@
 import { translate } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
-import type {
-  SettingsNavIcon,
-  SettingsNavSection
-} from '@/components/settings/navigation/settings-navigation-types'
+import type { SettingsNavIcon, SettingsNavSection } from '@/lib/settings-navigation-types'
 import type { CmdJQuickAction } from './quick-actions'
-import { isClipboardTextByteLengthOverLimit } from '../../../../shared/clipboard/clipboard-text'
+import { isClipboardTextByteLengthOverLimit } from '../../../../shared/clipboard-text'
 import {
   cmdJPaletteTokenScore,
   isCmdJPaletteQueryOverTokenLimit,
@@ -99,15 +95,15 @@ export function isCmdJPaletteQueryTooLarge(
 }
 
 // Translate at call time; localized users can search the same Settings word displayed on row badges.
-function settingsWord(t: Translate = translate): string {
-  return t('auto.components.WorktreeJumpPalette.settingsBadge', 'Settings').toLowerCase()
+function settingsWord(): string {
+  return translate('auto.components.WorktreeJumpPalette.settingsBadge', 'Settings').toLowerCase()
 }
 
-function keywordParts(section: SettingsNavSection, t?: Translate): string[] {
+function keywordParts(section: SettingsNavSection): string[] {
   const baseId = section.id.startsWith('repo-') ? 'repo' : section.id
   const idWords = baseId.replace(/-/g, ' ')
   const paneLevelEntries = section.searchEntries.filter((entry) => !entry.targetSectionId)
-  const localized = settingsWord(t)
+  const localized = settingsWord()
   // Keep English aliases too; catalog titles may remain English and users can still type English queries.
   const suffixed = [`${section.title} settings`, `${idWords} settings`]
   if (localized !== 'settings') {
@@ -124,8 +120,8 @@ function keywordParts(section: SettingsNavSection, t?: Translate): string[] {
   ]
 }
 
-function targetEntryKeywordParts(entryTitle: string, t?: Translate): string[] {
-  const localized = settingsWord(t)
+function targetEntryKeywordParts(entryTitle: string): string[] {
+  const localized = settingsWord()
   const parts = [entryTitle, `${entryTitle} settings`]
   if (localized !== 'settings') {
     parts.push(`${entryTitle} ${localized}`)
@@ -134,8 +130,7 @@ function targetEntryKeywordParts(entryTitle: string, t?: Translate): string[] {
 }
 
 export function buildCmdJSettingsResults(
-  sections: readonly SettingsNavSection[],
-  t?: Translate
+  sections: readonly SettingsNavSection[]
 ): CmdJSettingsResult[] {
   return sections.flatMap((section, order) => {
     const paneResult: CmdJSettingsResult = {
@@ -146,7 +141,7 @@ export function buildCmdJSettingsResults(
       icon: section.icon,
       sectionId: section.id,
       order,
-      configKeywords: uniqueNormalizedCmdJPaletteKeywords(keywordParts(section, t))
+      configKeywords: uniqueNormalizedCmdJPaletteKeywords(keywordParts(section))
     }
     const targetedResults = section.searchEntries
       .filter((entry) => entry.targetSectionId)
@@ -160,7 +155,7 @@ export function buildCmdJSettingsResults(
         targetSectionId: entry.targetSectionId,
         order: order + (entryIndex + 1) / 100,
         configKeywords: uniqueNormalizedCmdJPaletteKeywords([
-          ...targetEntryKeywordParts(entry.title, t),
+          ...targetEntryKeywordParts(entry.title),
           ...(entry.cmdJKeywords ?? entry.keywords ?? [])
         ])
       }))

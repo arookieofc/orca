@@ -1,16 +1,17 @@
 import type { SFTPWrapper } from 'ssh2'
-import type { AgentHookInstallStatus } from '../../shared/agent-hook-listener/configuration/agent-hook-types'
+import type { AgentHookInstallStatus } from '../../shared/agent-hook-types'
 import {
   createManagedCommandMatcher,
-  removeManagedCommands
-} from '../agent-hooks/installation/commands/managed-hook-command-matching'
-import type { HookDefinition } from '../agent-hooks/installation/configuration/hook-config-schema'
+  removeManagedCommands,
+  wrapPosixHookCommand,
+  type HookDefinition
+} from '../agent-hooks/installer-utils'
 import {
   readHooksJsonRemote,
-  writeHooksJsonRemote
-} from '../agent-hooks/installation/configuration/hooks-json-remote'
-import { writeManagedScriptRemote } from '../agent-hooks/installation/scripts/managed-script-write-remote'
-import { COPILOT_EVENTS, getPosixManagedCommand } from './copilot-managed-hook-definitions'
+  writeHooksJsonRemote,
+  writeManagedScriptRemote
+} from '../agent-hooks/installer-utils-remote'
+import { COPILOT_EVENTS } from './copilot-managed-hook-definitions'
 import { getManagedScript } from './copilot-managed-script'
 
 function getRemoteManagedHookDefinition(command: string): HookDefinition {
@@ -58,7 +59,9 @@ export async function installCopilotHooksRemote(
       const cleaned = removeManagedCommands(current, isManagedCommand)
       nextHooks[eventName] = [
         ...cleaned,
-        getRemoteManagedHookDefinition(getPosixManagedCommand(remoteScriptPath, eventName))
+        getRemoteManagedHookDefinition(
+          wrapPosixHookCommand(remoteScriptPath, { ORCA_COPILOT_HOOK_EVENT: eventName })
+        )
       ]
     }
 

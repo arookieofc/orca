@@ -1,13 +1,11 @@
-import { useSourceControlScope } from '../panel/worktree-scope'
-import type { SelectedSourceControlActionRecipe } from '../../../../../../shared/source-control/ai/recipes/source-control-action-selection'
 import { useCallback, useMemo, useState } from 'react'
-import type { SourceControlLaunchActionId } from '../../../../../../shared/source-control/ai/recipes/source-control-ai-actions'
-import type { GitStatusEntry } from '../../../../../../shared/git/status/git-status-types'
-import {
-  buildFixCommitFailurePrompt,
-  summarizeCommitFailure
-} from '../../../../../../shared/source-control/recovery/source-control-commit-failure'
-
+import type {
+  SourceControlActionRecipe,
+  SourceControlLaunchActionId
+} from '../../../../../../shared/source-control-ai-actions'
+import type { GitStatusEntry } from '../../../../../../shared/git-status-types'
+import { buildFixCommitFailurePrompt } from './prompts'
+import { summarizeCommitFailure } from '../commit/commit-failure-summary'
 import {
   getDefaultSourceControlRecoveryLaunchCopy,
   launchSourceControlRecoveryAgentWithDefault
@@ -24,9 +22,7 @@ type SourceControlRecoveryAiParams = {
   commitError: string | null
   pushRecoveryPrompt: string | null
   stagedEntries: Pick<GitStatusEntry, 'path' | 'status' | 'area'>[]
-  getLaunchActionRecipe: (
-    actionId: SourceControlLaunchActionId
-  ) => SelectedSourceControlActionRecipe
+  getLaunchActionRecipe: (actionId: SourceControlLaunchActionId) => SourceControlActionRecipe
   getStoreState: () => SourceControlAiStoreSnapshot
 }
 
@@ -43,7 +39,6 @@ export function useSourceControlRecoveryAi({
   getLaunchActionRecipe,
   getStoreState
 }: SourceControlRecoveryAiParams) {
-  const scope = useSourceControlScope()
   const [isLaunchingCommitFailureAgent, setIsLaunchingCommitFailureAgent] = useState(false)
   const [isLaunchingPushFailureAgent, setIsLaunchingPushFailureAgent] = useState(false)
 
@@ -70,9 +65,6 @@ export function useSourceControlRecoveryAi({
       try {
         return await launchSourceControlRecoveryAgentWithDefault({
           activeWorktreeId,
-          placementWorkspaceId: scope?.placementWorkspaceId,
-          initialCwd: scope ? (worktreePath ?? undefined) : undefined,
-          executionHostId: scope?.executionHostId,
           activeGroupId,
           activeSourceControlLaunchPlatform,
           sourceRepoConnectionId,
@@ -88,8 +80,6 @@ export function useSourceControlRecoveryAi({
       }
     },
     [
-      scope,
-      worktreePath,
       activeGroupId,
       activeWorktreeId,
       activeSourceControlLaunchPlatform,
@@ -112,9 +102,6 @@ export function useSourceControlRecoveryAi({
       try {
         return await launchSourceControlRecoveryAgentWithDefault({
           activeWorktreeId,
-          placementWorkspaceId: scope?.placementWorkspaceId,
-          initialCwd: scope ? (worktreePath ?? undefined) : undefined,
-          executionHostId: scope?.executionHostId,
           activeGroupId,
           activeSourceControlLaunchPlatform,
           sourceRepoConnectionId,
@@ -130,8 +117,6 @@ export function useSourceControlRecoveryAi({
       }
     },
     [
-      scope,
-      worktreePath,
       activeGroupId,
       activeWorktreeId,
       activeSourceControlLaunchPlatform,

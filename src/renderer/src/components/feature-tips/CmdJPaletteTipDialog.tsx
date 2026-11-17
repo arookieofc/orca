@@ -1,16 +1,15 @@
 import type { JSX } from 'react'
-import type { FeatureTip } from '../../../../shared/feature-education/feature-tips'
+import type { FeatureTip } from '../../../../shared/feature-tips'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatShortcutLabel, useShortcutLabel } from '@/hooks/useShortcutLabel'
 import { CmdJPaletteFeatureTipVisual } from './CmdJPaletteFeatureTipVisual'
 import { FeatureTipActions } from './FeatureTipActions'
-import { getLocalizedFeatureTipCopy } from './feature-tip-localized-copy'
 import {
   FeatureTipDialogFrame,
   FeatureTipEyebrow,
   FeatureTipSettingsLine
 } from './FeatureTipDialogFrame'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 export function CmdJPaletteTipDialog({
   open,
@@ -29,7 +28,6 @@ export function CmdJPaletteTipDialog({
   onSkip: () => void
   onRebindClick: () => void
 }): JSX.Element {
-  const t = useTranslate()
   // Use the live binding for rebindings and platform-specific shortcuts.
   const worktreePaletteShortcutLabel = useShortcutLabel('worktree.palette')
   const displayShortcutLabel =
@@ -37,8 +35,7 @@ export function CmdJPaletteTipDialog({
       ? worktreePaletteShortcutLabel
       : formatShortcutLabel('worktree.palette')
   // Split the translated placeholder to render the shortcut as an inline key chip.
-  const copy = getLocalizedFeatureTipCopy(tip)
-  const titleParts = copy.title.split('<shortcut>')
+  const titleParts = tip.title.split('<shortcut>')
   const titlePrefix = titleParts[0]
   const titleSuffix = titleParts.slice(1).join('<shortcut>')
 
@@ -53,7 +50,7 @@ export function CmdJPaletteTipDialog({
       <DialogHeader className="gap-4 text-left">
         <div>
           {/* Category label. */}
-          <FeatureTipEyebrow label={copy.eyebrow} />
+          <FeatureTipEyebrow label={tip.eyebrow} />
           {/* Keep the shortcut inline so wide Windows/Linux bindings wrap naturally. */}
           <DialogTitle className="text-2xl font-semibold leading-tight tracking-tight md:text-[1.75rem]">
             {titlePrefix.trimEnd()}
@@ -68,11 +65,15 @@ export function CmdJPaletteTipDialog({
             {titleSuffix ? ` ${titleSuffix}` : null}
           </DialogTitle>
           <DialogDescription className="mt-3 max-w-2xl space-y-3 text-sm leading-relaxed">
-            <span className="block">{copy.description}</span>
+            <span className="block">{tip.description}</span>
             <FeatureTipSettingsLine
-              text={t(
-                'auto.components.feature.tips.CmdJPaletteTipDialog.rebindInSettings',
-                'Rebind the shortcut anytime in <link>Settings → Shortcuts</link>.'
+              lead={translate(
+                'auto.components.feature.tips.CmdJPaletteTipDialog.8241897205',
+                'Rebind the shortcut anytime in'
+              )}
+              link={translate(
+                'auto.components.feature.tips.CmdJPaletteTipDialog.c0bb9f869b',
+                'Settings → Shortcuts'
               )}
               onClick={onRebindClick}
             />

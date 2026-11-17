@@ -1,5 +1,5 @@
 import type { DispatchCreator } from '../../../../orchestration/db/dispatch-depth'
-import type { OrchestrationEntryCaller } from '../../../../orchestration/addressing/orchestration-caller-identity'
+import type { OrchestrationSessionCaller } from '../../../../orchestration/orchestration-caller-identity'
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import { orchestrationCallerIdentity } from './run-scope'
 
@@ -7,7 +7,7 @@ import { orchestrationCallerIdentity } from './run-scope'
 export function resolveDispatchCreator(
   runtime: OrcaRuntimeService,
   callerHandle: string | undefined,
-  callerSession: OrchestrationEntryCaller | undefined
+  callerSession: OrchestrationSessionCaller | undefined
 ): DispatchCreator {
   if (!callerHandle) {
     // No declared caller resolves no parent; retain legacy Run-binding depth zero.

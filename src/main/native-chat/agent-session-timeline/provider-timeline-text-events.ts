@@ -1,8 +1,12 @@
-import type { StructuredAgentSessionSinkAdmission } from '../agent-session-wire/journal-ingress/structured-agent-session-event-sink'
+import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
+import type { StructuredAgentSessionSinkAdmission } from '../agent-session-wire/structured-agent-session-event-sink'
+import type { StructuredAgentSessionTransitionJournal } from '../agent-session-wire/structured-agent-session-transition'
+import type { ProviderTimelineHold } from './provider-timeline-budget'
+import { PROVIDER_TIMELINE_OVER_BUDGET } from './provider-timeline-budget'
 import type { ProviderTimelineDropRule } from './provider-timeline-decision'
 import type { ProviderTimelineEvent } from './provider-timeline-event'
 import { ProviderTimelinePlan, type ProviderTimelineSink } from './provider-timeline-plan'
-import { turnOf } from './provider-timeline-rows'
+import { providerTimelineTurnRowState, turnOf } from './provider-timeline-rows'
 import type { ProviderTimelineState } from './provider-timeline-state'
 import type { ProviderTimelineTextStreams } from './provider-timeline-text-streams'
 
@@ -16,6 +20,8 @@ export type ProviderTimelineTextHost = {
   sink: ProviderTimelineSink
   state: ProviderTimelineState
   streams: ProviderTimelineTextStreams
+  journal: StructuredAgentSessionTransitionJournal | null
+  admits(hold: ProviderTimelineHold): boolean
 }
 
 const ADMITTED: StructuredAgentSessionSinkAdmission = { accepted: true }
@@ -45,8 +51,7 @@ export function applyProviderTimelineTextDelta(
     if (streams.stoppedFor(key, event.join)) {
       return { admission: ADMITTED, dropped: 'turn-settled' }
     }
-    // The writer refuses text for a settled turn; this producer's own closes need no journal read.
-    if ('id' in event.item && state.closedItems.has(key)) {
+    if ('id' in event.item && settledNamedItem(host, key)) {
       return { admission: ADMITTED, dropped: 'item-settled' }
     }
     const serials = state.serials()
@@ -58,10 +63,26 @@ export function applyProviderTimelineTextDelta(
       state,
       serial: serials.next()
     })
+    if (!host.admits({ key: stream.key, bytes: stream.bytes })) {
+      return { admission: PROVIDER_TIMELINE_OVER_BUDGET }
+    }
     plan.onAdmitted(serials.commit)
   }
   streams.planAppend(plan, stream, event.text)
   return { admission: plan.submit(host.sink) }
+}
+
+function settledNamedItem(host: ProviderTimelineTextHost, key: string): boolean {
+  if (host.state.items.get(key)?.closed) {
+    return true
+  }
+  const held = host.journal?.item(key)
+  const turn = held ? turnOf(held.turnScope ?? AGENT_JOURNAL_THREAD_SCOPE) : null
+  return (
+    host.journal !== null &&
+    turn !== null &&
+    providerTimelineTurnRowState(host.journal, turn) === 'settled'
+  )
 }
 
 export function applyProviderTimelineTextClose(

@@ -111,7 +111,7 @@ async function getAgentStatuses(page: Page): Promise<AgentStatusSummary[]> {
     if (!store) {
       return []
     }
-    return Array.from(store.getState().agentStatusByPaneKey?.values() ?? []).map((entry) => ({
+    return Object.values(store.getState().agentStatusByPaneKey ?? {}).map((entry) => ({
       paneKey: entry.paneKey,
       state: entry.state,
       agentType: entry.agentType,

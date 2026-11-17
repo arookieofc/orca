@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react'
-import type {
-  ArtifactCloudOperation,
-  ArtifactListItem
-} from '../../../../shared/artifacts/artifacts'
+import type { ArtifactCloudOperation, ArtifactListItem } from '../../../../shared/artifacts'
 import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
 import { persistConfirmationSkipPreference } from '@/components/confirmation-skip-preference'
-import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { useAppStore } from '@/store'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import { ArtifactCollection } from './ArtifactCollection'
 import { ArtifactDetailDrawer } from './ArtifactDetailDrawer'
 import { ArtifactsPageSkeleton } from './ArtifactsPageSkeleton'
@@ -21,7 +18,6 @@ import { artifactAccountIdentity, useArtifactPagination } from './useArtifactPag
 const LOCAL_RUNTIME = { kind: 'local' } as const
 
 export default function ArtifactsPage(): React.JSX.Element {
-  const t = useTranslate()
   const closePage = useAppStore((state) => state.closeArtifactsPage)
   const authStatus = useAppStore((state) => state.orcaProfileAuthStatus)
   const refreshAuth = useAppStore((state) => state.refreshCurrentOrcaProfileAuth)
@@ -58,10 +54,11 @@ export default function ArtifactsPage(): React.JSX.Element {
       ? null
       : (artifacts.find(({ artifact }) => artifact.slug === selectedSlug) ?? null)
 
-  if (selectedSlug !== null && selectedArtifact === null) {
-    // Drop a vanished selection during render so a later reload cannot reopen it.
-    setSelectedSlug(null)
-  }
+  useEffect(() => {
+    if (selectedSlug && !artifacts.some(({ artifact }) => artifact.slug === selectedSlug)) {
+      setSelectedSlug(null)
+    }
+  }, [selectedSlug, artifacts])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
@@ -101,13 +98,13 @@ export default function ArtifactsPage(): React.JSX.Element {
     const name = item.artifact.title || item.artifact.originalFileName || item.artifact.slug
     if (!settings?.skipDeleteArtifactConfirm) {
       const accepted = await confirm({
-        title: t('common.delete', 'Delete'),
-        description: t(
+        title: translate('auto.components.artifacts.ArtifactsPage.deleteTitle', 'Delete artifact?'),
+        description: translate(
           'auto.components.artifacts.ArtifactsPage.deleteDescription',
           '“{{name}}” will no longer be available at its public link.',
           { name }
         ),
-        confirmLabel: t('auto.components.artifacts.ArtifactsPage.delete', 'Delete'),
+        confirmLabel: translate('auto.components.artifacts.ArtifactsPage.delete', 'Delete'),
         confirmVariant: 'destructive',
         dontAskAgain: {
           onConfirmed: () =>
@@ -152,7 +149,7 @@ export default function ArtifactsPage(): React.JSX.Element {
       console.error('Failed to delete artifact:', deleteError)
       if (requestedAccountIsCurrent()) {
         setError(
-          t(
+          translate(
             'auto.components.artifacts.ArtifactsPage.deleteFailed',
             'Could not delete the artifact.'
           )
@@ -179,7 +176,7 @@ export default function ArtifactsPage(): React.JSX.Element {
         }
       >
         <h1 className="truncate text-base font-semibold leading-8">
-          {t('auto.components.artifacts.ArtifactsPage.title', 'Artifacts')}
+          {translate('auto.components.artifacts.ArtifactsPage.title', 'Artifacts')}
         </h1>
       </header>
 

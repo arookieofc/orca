@@ -1,27 +1,32 @@
 import { OrcaRuntimeWithCreateAgentPromptRenderGate } from '../input/terminal-agent-prompt-render'
-import type { RuntimeProviderSnapshotReadOptions } from '../output/provider-snapshot-read-options'
-import type { TerminalWaiter } from './terminal-waiter'
-import { VISIBLE_TERMINAL_SNAPSHOT_TIMEOUT_MS } from '../output/provider-snapshot-budget'
-import { withTimeout } from '../../../../shared/concurrency/promise-timeout-fallback'
+import type {
+  RuntimeProviderSnapshotReadOptions,
+  TerminalWaiter
+} from '../../runtime-terminal-contracts'
+import {
+  TUI_IDLE_VISIBLE_PROBE_SETTLE_MARGIN_MS,
+  VISIBLE_TERMINAL_SNAPSHOT_TIMEOUT_MS
+} from '../../orca-runtime-postlude'
+import { withTimeout } from '../../runtime-async-boundaries'
 import {
   detectTerminalWaitBlockedReason,
   isKnownReadyPromptBody,
   isKnownReadyPromptSettled
-} from './terminal-wait-detection'
+} from '../../terminal-wait-detection'
 import { readsTrustedScreen } from '../../agent-state-rules/agent-state-rules-engine'
-import { restoreProjectedComposerDraft } from '../view/orca-runtime-terminal-projection'
+import { restoreProjectedComposerDraft } from '../../orca-runtime-terminal-projection'
 import type {
   RuntimeTerminalWait,
   RuntimeTerminalWaitBlockedReason
-} from '../../../../shared/terminal/runtime/runtime-terminal-contracts'
+} from '../../../../shared/runtime-terminal-contracts'
 import {
   buildPtyTerminalWaitBlockedResult,
-  buildPtyTerminalWaitResult
-} from './terminal-wait-results'
-import { outputClockOf } from './tui-idle-evidence-source'
-import { createSetupCompletionScanner } from '../../orchestration/workers/launch/setup-completion-signal'
-import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
-const TUI_IDLE_VISIBLE_PROBE_SETTLE_MARGIN_MS = 10
+  buildPtyTerminalWaitResult,
+  buildTerminalWaitBlockedResult,
+  buildTerminalWaitResult
+} from '../../terminal-wait-results'
+import { createSetupCompletionScanner } from '../../orchestration/setup-completion-signal'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 
 export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWithCreateAgentPromptRenderGate {
   /** One bounded readiness read for adopted PTYs with lost metadata; later working-to-idle transitions belong to the poll. */
@@ -58,12 +63,10 @@ export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRu
       null
     )
       .then((projection) => {
-        const pty = this.ptysById.get(waiter.ptyId)
         if (
           !projection ||
           projection.source !== 'screen' ||
-          !pty ||
-          !this.terminalWaiters.has(waiter)
+          !this.terminalWaiters.get(waiter.handle)?.has(waiter)
         ) {
           return
         }
@@ -76,15 +79,16 @@ export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRu
               agent,
               () => restoreProjectedComposerDraft(projection.tail, projection.draft),
               // Why read now: output since the probe started makes the pane clocked.
-              outputClockOf(this.tuiIdleEvidenceSource, pty) !== null
+              (
+                this.getLivePtyForHandle(waiter.handle)?.pty ??
+                this.getLiveLeafForHandle(waiter.handle).leaf
+              ).lastOutputAt !== null
             )
           : isKnownReadyPromptSettled(snapshotText)
         if (!blockedReason && !ready) {
           return
         }
-        const result = blockedReason
-          ? buildPtyTerminalWaitBlockedResult(waiter.handle, 'tui-idle', pty, blockedReason)
-          : buildPtyTerminalWaitResult(waiter.handle, 'tui-idle', pty)
+        const result = this.buildTuiIdleProbeResult(waiter.handle, blockedReason)
         if (waiter.cancelIdlePoll) {
           waiter.cancelIdlePoll()
         }
@@ -97,10 +101,16 @@ export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRu
     handle: string,
     blockedReason: RuntimeTerminalWaitBlockedReason | null
   ): RuntimeTerminalWait {
-    const { pty } = this.getTerminalPtyForHandle(handle)
+    const pty = this.getLivePtyForHandle(handle)
+    if (pty) {
+      return blockedReason
+        ? buildPtyTerminalWaitBlockedResult(handle, 'tui-idle', pty.pty, blockedReason)
+        : buildPtyTerminalWaitResult(handle, 'tui-idle', pty.pty)
+    }
+    const { leaf } = this.getLiveLeafForHandle(handle)
     return blockedReason
-      ? buildPtyTerminalWaitBlockedResult(handle, 'tui-idle', pty, blockedReason)
-      : buildPtyTerminalWaitResult(handle, 'tui-idle', pty)
+      ? buildTerminalWaitBlockedResult(handle, 'tui-idle', leaf, blockedReason)
+      : buildTerminalWaitResult(handle, 'tui-idle', leaf)
   }
 
   async waitForSetupTerminalCompletion(

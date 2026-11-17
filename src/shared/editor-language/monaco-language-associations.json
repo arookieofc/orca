@@ -316,7 +316,7 @@
   },
   {
     "id": "razor",
-    "extensions": [".cshtml", ".razor"],
+    "extensions": [".cshtml"],
     "filenames": []
   },
   {

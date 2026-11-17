@@ -2,15 +2,15 @@ import { OrcaRuntimeWithSerializeHeadlessTerminalBuffer } from '../../terminal/o
 import type {
   OrchestrationCompatibilityEvidence,
   OrchestrationCompatibilityHostStamp
-} from '../../../../shared/orchestration/orchestration-compatibility-evidence'
+} from '../../../../shared/orchestration-compatibility-evidence'
 import type {
   OrchestrationCompatibilityCallerAuthority,
   OrchestrationCompatibilitySshTerminal,
   OrchestrationCompatibilityTerminalAuthority
-} from './orchestration-compatibility-authority'
+} from '../../runtime-terminal-contracts'
 import { createHash } from 'node:crypto'
-import type { RuntimePtyWorktreeRecord } from '../../terminal/records/runtime-terminal-state-records'
-import { parsePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
+import type { RuntimePtyWorktreeRecord } from '../../runtime-terminal-state-records'
+import { parsePaneKey } from '../../../../shared/stable-pane-id'
 
 export abstract class OrcaRuntimeWithVerifyOrchestrationCompatibilityCaller extends OrcaRuntimeWithSerializeHeadlessTerminalBuffer {
   abstract getOrchestrationDispatchAuthority(

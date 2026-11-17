@@ -4,22 +4,19 @@ import { toast } from 'sonner'
 import type {
   PtyManagementFolderAccessMismatch,
   PtyManagementMacTccAttributionHealth
-} from '../../../preload/api/terminal/pty-management-api'
-import { isPluginUiLanguage } from '../../../shared/i18n/ui-language'
-import { useAppStore } from '@/store/index'
-import {
-  usePluginLanguagePackStore,
-  usePluginLanguagePacks
-} from '@/store/plugins/localization/plugin-language-packs'
+} from '../../../preload/api-types'
+import { isPluginUiLanguage } from '../../../shared/ui-language'
+import { useAppStore } from '@/store'
+import { usePluginLanguagePackStore } from '@/store/plugin-language-packs'
 import { translate } from '@/i18n/i18n'
-import { track } from '@/diagnostics/telemetry/telemetry'
+import { track } from '@/lib/telemetry'
 import { resolveUiLocale } from '@/i18n/supported-languages'
-import { MANAGE_SESSIONS_SECTION_ID } from '@/components/settings/terminal/session-management/open-terminal-manage-sessions'
+import { MANAGE_SESSIONS_SECTION_ID } from '@/components/settings/TerminalTccAttributionNotice'
 import { macFolderAccessFolderName } from '@/components/shared/mac-folder-access-folder-name'
 import {
   FOLDER_ACCESS_MISMATCH_NOTICE_ID,
   useMacFolderAccessFixStore
-} from '@/store/terminals/folder-access/mac-folder-access-fix'
+} from '@/store/mac-folder-access-fix'
 
 const SEVERED_TCC_NOTICE_ID = 'mac-tcc-attribution-severed'
 
@@ -29,7 +26,7 @@ export function useMacTccAttributionSeveredNotice(): void {
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const setSettingsSearchQuery = useAppStore((s) => s.setSettingsSearchQuery)
   const uiLanguage = useAppStore((s) => s.settings?.uiLanguage ?? null)
-  const pluginLanguagePacks = usePluginLanguagePacks()
+  const pluginLanguagePacks = usePluginLanguagePackStore((s) => s.entries)
   const pluginLanguagePacksLoaded = usePluginLanguagePackStore((s) => s.loaded)
   const { i18n } = useTranslation()
   const selectedPluginLanguage = pluginLanguagePacks.find((pack) => pack.id === uiLanguage)

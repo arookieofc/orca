@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -51,13 +51,11 @@ export function CustomAddressDialog({
   const [confirmationFailed, setConfirmationFailed] = useState(false)
 
   // Reset on open so canceled edits cannot leak into later visits.
-  const [seededFor, setSeededFor] = useState({ open, initialValue })
-  if (seededFor.open !== open || seededFor.initialValue !== initialValue) {
-    setSeededFor({ open, initialValue })
+  useEffect(() => {
     if (open) {
       setValue(initialValue ?? '')
     }
-  }
+  }, [open, initialValue])
 
   const close = (): void => {
     setSubmitting(false)

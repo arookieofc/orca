@@ -3,11 +3,10 @@ import path from 'node:path'
 import {
   normalizeAgentProviderSession,
   type AgentProviderSessionMetadata
-} from '../agent-session/lifecycle/agent-session-resume'
+} from '../agent-session-resume'
 import type { AgentHookEventPayload } from './listener-event'
 import { scanFileRegionsBackward } from './reverse-file-region-scan'
 import { TRANSCRIPT_CHUNK_BYTES } from './transcript-reader'
-import { isClaudeToolResultContent } from './providers/claude/transcripts/claude-tool-content'
 
 const FIRST_SCAN_BYTES = 1024 * 1024
 // Why: a rescan reads only what was appended, plus enough to re-read a line split at the old end.
@@ -189,7 +188,7 @@ function isCompletedTurn(record: Record<string, unknown>): boolean {
   const content: unknown = fields.content
   const texts: unknown[] = typeof content === 'string' ? [content] : []
   if (Array.isArray(content)) {
-    if (content.some(isClaudeToolResultContent)) {
+    if (content.some((block) => block?.type === 'tool_result')) {
       return false
     }
     texts.push(...content.filter((block) => block?.type === 'text').map((block) => block.text))

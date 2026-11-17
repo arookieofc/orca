@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import type { Worktree } from '../../../shared/worktree/types'
 
@@ -22,12 +22,13 @@ export function JiraLinkedWorkspaceAction({
   onOpenWorkspace: (workspace: Worktree) => void
   onStartWorkspace: (issue: JiraIssue) => void
 }): React.JSX.Element {
-  const t = useTranslate()
-  const label = t('jira.workspace.linkedCount', '{{count}} workspaces linked to {{key}}', {
-    count: workspaces.length,
-    key: issue.key,
-    defaultValue_one: '{{count}} workspace linked to {{key}}'
-  })
+  const label =
+    workspaces.length === 1
+      ? translate('jira.workspace.single', '1 workspace linked to {{key}}', { key: issue.key })
+      : translate('jira.workspace.count', '{{count}} workspaces linked to {{key}}', {
+          count: workspaces.length,
+          key: issue.key
+        })
   const trigger = (
     <Button
       variant="ghost"
@@ -56,7 +57,7 @@ export function JiraLinkedWorkspaceAction({
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => onStartWorkspace(issue)}>
           <ArrowRight className="size-3.5" />
-          {t('jira.workspace.startAnother', 'Start new workspace')}
+          {translate('jira.workspace.startAnother', 'Start new workspace')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,7 +1,4 @@
-import type {
-  RateLimitBucket,
-  RateLimitWindow
-} from '../../shared/agent-usage/rate-limits/rate-limit-types'
+import type { RateLimitBucket, RateLimitWindow } from '../../shared/rate-limit-types'
 
 /** Any exhausted model pool limits the tier; summarize the most-consumed bucket rather than averaging. */
 export function deriveMostConstrainedWindow(buckets: RateLimitBucket[]): RateLimitWindow | null {

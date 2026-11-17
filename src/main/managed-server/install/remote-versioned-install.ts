@@ -5,24 +5,22 @@ import { existsSync, readFileSync } from 'node:fs'
 import type { RemoteInstallTransport } from './remote-install-transport'
 import { execHostCommand } from '../../ssh/remote-exec/remote-host-exec'
 import { isUnconfirmedSshCommandTermination } from '../../ssh/remote-exec/remote-exec-command'
-import { RELAY_INSTALL_LOCK_NAME } from '../../../shared/remote-runtime/relay/relay-install-lock-name'
-import { RELAY_REMOTE_DIR } from './remote-install-root'
+import { RELAY_INSTALL_LOCK_NAME } from '../../../shared/relay-install-lock-name'
+import { RELAY_REMOTE_DIR } from '../../ssh/remote-exec/remote-frame-protocol'
 import { remoteInstallDirName, type RemoteInstallModel } from './remote-install-model'
-import { probeRemoteInstallCompleteCommand } from './remote-install-completeness-command'
-import { removeOwnedInstallLockCommand } from './remote-install-lock-owner-commands'
-import type { InstallLockOwnerFile } from './remote-install-lock-commands'
 import {
+  probeRemoteInstallCompleteCommand,
   removeRemoteTreeCommand,
   writeRemoteEmptyFileCommand
-} from '../../ssh/remote-exec/ssh-remote-commands'
+} from '../../ssh/ssh-remote-commands'
 import {
   assertSafeRemotePathSegment,
   getRemoteHostPlatform,
   joinRemotePath,
   type RemoteHostPlatform,
   type RemotePathFlavor
-} from '../../ssh/remote-host/ssh-remote-platform'
-import { isSshSessionLimitError } from '../../ssh/connection/ssh-session-limit-error'
+} from '../../ssh/ssh-remote-platform'
+import { isSshSessionLimitError } from '../../ssh/ssh-session-limit-error'
 
 const INSTALL_COMPLETE_NAME = '.install-complete'
 const DEFAULT_REMOTE_HOST = getRemoteHostPlatform('linux-x64')
@@ -126,18 +124,10 @@ export async function finalizeInstall(
 export async function abandonInstall(
   conn: RemoteInstallTransport,
   remoteRelayDir: string,
-  host: RemoteHostPlatform = DEFAULT_REMOTE_HOST,
-  /** Remove only while the lock still names this owner, so a late cleanup spares a successor. */
-  owner?: InstallLockOwnerFile,
-  /** POSIX statement run first; it may end the command without removing the lock. */
-  releaseGate?: string
+  host: RemoteHostPlatform = DEFAULT_REMOTE_HOST
 ): Promise<boolean> {
   const lock = joinRemotePath(host, remoteRelayDir, RELAY_INSTALL_LOCK_NAME)
-  const remove = owner
-    ? removeOwnedInstallLockCommand(host, lock, owner)
-    : removeRemoteTreeCommand(host, lock)
-  const command = releaseGate ? `${releaseGate} ${remove}` : remove
-  return execHostCommand(conn, host, command).then(
+  return execHostCommand(conn, host, removeRemoteTreeCommand(host, lock)).then(
     () => true,
     (error) => {
       if (isUnconfirmedSshCommandTermination(error)) {

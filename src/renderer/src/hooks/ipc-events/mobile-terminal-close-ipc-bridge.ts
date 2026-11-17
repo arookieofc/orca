@@ -1,29 +1,26 @@
 import { createRuntimeFilePositionQueue } from './runtime-file-position'
-import { applyClosedTerminalLeafNotice } from '@/components/terminal-pane/layout/close/closed-terminal-leaf-notice'
-import { closeTerminalTab } from '@/components/terminal/tab-lifecycle/terminal-tab-actions'
-import { detectLanguage } from '../../../../shared/editor-language/editor-language-detect'
-import { followWorkspaceSleep } from '@/components/sidebar/workspace-actions/sleep/workspace-sleep-follower'
+import { applyClosedTerminalLeafNotice } from '@/components/terminal-pane/closed-terminal-leaf-notice'
+import { closeTerminalTab } from '@/components/terminal/terminal-tab-actions'
+import { detectLanguage } from '@/lib/language-detect'
+import { followWorkspaceSleep } from '@/components/sidebar/workspace-sleep-follower'
 import { createProjectMovePauseFollower } from '@/components/sidebar/project-move-pause-follower'
-import { buildWorkspaceSessionPayload } from '@/lib/workspace/persistence/workspace-session'
-import { persistWorkspaceSessionByHost } from '@/lib/workspace/persistence/workspace-session-host-persistence'
-import { revealWorkspaceSurface } from '@/lib/workspace/activation/workspace-surface-reveal'
-import { selectFloatingWorkspacePanelVisible } from '@/store/workspaces/floating/floating-workspace-panel-selector'
-import { isFloatingWorkspaceId } from '../../../../shared/workspace/identity/floating-workspace-worktree'
+import { buildWorkspaceSessionPayload } from '@/lib/workspace-session'
+import { persistWorkspaceSessionByHost } from '@/lib/workspace-session-host-persistence'
+import { revealWorkspaceSurface } from '@/lib/workspace-surface-reveal'
+import { selectFloatingWorkspacePanelVisible } from '@/store/floating-workspace-panel-selector'
+import { isFloatingWorkspaceId } from '../../../../shared/floating-workspace-worktree'
 import { useAppStore } from '../../store'
-import {
-  afterLayoutFrame,
-  layoutFramesFlowing
-} from '@/runtime/workspace-layout/frames/layout-frame-position'
-import { framesDrawWorkspace } from '@/runtime/workspace-layout/frames/workspace-layout-frame-drawn-workspaces'
-import type { RuntimeEditorTabReveal } from '../../../../shared/file-access/runtime-editor-file-open'
+import { afterLayoutFrame, layoutFramesFlowing } from '@/runtime/layout-frame-position'
+import { framesDrawWorkspace } from '@/runtime/workspace-layout-frame-drawn-workspaces'
+import type { RuntimeEditorTabReveal } from '../../../../shared/runtime-file-contracts'
 import type { AppState } from '../../store/types'
 import type { EditorTabSelection } from '../../store/slices/editor/types/open-file'
 import {
   navigationTargetsHost,
   type RuntimeNavigationTarget
-} from '../../../../shared/remote-runtime/session-graph/runtime-navigation'
+} from '../../../../shared/runtime-navigation'
 
-// Non-host targets stay off-screen without visit accounting; files.open always names a target, so absence is only legacy switching.
+// Explicit non-host targets stay off-screen without visit accounting; absent targets preserve older CLI/phone Open in session behavior.
 function openRuntimeEditorTab(
   worktreeId: string,
   navigation: RuntimeNavigationTarget | undefined,
@@ -134,21 +131,12 @@ export function registerMobileAndTerminalCloseIpcBridge(
 
   unsubs.push(
     window.api.ui.onOpenDiffFromMobile(
-      ({
-        worktreeId,
-        filePath,
-        relativePath,
-        staged,
-        runtimeEnvironmentId,
-        navigation,
-        oldPath
-      }) => {
+      ({ worktreeId, filePath, relativePath, staged, runtimeEnvironmentId, navigation }) => {
         openRuntimeEditorTab(worktreeId, navigation, (store, selection) =>
           // Why: mobile renders diffs from metadata; the editor-local Changes shortcut would send plain markdown back to mobile.
           store.openDiff(worktreeId, filePath, relativePath, detectLanguage(relativePath), staged, {
             runtimeEnvironmentId,
-            selection,
-            ...(oldPath ? { oldPath } : {})
+            selection
           })
         )
       }
@@ -158,10 +146,10 @@ export function registerMobileAndTerminalCloseIpcBridge(
   unsubs.push(
     window.api.ui.onCloseTerminal((target) => {
       if (target.kind === 'pane') {
-        applyClosedTerminalLeafNotice(target.tabId, target.leafId, 'requested')
+        applyClosedTerminalLeafNotice(target.tabId, target.leafId)
       } else {
         // Why: the CLI/RPC caller is answered immediately, so it cannot wait on a modal.
-        closeTerminalTab(target.tabId, { reason: 'requested', skipRunningProcessConfirm: true })
+        closeTerminalTab(target.tabId, { skipRunningProcessConfirm: true })
       }
     })
   )
@@ -180,7 +168,6 @@ export function registerMobileAndTerminalCloseIpcBridge(
             window.api.ui.respondTerminalTabClose({ requestId, ...(error ? { error } : {}) })
           }
           closeTerminalTab(tabId, {
-            reason: 'requested',
             rejectPinned: true,
             ...(force ? { force: true } : {}),
             ...(localPtyTeardownOwnedExternally ? { localPtyTeardownOwnedExternally: true } : {}),

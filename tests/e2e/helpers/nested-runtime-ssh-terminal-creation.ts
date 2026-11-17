@@ -20,8 +20,7 @@ export async function assertPairedTerminalCreation(
   })
   await client.page.getByRole('button', { name: 'New tab' }).click({ force: true })
   await client.page
-    .getByRole('menu')
-    .getByRole('button', { name: /New Terminal/i })
+    .getByRole('menuitem', { name: /New Terminal/i })
     .first()
     .click({ force: true })
   let tabId = ''

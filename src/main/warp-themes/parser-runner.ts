@@ -1,4 +1,4 @@
-import { spawnWorkerThread } from '../worker-threads/worker-thread-spawn'
+import { Worker } from 'node:worker_threads'
 import { app } from 'electron'
 import { join } from 'node:path'
 import type { ParsedWarpThemeResult, ParseWarpThemeOptions } from './parser'
@@ -31,8 +31,7 @@ export function parseWarpThemeYamlWithTimeout(
   timeoutOptions: ParseWarpThemeTimeoutOptions = {}
 ): Promise<ParsedWarpThemeResult> {
   return new Promise((resolve) => {
-    const worker = spawnWorkerThread(getParserWorkerPath(), {
-      name: 'orca-warp-theme-parser',
+    const worker = new Worker(getParserWorkerPath(), {
       workerData: { content, fileLabel, options }
     })
     let settled = false

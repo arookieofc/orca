@@ -1,6 +1,6 @@
-import { openSidebarProjectMenu } from './helpers/sidebar-project-dialog'
+import { openSidebarProjectDialog } from './helpers/sidebar-project-dialog'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -20,12 +20,10 @@ async function createCloneFixture(): Promise<{
   tempRoots.push(rootPath)
 
   const sourcePath = path.join(rootPath, 'default-checkout-source')
-  // Clone through a symlinked parent: git reports the resolved path, which must still be the project's own checkout.
-  const destinationParent = path.join(rootPath, 'clones-link')
+  const destinationParent = path.join(rootPath, 'clones')
 
   mkdirSync(sourcePath, { recursive: true })
-  mkdirSync(path.join(rootPath, 'clones'), { recursive: true })
-  symlinkSync(path.join(rootPath, 'clones'), destinationParent, 'junction')
+  mkdirSync(destinationParent, { recursive: true })
   execFileSync('git', ['init'], { cwd: sourcePath, stdio: 'pipe' })
   execFileSync('git', ['config', 'user.email', 'e2e@test.local'], {
     cwd: sourcePath,
@@ -85,8 +83,10 @@ test.describe('Add project default checkout', () => {
     await waitForSessionReady(orcaPage)
     const fixture = await createCloneFixture()
 
-    await openSidebarProjectMenu(orcaPage)
-    await orcaPage.getByRole('menuitem', { name: /Clone from URL/i }).click()
+    await openSidebarProjectDialog(orcaPage)
+    const addDialog = orcaPage.getByRole('dialog', { name: /Add a project/i })
+    await expect(addDialog).toBeVisible()
+    await addDialog.getByRole('button', { name: /Clone from URL/i }).click()
 
     const cloneDialog = orcaPage.getByRole('dialog', { name: /Clone from URL/i })
     await expect(cloneDialog).toBeVisible()
@@ -95,6 +95,8 @@ test.describe('Add project default checkout', () => {
     await cloneDialog.getByRole('button', { name: /^Clone$/ }).click()
 
     await expect(orcaPage.getByRole('dialog', { name: /Repo added/i })).toBeHidden()
+    await expect(orcaPage.getByText('Use existing worktrees')).toBeHidden()
+    await expect(orcaPage.getByText('Create a new worktree')).toBeHidden()
 
     await expect
       .poll(
@@ -114,7 +116,8 @@ test.describe('Add project default checkout', () => {
             return {
               activeCheckoutIsDefault: state.activeWorktreeId === defaultCheckout?.id,
               defaultCheckoutLooksCloned:
-                normalizedDefaultCheckoutPath?.endsWith(`/clones/${cloneName}`) ?? false
+                normalizedDefaultCheckoutPath?.endsWith(`/clones/${cloneName}`) ?? false,
+              oldSetupModalOpen: state.activeModal === 'project-added'
             }
           }, path.basename(fixture.sourcePath)),
         {
@@ -124,11 +127,12 @@ test.describe('Add project default checkout', () => {
       )
       .toEqual({
         activeCheckoutIsDefault: true,
-        defaultCheckoutLooksCloned: true
+        defaultCheckoutLooksCloned: true,
+        oldSetupModalOpen: false
       })
   })
 
-  test('keeps sibling git worktrees hidden when opening the default checkout', async ({
+  test('reveals sibling git worktrees before opening the default checkout', async ({
     orcaPage
   }) => {
     await waitForSessionReady(orcaPage)
@@ -143,6 +147,7 @@ test.describe('Add project default checkout', () => {
 
     await expect(addProjectDialog).toBeHidden()
     await expect(orcaPage.getByRole('dialog', { name: /Repo added/i })).toBeHidden()
+    await expect(orcaPage.getByText('Use existing worktrees')).toBeHidden()
 
     await expect
       .poll(
@@ -160,17 +165,21 @@ test.describe('Add project default checkout', () => {
             const defaultCheckout = worktrees.find((worktree) => worktree.isMainWorktree)
             return {
               activeCheckoutIsDefault: state.activeWorktreeId === defaultCheckout?.id,
-              visibleBranches: worktrees.map((worktree) => worktree.branch).sort()
+              linkedRepoVisibility: repo.externalWorktreeVisibility,
+              visibleBranches: worktrees.map((worktree) => worktree.branch).sort(),
+              visibleCount: worktrees.length
             }
           }, fixture.mainPath),
         {
           timeout: 30_000,
-          message: 'default checkout did not open with sibling worktrees hidden'
+          message: 'linked worktrees were not revealed before opening the default checkout'
         }
       )
       .toEqual({
         activeCheckoutIsDefault: true,
-        visibleBranches: ['refs/heads/main']
+        linkedRepoVisibility: 'show',
+        visibleBranches: ['refs/heads/feature', 'refs/heads/main'],
+        visibleCount: 2
       })
   })
 })

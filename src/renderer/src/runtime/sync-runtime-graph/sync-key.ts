@@ -1,10 +1,13 @@
-import { getSystemPrefersDark } from '@/lib/terminal/appearance/terminal-theme'
+import { getSystemPrefersDark } from '@/lib/terminal-theme'
+import type { AppState } from '@/store/types'
 import {
   EMPTY_ACTIVE_BROWSER_TAB_ID_BY_WORKTREE,
+  EMPTY_AGENT_STATUS_BY_PANE_KEY,
   EMPTY_BROWSER_PAGES_BY_WORKSPACE,
   EMPTY_BROWSER_TABS_BY_WORKTREE,
   EMPTY_LAYOUT_BY_WORKTREE
 } from './graph-state'
+import { buildRuntimeMobileAgentStatusProjection } from './agent-status-projection'
 import {
   buildRuntimeMobileBrowserProjection,
   buildRuntimeMobileEditorDraftsProjection,
@@ -14,9 +17,8 @@ import {
   getBrowserTabsByWorktree
 } from './sync-projections'
 import { resolveMobileTerminalTheme } from './mobile-terminal-theme'
-import { selectFolderWorkspaces } from '@/store/workspaces/catalog/workspace-record-fields'
-import type { AppState } from '@/store/types'
 import type { RuntimeMobileSessionSyncKey } from './types'
+import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
 
 function getTerminalThemeSystemPrefersDark(
   state: Pick<AppState, 'settings'>,
@@ -59,7 +61,9 @@ export function canSkipRuntimeMobileSessionSyncKeyBuild(
     state.terminalLayoutsByTabId === previousState.terminalLayoutsByTabId &&
     state.runtimePaneTitlesByTabId === previousState.runtimePaneTitlesByTabId &&
     state.nativeChatLaunchDraftByTabId === previousState.nativeChatLaunchDraftByTabId &&
-    selectFolderWorkspaces(state) === selectFolderWorkspaces(previousState)
+    selectFolderWorkspaces(state) === selectFolderWorkspaces(previousState) &&
+    state.agentStatusEpoch === previousState.agentStatusEpoch &&
+    state.agentStatusByPaneKey === previousState.agentStatusByPaneKey
   )
 }
 
@@ -73,12 +77,16 @@ export function getRuntimeMobileSessionSyncKey(
   const themeSystemPrefersDark = getTerminalThemeSystemPrefersDark(state, systemPrefersDark)
   const browserTabsByWorktree = getBrowserTabsByWorktree(state)
   const browserPagesByWorkspace = getBrowserPagesByWorkspace(state)
+  const agentStatusByPaneKey = state.agentStatusByPaneKey ?? EMPTY_AGENT_STATUS_BY_PANE_KEY
   const previousBrowserTabsByWorktree = previousState
     ? getBrowserTabsByWorktree(previousState)
     : EMPTY_BROWSER_TABS_BY_WORKTREE
   const previousBrowserPagesByWorkspace = previousState
     ? getBrowserPagesByWorkspace(previousState)
     : EMPTY_BROWSER_PAGES_BY_WORKSPACE
+  const previousAgentStatusByPaneKey = previousState
+    ? (previousState.agentStatusByPaneKey ?? EMPTY_AGENT_STATUS_BY_PANE_KEY)
+    : EMPTY_AGENT_STATUS_BY_PANE_KEY
   return {
     terminalLayoutsByTabId: state.terminalLayoutsByTabId,
     runtimePaneTitlesByTabId: state.runtimePaneTitlesByTabId,
@@ -96,6 +104,11 @@ export function getRuntimeMobileSessionSyncKey(
     activeTabId: state.activeTabId,
     activeBrowserTabIdByWorktree:
       state.activeBrowserTabIdByWorktree ?? EMPTY_ACTIVE_BROWSER_TAB_ID_BY_WORKTREE,
+    agentStatusEpoch: state.agentStatusEpoch ?? 0,
+    agentStatusProjection:
+      canReusePrevious && agentStatusByPaneKey === previousAgentStatusByPaneKey
+        ? previousKey.agentStatusProjection
+        : buildRuntimeMobileAgentStatusProjection(agentStatusByPaneKey),
     generatedTabTitlesEnabled: state.settings?.tabAutoGenerateTitle === true,
     systemPrefersDark: themeSystemPrefersDark,
     terminalThemeProjection:
@@ -119,30 +132,10 @@ export function getRuntimeMobileSessionSyncKey(
         ? previousKey.browserProjection
         : buildRuntimeMobileBrowserProjection(state),
     editorDraftsProjection:
-      canReusePrevious &&
-      state.editorDrafts === previousState.editorDrafts &&
-      state.openFiles === previousState.openFiles
+      canReusePrevious && state.editorDrafts === previousState.editorDrafts
         ? previousKey.editorDraftsProjection
-        : buildRuntimeMobileEditorDraftsProjection(state.editorDrafts, state.openFiles)
+        : buildRuntimeMobileEditorDraftsProjection(state.editorDrafts)
   }
-}
-
-function editorDraftsEqual(
-  a: ReadonlyMap<string, string>,
-  b: ReadonlyMap<string, string>
-): boolean {
-  if (a === b) {
-    return true
-  }
-  if (a.size !== b.size) {
-    return false
-  }
-  for (const [fileId, content] of a) {
-    if (b.get(fileId) !== content) {
-      return false
-    }
-  }
-  return true
 }
 
 export function runtimeMobileSessionSyncKeysEqual(
@@ -165,12 +158,14 @@ export function runtimeMobileSessionSyncKeysEqual(
     a.activeTabTypeByWorktree === b.activeTabTypeByWorktree &&
     a.activeTabId === b.activeTabId &&
     a.activeBrowserTabIdByWorktree === b.activeBrowserTabIdByWorktree &&
+    a.agentStatusEpoch === b.agentStatusEpoch &&
+    a.agentStatusProjection === b.agentStatusProjection &&
     a.generatedTabTitlesEnabled === b.generatedTabTitlesEnabled &&
     a.systemPrefersDark === b.systemPrefersDark &&
     a.terminalThemeProjection === b.terminalThemeProjection &&
     a.tabsProjection === b.tabsProjection &&
     a.openFilesProjection === b.openFilesProjection &&
     a.browserProjection === b.browserProjection &&
-    editorDraftsEqual(a.editorDraftsProjection, b.editorDraftsProjection)
+    a.editorDraftsProjection === b.editorDraftsProjection
   )
 }

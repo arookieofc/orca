@@ -1,12 +1,11 @@
-import '../../components/terminal-pane/layout/terminal-layout-leaf-traversal'
-import { collectLayoutLeafIdsInOrder } from '../../../../shared/workspace-layout/terminal-topology/terminal-pane-tree'
-import { focusTerminalTabSurface } from '@/components/terminal-pane/input/focus/focus-terminal-tab-surface'
-import { focusRuntimeTerminalSurface } from '@/runtime/hosted-terminals/mounted-surfaces/mounted-terminal-tab-registry'
-import type { RuntimeTerminalPresentation } from '../../../../shared/terminal/runtime/runtime-terminal-contracts'
+import { collectLeafIdsInOrder } from '@/components/terminal-pane/layout-serialization'
+import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
+import { focusRuntimeTerminalSurface } from '@/runtime/mounted-terminal-tab-registry'
+import type { RuntimeTerminalPresentation } from '../../../../shared/runtime-types'
 import type {
   TerminalLayoutSnapshot,
   TerminalPaneLayoutNode
-} from '../../../../shared/workspace-layout/terminal-tab-types'
+} from '../../../../shared/terminal-tab-types'
 
 export function resolveTerminalPresentation(data: {
   presentation?: RuntimeTerminalPresentation
@@ -78,7 +77,7 @@ export function addSplitLeafToLayout(
   activateNewLeaf = true
 ): TerminalLayoutSnapshot {
   const root = layout?.root ?? { type: 'leaf', leafId: sourceLeafId }
-  const existingLeafIds = collectLayoutLeafIdsInOrder(root)
+  const existingLeafIds = collectLeafIdsInOrder(root)
   const nextActiveLeafId =
     activateNewLeaf || !layout?.activeLeafId || !existingLeafIds.includes(layout.activeLeafId)
       ? newLeafId
@@ -114,7 +113,7 @@ export function activateExistingLeafInLayout(
   ptyId: string,
   title?: string | null
 ): TerminalLayoutSnapshot | null {
-  if (!layout?.root || !collectLayoutLeafIdsInOrder(layout.root).includes(leafId)) {
+  if (!layout?.root || !collectLeafIdsInOrder(layout.root).includes(leafId)) {
     return null
   }
   return {

@@ -1,5 +1,5 @@
-import type { AgentStatusEntry } from '../../../../shared/agent-status/contracts/agent-status-types'
-import { isAgentStatusFresh } from '../../../../shared/agent-status/contracts/agent-status-freshness'
+import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
+import { isExplicitAgentStatusFresh } from '@/lib/agent-status'
 
 export type PetAnimationName =
   | 'idle'
@@ -28,6 +28,7 @@ export function nextPetDragAnimation(
 
 export type PetAnimationInput = {
   entries: AgentStatusEntry[]
+  retainedCount: number
   dragging: boolean
   dragAnimation: PetDragAnimation
   hovering: boolean
@@ -37,6 +38,7 @@ export type PetAnimationInput = {
 
 function agentStateAnimation(
   entries: AgentStatusEntry[],
+  retainedCount: number,
   now: number,
   staleAfterMs: number
 ): PetAnimationName {
@@ -44,7 +46,7 @@ function agentStateAnimation(
   let hasDone = false
 
   for (const entry of entries) {
-    if (!isAgentStatusFresh(entry, now, staleAfterMs)) {
+    if (!isExplicitAgentStatusFresh(entry, now, staleAfterMs)) {
       continue
     }
     if (entry.state === 'blocked' || entry.state === 'waiting') {
@@ -60,7 +62,7 @@ function agentStateAnimation(
   if (hasWorking) {
     return 'running'
   }
-  if (hasDone) {
+  if (hasDone || retainedCount > 0) {
     return 'review'
   }
   return 'idle'
@@ -68,13 +70,14 @@ function agentStateAnimation(
 
 export function selectPetAnimationName({
   entries,
+  retainedCount,
   dragging,
   dragAnimation,
   hovering,
   now,
   staleAfterMs
 }: PetAnimationInput): PetAnimationName {
-  const base = agentStateAnimation(entries, now, staleAfterMs)
+  const base = agentStateAnimation(entries, retainedCount, now, staleAfterMs)
   // Horizontal drags run toward the pointer; stationary grabs retain live agent state, and plain hover jumps.
   if (dragging) {
     return dragAnimation ?? base

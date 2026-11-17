@@ -3,9 +3,8 @@ import { useAppStore } from '@/store'
 import {
   normalizeBrowserNavigationUrl,
   redactKagiSessionToken
-} from '../../../../../shared/browser/navigation/browser-url'
-import type { BrowserLoadError } from '../../../../../shared/browser/workspaces/browser-workspace-types'
-import { parseChromeExtensionUrl } from '../../../../../shared/browser/extensions/browser-extension-url'
+} from '../../../../../shared/browser-url'
+import type { BrowserLoadError } from '../../../../../shared/browser-workspace-types'
 
 export type BrowserAddressBarSubmission =
   | { status: 'navigate'; url: string }
@@ -14,16 +13,8 @@ export type BrowserAddressBarSubmission =
 /** Share search fallback, Kagi handling and invalid-input failures across browser backends. */
 export function resolveBrowserAddressBarSubmission(
   rawValue: string,
-  options?: { allowFileUrls?: boolean; allowExtensionPages?: boolean }
+  options?: { allowFileUrls?: boolean }
 ): BrowserAddressBarSubmission {
-  // Why opt-in: only a local browser-profile tab can host an extension page; main's session decides
-  // whether that extension is on, and Chromium refuses pages of extensions the session never loaded.
-  const extensionUrl = options?.allowExtensionPages
-    ? parseChromeExtensionUrl(rawValue.trim())
-    : null
-  if (extensionUrl) {
-    return { status: 'navigate', url: extensionUrl.url }
-  }
   const { browserDefaultSearchEngine, browserKagiSessionLink } = useAppStore.getState()
   // Passing the search engine enables query fallback; otherwise “google maps” becomes a host.
   const url = normalizeBrowserNavigationUrl(rawValue, browserDefaultSearchEngine, {

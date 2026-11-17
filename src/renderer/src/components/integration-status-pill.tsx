@@ -1,4 +1,4 @@
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 
 export type IntegrationStatusTone = 'connected' | 'attention' | 'neutral'
 

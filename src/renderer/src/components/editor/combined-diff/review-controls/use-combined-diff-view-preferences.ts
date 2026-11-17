@@ -1,20 +1,15 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type React from 'react'
-import type { GlobalSettings } from '../../../../../../shared/settings/global-settings-types'
-import type { DiffSection } from '../../diff/sections/diff-section-types'
+import type { DiffSection } from '../../diff-section-types'
 import { combinedDiffViewPreferences } from '../remember-view/combined-diff-view-memory'
 import { getInitialCombinedDiffSectionLoadIndices } from '../load-sections/combined-diff-initial-section-load'
 import type { CombinedDiffSectionLoadRegistry } from '../load-sections/combined-diff-section-load-registry'
-
-type DiffViewSettings = Pick<
-  GlobalSettings,
-  'diffDefaultView' | 'diffShowWhitespace' | 'diffWordWrap'
->
 
 export type CombinedDiffViewPreferences = {
   fileTreeCollapsed: boolean
   setAllSectionsCollapsed: (collapsed: boolean) => void
   setFileTreeCollapsed: (collapsed: boolean) => void
+  setSideBySide: React.Dispatch<React.SetStateAction<boolean>>
   sideBySide: boolean
   toggleDiffShowWhitespace: () => void
   toggleDiffWordWrap: () => void
@@ -31,33 +26,38 @@ export function useCombinedDiffViewPreferences({
   updateSettings
 }: {
   combinedDiffFileTreeVisibleByDefault: boolean | undefined
-  diffDefaultView: DiffViewSettings['diffDefaultView'] | undefined
+  diffDefaultView: string | undefined
   diffShowWhitespace: boolean | undefined
   diffWordWrap: boolean | undefined
   registry: CombinedDiffSectionLoadRegistry
   setSections: React.Dispatch<React.SetStateAction<DiffSection[]>>
-  updateSettings: (patch: Partial<DiffViewSettings>) => unknown
+  updateSettings: (patch: { diffShowWhitespace?: boolean; diffWordWrap?: boolean }) => unknown
 }): CombinedDiffViewPreferences {
   const { loadSchedulerRef, loadedIndicesRef, sectionsRef } = registry
-  const sideBySide = diffDefaultView === 'side-by-side'
+  const [sideBySide, setSideBySide] = useState(
+    () => combinedDiffViewPreferences.sideBySide ?? diffDefaultView === 'side-by-side'
+  )
   const [fileTreeCollapsed, setFileTreeCollapsedState] = useState(
     () =>
       // While settings load, open the opt-in tree only for an explicit saved preference.
       combinedDiffViewPreferences.fileTreeCollapsed ?? combinedDiffFileTreeVisibleByDefault !== true
   )
 
-  const [prevFileTreeVisibleByDefault, setPrevFileTreeVisibleByDefault] = useState(
-    combinedDiffFileTreeVisibleByDefault
-  )
-  if (prevFileTreeVisibleByDefault !== combinedDiffFileTreeVisibleByDefault) {
-    setPrevFileTreeVisibleByDefault(combinedDiffFileTreeVisibleByDefault)
+  // Use settings until the first session toolbar choice, then retain that choice over global defaults.
+  useEffect(() => {
+    if (diffDefaultView !== undefined && combinedDiffViewPreferences.sideBySide === null) {
+      setSideBySide(diffDefaultView === 'side-by-side')
+    }
+  }, [diffDefaultView])
+
+  useEffect(() => {
     if (
       combinedDiffFileTreeVisibleByDefault !== undefined &&
       combinedDiffViewPreferences.fileTreeCollapsed === null
     ) {
       setFileTreeCollapsedState(combinedDiffFileTreeVisibleByDefault === false)
     }
-  }
+  }, [combinedDiffFileTreeVisibleByDefault])
 
   const setFileTreeCollapsed = useCallback((collapsed: boolean) => {
     combinedDiffViewPreferences.fileTreeCollapsed = collapsed
@@ -82,8 +82,11 @@ export function useCombinedDiffViewPreferences({
   )
 
   const toggleSideBySide = useCallback(() => {
-    void updateSettings({ diffDefaultView: sideBySide ? 'inline' : 'side-by-side' })
-  }, [sideBySide, updateSettings])
+    // Write module preferences outside React updaters, which may replay.
+    const next = !sideBySide
+    combinedDiffViewPreferences.sideBySide = next
+    setSideBySide(next)
+  }, [sideBySide])
 
   const toggleDiffWordWrap = useCallback(() => {
     void updateSettings({ diffWordWrap: diffWordWrap !== true })
@@ -97,6 +100,7 @@ export function useCombinedDiffViewPreferences({
     fileTreeCollapsed,
     setAllSectionsCollapsed,
     setFileTreeCollapsed,
+    setSideBySide,
     sideBySide,
     toggleDiffShowWhitespace,
     toggleDiffWordWrap,

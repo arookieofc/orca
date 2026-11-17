@@ -1,4 +1,3 @@
-import { taskProviderFailure } from '../../shared/work-items/task-provider-failure'
 import type {
   JiraCreateIssueArgs,
   JiraCreateIssueResult,
@@ -32,11 +31,11 @@ function toUserFieldValue(site: JiraSite, value: unknown): unknown {
 export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreateIssueResult> {
   const entry = getClients(args.siteId)[0]
   if (!entry) {
-    return taskProviderFailure('jira.notConnected', 'Not connected to Jira.')
+    return { ok: false, error: 'Not connected to Jira.' }
   }
   const title = args.title.trim()
   if (!title) {
-    return taskProviderFailure('jira.titleRequired', 'Title is required.')
+    return { ok: false, error: 'Title is required.' }
   }
 
   await acquire()
@@ -70,9 +69,7 @@ export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreate
       clearToken(entry.site.id)
       throw error
     }
-    return error instanceof Error
-      ? { ok: false, error: error.message }
-      : taskProviderFailure('jira.createFailed', 'Failed to create issue.')
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to create issue.' }
   } finally {
     release()
   }
@@ -85,10 +82,10 @@ export async function updateIssue(
 ): Promise<JiraMutationResult> {
   const entry = getClients(siteId)[0]
   if (!entry) {
-    return taskProviderFailure('jira.notConnected', 'Not connected to Jira.')
+    return { ok: false, error: 'Not connected to Jira.' }
   }
   if (updates.labels && updates.labelOperations) {
-    return taskProviderFailure('jira.labelsConflict', 'Pass labels or labelOperations, not both.')
+    return { ok: false, error: 'Pass labels or labelOperations, not both.' }
   }
   await acquire()
   try {
@@ -144,9 +141,7 @@ export async function updateIssue(
       clearToken(entry.site.id)
       throw error
     }
-    return error instanceof Error
-      ? { ok: false, error: error.message }
-      : taskProviderFailure('jira.updateFailed', 'Failed to update issue.')
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to update issue.' }
   } finally {
     release()
   }
@@ -159,7 +154,7 @@ export async function addIssueComment(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const entry = getClients(siteId)[0]
   if (!entry) {
-    return taskProviderFailure('jira.notConnected', 'Not connected to Jira.')
+    return { ok: false, error: 'Not connected to Jira.' }
   }
   await acquire()
   try {
@@ -177,9 +172,7 @@ export async function addIssueComment(
       clearToken(entry.site.id)
       throw error
     }
-    return error instanceof Error
-      ? { ok: false, error: error.message }
-      : taskProviderFailure('jira.commentFailed', 'Failed to add comment.')
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to add comment.' }
   } finally {
     release()
   }

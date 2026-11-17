@@ -1,12 +1,6 @@
-import type {
-  OpenCodeUsageRange,
-  OpenCodeUsageScope
-} from '../../shared/agent-usage/analytics/opencode-usage-types'
+import type { OpenCodeUsageRange, OpenCodeUsageScope } from '../../shared/opencode-usage-types'
 import type { OpenCodeUsageDailyAggregate, OpenCodeUsageSession } from './types'
-import {
-  getLocalUsageDay,
-  getUsageRangeCutoff
-} from '../usage/reporting/range-query/usage-calendar-range'
+import { getLocalUsageDay, getUsageRangeCutoff } from '../usage/usage-calendar-range'
 
 export function filterDailyAggregatesByScopeAndRange(
   dailyAggregates: OpenCodeUsageDailyAggregate[],

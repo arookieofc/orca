@@ -2,25 +2,24 @@ import { existsSync, readFileSync, unlinkSync } from 'node:fs'
 import type { SFTPWrapper } from 'ssh2'
 
 // Muse allowlists hook environment variables; persist Orca coordinates to preserve attribution.
-import type {
-  AgentHookInstallState,
-  AgentHookInstallStatus
-} from '../../shared/agent-hook-listener/configuration/agent-hook-types'
-import { buildWindowsAgentHookCurlPostCommand } from '../agent-hooks/installation/commands/windows-agent-hook-post-command'
-import { writeHooksJson } from '../agent-hooks/installation/configuration/hooks-json-write'
-import { writeManagedScript } from '../agent-hooks/installation/scripts/managed-hook-script-write'
-import { refreshManagedScriptIfPresent } from '../agent-hooks/installation/scripts/managed-hook-script-refresh'
+import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
+import {
+  buildWindowsAgentHookCurlPostCommand,
+  writeHooksJson,
+  writeManagedScript
+} from '../agent-hooks/installer-utils'
+import { refreshManagedScriptIfPresent } from '../agent-hooks/managed-hook-script-refresh'
 import {
   readTextFileRemote,
+  writeManagedScriptRemote,
   writeTextFileRemoteAtomic
-} from '../agent-hooks/installation/remote/hook-text-files-remote'
-import { writeManagedScriptRemote } from '../agent-hooks/installation/scripts/managed-script-write-remote'
+} from '../agent-hooks/installer-utils-remote'
 import {
   buildPosixHookPayloadCapture,
   buildPosixHookSpoolLines,
   buildWindowsHookEnvironmentGuardLines
-} from '../agent-hooks/installation/scripts/hook-stdin-contract'
-import { buildPosixAgentHookPostCommand } from '../agent-hooks/installation/scripts/hook-post-command'
+} from '../agent-hooks/hook-stdin-contract'
+import { buildPosixAgentHookPostCommand } from '../agent-hooks/hook-post-command'
 import {
   buildMuseManagedHooksFile,
   getMuseConfigPath,
@@ -36,7 +35,6 @@ import {
   refreshMuseManagedHooksFile
 } from './hook-settings'
 import {
-  hasOrcaEnvVars,
   MUSE_MANAGED_HOOK_ENV_VARS,
   parseMuseSettingsText,
   readMuseSettingsSource,
@@ -294,9 +292,7 @@ export class MuseHookService {
         detail: 'Could not read Muse settings.json'
       }
     }
-    // Builds before the env-var cleanup dropped only the pointer; finish those too.
-    const pointer = source.config.managed_hooks_path
-    if (pointer === managedHooksPath || (pointer === undefined && hasOrcaEnvVars(source.config))) {
+    if (source.config.managed_hooks_path === managedHooksPath) {
       const nextText = serializeMuseSettings(source.text, undefined)
       if (source.text !== nextText) {
         writeHooksJson(configPath, source.config, { serialized: nextText })

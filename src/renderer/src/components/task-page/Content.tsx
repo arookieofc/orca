@@ -1,9 +1,8 @@
 import type { TaskPageComposerActionsModel } from './use-task-page-composer-actions'
 import PullRequestPage from '@/components/PullRequestPage'
 import GitHubItemDialog from '@/components/GitHubItemDialog'
-import { useTranslate } from '@/i18n/use-translate'
 import ProjectViewWrapper from '@/components/github-project/ProjectViewWrapper'
-import { TaskPageGitHubList } from './github/listing/List'
+import { TaskPageGitHubList } from './github/List'
 import { TaskPageGitLabTodoList } from './gitlab/TodoList'
 import { TaskPageGitLabItemList } from './gitlab/ItemList'
 import { TaskPageJiraContent } from './jira/Content'
@@ -12,7 +11,6 @@ export function TaskPageContent({
 }: {
   model: TaskPageComposerActionsModel
 }): React.JSX.Element | null {
-  const t = useTranslate()
   const {
     repoSelection,
     taskSource,
@@ -36,7 +34,7 @@ export function TaskPageContent({
         repoPath={dialogRepoPath}
         repoId={dialogWorkItem.repoId}
         sourceContext={dialogSourceContext}
-        backLabel={t('auto.components.TaskPage.backToPullRequests', 'Pull requests')}
+        backLabel="Pull requests"
         onUse={(item) => {
           setDialogWorkItem(null)
           handleUseWorkItem(item)
@@ -51,7 +49,7 @@ export function TaskPageContent({
         repoPath={dialogRepoPath}
         repoId={dialogWorkItem.repoId}
         sourceContext={dialogSourceContext}
-        backLabel={t('auto.components.TaskPage.backToGitHubList', 'GitHub list')}
+        backLabel="GitHub list"
         onUse={(item) => {
           setDialogWorkItem(null)
           handleUseWorkItem(item)

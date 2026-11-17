@@ -1,6 +1,7 @@
-import { type BrowserWindow, ipcMain } from 'electron'
-import type { Store } from '../../persistence/loading-store/store'
-import type { Repo } from '../../../shared/repository/repo-types'
+import type { BrowserWindow } from 'electron'
+import { ipcMain } from 'electron'
+import type { Store } from '../../persistence'
+import type { Repo } from '../../../shared/repo-types'
 import type {
   ProjectHostSetupCreateArgs,
   ProjectHostSetupCreateResult,
@@ -10,20 +11,14 @@ import type {
   ProjectHostSetupResult,
   ProjectHostSetupUpdateArgs,
   ProjectHostSetupUpdateResult
-} from '../../../shared/project/project-types'
-import { getProjectHostSetupForRepo } from '../../../shared/project/host-setup/project-host-setup-lookup'
-import {
-  linkImportedFolderToProject,
-  type RepositoryMetadataOwner
-} from '../../workspaces/catalog/imported-folder-project-link'
-import { readCurrentGitRemoteIdentity } from '../../workspaces/catalog/repo-git-remote-identity'
-import {
-  getRepoExecutionHostId,
-  parseExecutionHostId
-} from '../../../shared/execution-host/execution-host'
-import { prepareLocalWorktreeRootForRepo } from '../../workspaces/creation/worktree-root-preparation'
-import { updateProjectHostSetupWithProvenKind } from '../../workspaces/catalog/folder-repo-git-conversion'
-import { invalidateAuthorizedRootsCache } from '../worktrees/removal/registered-worktree-roots-cache'
+} from '../../../shared/project-types'
+import { getProjectHostSetupForRepo } from '../../../shared/project-host-setup-lookup'
+import { resolveImportedFolderProjectLink } from '../../../shared/imported-folder-project-identity'
+import { readCurrentGitRemoteIdentity } from '../../repo-git-remote-identity'
+import { getRepoExecutionHostId, parseExecutionHostId } from '../../../shared/execution-host'
+import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation'
+import { updateProjectHostSetupWithProvenKind } from '../../folder-repo-git-conversion'
+import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
 import { emitRepoAdded } from './repo-added-telemetry'
 import { notifyReposChanged } from './repos-changed-notification'
 import {
@@ -34,12 +29,11 @@ import {
   parseProjectGroupIpcArgs
 } from './repo-ipc-arg-schemas'
 import { addLocalRepoFromPath } from './local-repo-registration'
-import { sshHostWithoutServerMessage } from '../../../shared/project/host-setup/project-host-setup-target'
-import { getSshTargetRegistryStore } from '../../ssh/targets/ssh-target-registry'
+import { sshTargetNotConnectedMessage } from '../../providers/ssh-host-not-served-error'
 import {
   assertWslMoveHostSetupIdWritable,
   assertWslMoveHostSetupWritable
-} from '../../persistence/moving-wsl-projects/quiescence/wsl-move-scope-guard'
+} from '../../persistence/moving-wsl-projects/wsl-move-scope-guard'
 
 function buildProjectHostSetupResult(store: Store, repo: Repo): ProjectHostSetupResult {
   const setup = getProjectHostSetupForRepo(store.getProjectHostSetups(), repo)
@@ -50,11 +44,48 @@ function buildProjectHostSetupResult(store: Store, repo: Repo): ProjectHostSetup
   return { project, setup, repo }
 }
 
-export function registerProjectHostSetupHandlers(
-  mainWindow: BrowserWindow,
+function alignRepoWithRequestedProject(
   store: Store,
-  metadata: RepositoryMetadataOwner
-): void {
+  repo: Repo,
+  folderRemote: Pick<Repo, 'gitRemoteIdentity'>,
+  projectId: string,
+  setupMethod: ProjectHostSetupExistingFolderArgs['setupMethod'] = 'imported-existing-folder',
+  requestedProviderIdentity?: ProjectHostSetupExistingFolderArgs['projectProviderIdentity']
+): ProjectHostSetupResult {
+  assertWslMoveHostSetupWritable(store, {
+    projectId,
+    hostId: getRepoExecutionHostId(repo),
+    repoId: repo.id
+  })
+  let setup = getProjectHostSetupForRepo(store.getProjectHostSetups(), repo)
+  if (setup.projectId !== projectId) {
+    const project = store.getProjects().find((entry) => entry.id === projectId)
+    // Project identity must travel with the request when it exists only on the source host.
+    const updated = store.updateRepo(
+      repo,
+      resolveImportedFolderProjectLink(
+        { ...repo, ...folderRemote },
+        projectId,
+        project?.providerIdentity ?? requestedProviderIdentity
+      )
+    )
+    if (!updated) {
+      throw new Error(`Project setup repo disappeared before it could be linked: ${repo.id}`)
+    }
+    repo = updated
+    setup = getProjectHostSetupForRepo(store.getProjectHostSetups(), repo)
+  }
+  const updated = store.updateRepo(repo, { projectHostSetupMethod: setupMethod })
+  if (!updated) {
+    throw new Error(
+      `Project setup repo disappeared before setup metadata could be linked: ${repo.id}`
+    )
+  }
+  repo = updated
+  return buildProjectHostSetupResult(store, repo)
+}
+
+export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, store: Store): void {
   ipcMain.handle(
     'projectHostSetups:create',
     (_event, rawArgs: ProjectHostSetupCreateArgs): ProjectHostSetupCreateResult => {
@@ -139,12 +170,7 @@ export function registerProjectHostSetupHandlers(
         parsedHost.kind === 'local'
           ? await addLocalRepoFromPath(store, args.path, args.kind)
           : parsedHost.kind === 'ssh'
-            ? {
-                error: sshHostWithoutServerMessage(
-                  getSshTargetRegistryStore()?.getTarget(parsedHost.targetId)?.label ??
-                    parsedHost.targetId
-                )
-              }
+            ? { error: sshTargetNotConnectedMessage(parsedHost.targetId) }
             : {
                 error:
                   'Runtime hosts must be set up through the runtime projectHostSetup.setupExistingFolder RPC.'
@@ -159,21 +185,20 @@ export function registerProjectHostSetupHandlers(
           : result.repo
       let aligned: ProjectHostSetupResult
       try {
-        const repo = await linkImportedFolderToProject(
-          () => store,
+        aligned = alignRepoWithRequestedProject(
+          store,
           result.repo,
           folderRemote,
-          { ...args, hostId: getRepoExecutionHostId(result.repo) },
-          metadata
+          args.projectId,
+          args.setupMethod,
+          args.projectProviderIdentity
         )
-        aligned = buildProjectHostSetupResult(store, repo)
       } catch (err) {
         // Failed linking must not leave a newly registered repo or authorization root.
         if (!result.alreadyExisted) {
           store.removeProjectForHost(result.repo)
           invalidateAuthorizedRootsCache()
         }
-        notifyReposChanged(mainWindow)
         throw err
       }
       invalidateAuthorizedRootsCache()

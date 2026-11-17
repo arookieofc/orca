@@ -1,13 +1,8 @@
 import { useEffect } from 'react'
-import { useAppStore } from '@/store/index'
-import { activateAndRevealWorktree } from '@/lib/workspace/activation/worktree-activation'
-import {
-  pickSpaceWindowState,
-  spaceWindowStateChanged,
-  type SpaceWindowState
-} from './space-window-state'
-import { revealWorkspaceSpaceChange } from '../status-bar/workspace-storage/table/workspace-space-open-change'
-import { refreshLinkedIssueForWorktree } from '../status-bar/workspace-storage/decisions/workspace-space-issue-freshness'
+import { useAppStore } from '@/store'
+import { activateAndRevealWorktree } from '@/lib/worktree-activation'
+import { pickSpaceWindowState, spaceWindowStateChanged } from './space-window-state'
+import { revealWorkspaceSpaceChange } from '../status-bar/workspace-space-open-change'
 
 export function SpaceWindowStatePublisher(): null {
   useEffect(() => {
@@ -15,24 +10,13 @@ export function SpaceWindowStatePublisher(): null {
     if (!api.publishWindowState || !api.onWindowStateRequested) {
       return
     }
-    const publishWindowState = api.publishWindowState
     let windowOpen = false
     let timer: ReturnType<typeof setTimeout> | null = null
     let offStore: (() => void) | null = null
-    let lastPublishedDrafts: SpaceWindowState['editorDrafts'] | null = null
-    const publish = (includeDrafts = false): void => {
-      if (timer !== null) {
-        clearTimeout(timer)
-      }
+    const publish = (): void => {
       timer = null
       if (windowOpen) {
-        const state = pickSpaceWindowState(useAppStore.getState())
-        const { editorDrafts, ...withoutDrafts } = state
-        const update = includeDrafts || editorDrafts !== lastPublishedDrafts ? state : withoutDrafts
-        lastPublishedDrafts = editorDrafts
-        void publishWindowState(update).catch(() => {
-          lastPublishedDrafts = null
-        })
+        void api.publishWindowState?.(pickSpaceWindowState(useAppStore.getState()))
       }
     }
     const queuePublish = (): void => {
@@ -42,18 +26,15 @@ export function SpaceWindowStatePublisher(): null {
     }
     const offRequest = api.onWindowStateRequested(() => {
       windowOpen = true
-      if (offStore == null) {
-        offStore = useAppStore.subscribe((next, previous) => {
-          if (spaceWindowStateChanged(previous, next)) {
-            queuePublish()
-          }
-        })
-      }
-      publish(true)
+      offStore ??= useAppStore.subscribe((next, previous) => {
+        if (spaceWindowStateChanged(previous, next)) {
+          queuePublish()
+        }
+      })
+      publish()
     })
     const offClose = api.onWindowClosed?.(() => {
       windowOpen = false
-      lastPublishedDrafts = null
       offStore?.()
       offStore = null
       if (timer !== null) {
@@ -71,9 +52,6 @@ export function SpaceWindowStatePublisher(): null {
     const offRefresh = api.onWorktreeRefreshRequested?.(() => {
       void useAppStore.getState().fetchAllWorktrees()
     })
-    const offIssueRefresh = api.onIssueRefreshRequested?.((worktreeId, executionHostId) => {
-      refreshLinkedIssueForWorktree(worktreeId, executionHostId)
-    })
     const offAnalysis = api.onWindowAnalysis?.((analysis) => {
       if (typeof analysis.scannedAt === 'number') {
         useAppStore.setState({ workspaceSpaceAnalysis: analysis })
@@ -88,7 +66,6 @@ export function SpaceWindowStatePublisher(): null {
       offClose?.()
       offReveal?.()
       offRefresh?.()
-      offIssueRefresh?.()
       offAnalysis?.()
     }
   }, [])

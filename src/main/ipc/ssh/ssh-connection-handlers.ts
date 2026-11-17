@@ -12,34 +12,34 @@ import { connectTarget } from './ssh-connect-flow'
 import { connectionManager } from './ssh-ipc-context'
 import { getPublicSshState } from './ssh-renderer-broadcast'
 import { disconnectSshHostForUser } from './ssh-host-user-disconnect'
-import { errorMessage } from '../../../shared/errors/error-message'
+import { disconnectRegisteredSshTarget } from './ssh-session-teardown'
+import { errorMessage } from '../../../shared/error-message'
 import {
   clearSshCredentialDeclined,
   isSshCredentialDeclined
-} from '../../ssh/authentication/ssh-credential-decline'
+} from '../../ssh/ssh-credential-decline'
 
-export function registerSshConnectionHandlers(
-  handle: typeof ipcMain.handle = ipcMain.handle.bind(ipcMain)
-): void {
+export function registerSshConnectionHandlers(): void {
   setSshTargetRegistryHandlers({
     connect: connectTarget,
-    getState: (targetId: string) => getPublicSshState(targetId)
+    getState: (targetId: string) => getPublicSshState(targetId),
+    disconnect: disconnectRegisteredSshTarget
   })
 
-  handle('ssh:connect', async (_event, args: { targetId: string; automatic?: boolean }) => {
+  ipcMain.handle('ssh:connect', async (_event, args: { targetId: string; automatic?: boolean }) => {
     return connectTarget(args.targetId, { automatic: args.automatic === true })
   })
 
-  handle('ssh:disconnect', async (_event, args: { targetId: string }) => {
+  ipcMain.handle('ssh:disconnect', async (_event, args: { targetId: string }) => {
     await disconnectSshHostForUser(args.targetId)
   })
 
-  handle('ssh:getState', (_event, args: { targetId: string }) => {
+  ipcMain.handle('ssh:getState', (_event, args: { targetId: string }) => {
     return getPublicSshState(args.targetId)
   })
 
   // Auto-connect callers need to avoid prompts when credentials were declined or are no longer cached.
-  handle('ssh:needsPassphrasePrompt', (_event, args: { targetId: string }) => {
+  ipcMain.handle('ssh:needsPassphrasePrompt', (_event, args: { targetId: string }) => {
     if (isSshCredentialDeclined(args.targetId)) {
       return true
     }
@@ -50,7 +50,7 @@ export function registerSshConnectionHandlers(
     return !connectionManager!.hasCachedCredential(target)
   })
 
-  handle('ssh:testConnection', async (_event, args: { targetId: string }) => {
+  ipcMain.handle('ssh:testConnection', async (_event, args: { targetId: string }) => {
     const target = getSshTargetRegistryStore()!.getTarget(args.targetId)
     if (!target) {
       throw new Error(`SSH target "${args.targetId}" not found`)

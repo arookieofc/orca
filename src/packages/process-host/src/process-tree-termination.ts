@@ -81,9 +81,6 @@ function taskkillTree(
 async function waitForPosixProcessGroupQuiescence(processGroupId: number): Promise<boolean> {
   const deadline = Date.now() + SUBPROCESS_TIMEOUT_MS
   while (true) {
-    if (!processGroupExists(processGroupId)) {
-      return true
-    }
     const states = await readPosixProcessGroupStates(processGroupId)
     if (
       states ? states.every((state) => state.startsWith('Z')) : !processGroupExists(processGroupId)
@@ -150,7 +147,7 @@ function readPosixProcessGroupStates(processGroupId: number): Promise<string[] |
   })
 }
 
-export function processGroupExists(processGroupId: number): boolean {
+function processGroupExists(processGroupId: number): boolean {
   try {
     process.kill(-processGroupId, 0)
     return true

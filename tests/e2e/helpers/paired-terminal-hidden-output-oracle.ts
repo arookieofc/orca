@@ -1,5 +1,5 @@
 import type { Page } from '@stablyai/playwright-test'
-import type { RuntimeTerminalRead } from '../../../src/shared/terminal/runtime/runtime-terminal-contracts'
+import type { RuntimeTerminalRead } from '../../../src/shared/runtime-types'
 import { startRendererLagProbe } from '../paired-runtime-retention-metrics'
 import { expect } from './orca-app'
 

@@ -1,15 +1,11 @@
 import { LayoutDashboard } from 'lucide-react'
-import { useAppStore } from '@/store/index'
-import { cn } from '@/lib/class-names'
+import { useAppStore } from '@/store'
+import { cn } from '@/lib/utils'
 import { AgentQuestionIcon } from '@/components/AgentQuestionIcon'
-import {
-  DASHBOARD_BUCKET_ORDER,
-  type DashboardBucket
-} from '../../../../shared/agent-status/presentation/dashboard-snapshot'
-import { useAgentBucketCounts } from '@/components/dashboard/bucket-counts/useAgentBucketCounts'
-import { resolveAgentDashboardMode } from '@/components/dashboard/settings/agent-dashboard-open-mode'
+import { DASHBOARD_BUCKET_ORDER, type DashboardBucket } from '../../../../shared/dashboard-snapshot'
+import { useAgentBucketCounts } from '@/components/dashboard/useAgentBucketCounts'
+import { resolveAgentDashboardMode } from '@/components/dashboard/agent-dashboard-open-mode'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
 
 const DASHBOARD_BUCKET_DOT_CLASS: Record<'working' | 'done' | 'idle', string> = {
   working: 'bg-yellow-500',
@@ -17,16 +13,16 @@ const DASHBOARD_BUCKET_DOT_CLASS: Record<'working' | 'done' | 'idle', string> = 
   idle: 'bg-neutral-500/50'
 }
 
-function dashboardBucketLabel(bucket: DashboardBucket, t: Translate = translate): string {
+function dashboardBucketLabel(bucket: DashboardBucket): string {
   switch (bucket) {
     case 'attention':
-      return t('dashboardPopout.bucket.attention', 'Needs You')
+      return translate('dashboardPopout.bucket.attention', 'Needs You')
     case 'working':
-      return t('dashboardPopout.bucket.working', 'Working')
+      return translate('dashboardPopout.bucket.working', 'Working')
     case 'done':
-      return t('dashboardPopout.bucket.done', 'Done')
+      return translate('dashboardPopout.bucket.done', 'Done')
     case 'idle':
-      return t('dashboardPopout.bucket.idle', 'Idle')
+      return translate('dashboardPopout.bucket.idle', 'Idle')
   }
 }
 
@@ -37,7 +33,6 @@ function DashboardBucketCounts({
   counts: Record<DashboardBucket, number>
   showIdle: boolean
 }): React.JSX.Element | null {
-  const t = useTranslate()
   const active = DASHBOARD_BUCKET_ORDER.filter(
     (bucket) => counts[bucket] > 0 && (bucket !== 'idle' || showIdle)
   )
@@ -49,7 +44,7 @@ function DashboardBucketCounts({
       {active.map((bucket) => (
         <span
           key={bucket}
-          aria-label={`${dashboardBucketLabel(bucket, t)}: ${counts[bucket]}`}
+          aria-label={`${dashboardBucketLabel(bucket)}: ${counts[bucket]}`}
           className="inline-flex items-center gap-1 text-[10px] tabular-nums text-worktree-sidebar-foreground/55"
         >
           {bucket === 'attention' ? (
@@ -65,7 +60,6 @@ function DashboardBucketCounts({
 }
 
 export default function AgentDashboardSidebarEntry(): React.JSX.Element {
-  const t = useTranslate()
   const dashboardBucketCounts = useAgentBucketCounts()
   const showIdle = useAppStore((s) => s.settings?.experimentalAgentDashboardShowIdle === true)
   const openAsPopout = useAppStore((s) => resolveAgentDashboardMode(s.settings) === 'popout')
@@ -92,7 +86,9 @@ export default function AgentDashboardSidebarEntry(): React.JSX.Element {
         className="size-4 shrink-0 text-worktree-sidebar-foreground/30"
         strokeWidth={1.75}
       />
-      <span className="flex-1">{t('dashboard.sidebar.dashboardLabel', 'Agent Dashboard')}</span>
+      <span className="flex-1">
+        {translate('dashboard.sidebar.dashboardLabel', 'Agent Dashboard')}
+      </span>
       <DashboardBucketCounts counts={dashboardBucketCounts} showIdle={showIdle} />
     </button>
   )

@@ -1,5 +1,5 @@
-import { cn } from '@/lib/class-names'
-import { useTranslate } from '@/i18n/use-translate'
+import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
 import type { ReactNode } from 'react'
 
 export type ComposerTab = 'write' | 'preview'
@@ -13,7 +13,6 @@ export function GitHubMarkdownComposerTabbar({
   onTabChange: (tab: ComposerTab) => void
   children: ReactNode
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div className="github-markdown-composer-tabbar">
       <div className="github-markdown-composer-tabs" role="tablist">
@@ -24,7 +23,7 @@ export function GitHubMarkdownComposerTabbar({
           className={cn('github-markdown-composer-tab', activeTab === 'write' && 'is-active')}
           onClick={() => onTabChange('write')}
         >
-          {t('auto.components.github.GitHubMarkdownComposer.c91f0a2b14', 'Write')}
+          {translate('auto.components.github.GitHubMarkdownComposer.c91f0a2b14', 'Write')}
         </button>
         <button
           type="button"
@@ -33,7 +32,7 @@ export function GitHubMarkdownComposerTabbar({
           className={cn('github-markdown-composer-tab', activeTab === 'preview' && 'is-active')}
           onClick={() => onTabChange('preview')}
         >
-          {t('auto.components.github.GitHubMarkdownComposer.d82b1e3f05', 'Preview')}
+          {translate('auto.components.github.GitHubMarkdownComposer.d82b1e3f05', 'Preview')}
         </button>
       </div>
       {activeTab === 'write' ? (

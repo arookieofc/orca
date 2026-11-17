@@ -4,13 +4,12 @@ import { translate } from '@/i18n/i18n'
 import {
   ONBOARDING_FINAL_STEP,
   ONBOARDING_FLOW_VERSION
-} from '../../../../shared/onboarding/onboarding-defaults'
-import type { EventProps } from '../../../../shared/telemetry/telemetry-event-classification'
-import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
-import type { OnboardingState } from '../../../../shared/onboarding/onboarding-state-types'
-import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
-import { STEPS, type AgentSurface } from './use-onboarding-flow-types'
-import type { ThemeLookSettings } from './onboarding-theme-look-settings'
+} from '../../../../shared/onboarding-defaults'
+import type { EventProps } from '../../../../shared/telemetry-events'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { OnboardingState } from '../../../../shared/onboarding-state-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import { STEPS } from './use-onboarding-flow-types'
 
 type TaskSourcesSnapshotProps = EventProps<'onboarding_task_sources_snapshot'>
 type TaskSourcesGithubStatus = TaskSourcesSnapshotProps['github_status']
@@ -122,23 +121,11 @@ export function remapOpenOnboardingLastCompletedStep({
   return lastCompletedStep
 }
 
-/** Chat turns on the experimental Chat UI; Terminal turns it off. Unchanged choices write nothing. */
-export function agentSurfaceSettingsUpdate(
-  settings: Pick<GlobalSettings, 'agentDefaultSurface'> | null | undefined,
-  surface: AgentSurface
-): Partial<Pick<GlobalSettings, 'agentDefaultSurface'>> {
-  const chat = surface === 'chat'
-  return (settings?.agentDefaultSurface === 'chat') === chat ? {} : { agentDefaultSurface: surface }
-}
-
 type SkippedOnboardingPreferenceOptions = {
   currentStepId: OnboardingStepId
-  /** Look settings as the theme step found them; null before it was reached. */
-  lookBeforePreview: ThemeLookSettings | null
+  themeBeforePreview: GlobalSettings['theme'] | null
   settingsTheme: GlobalSettings['theme'] | undefined
   selectedAgent: TuiAgent | null
-  agentSurface: AgentSurface
-  settings: Pick<GlobalSettings, 'agentDefaultSurface'> | null
   setTheme: (theme: GlobalSettings['theme']) => void
   applyTheme: (theme: GlobalSettings['theme']) => void
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void> | void
@@ -147,11 +134,9 @@ type SkippedOnboardingPreferenceOptions = {
 
 export async function prepareSkippedOnboardingPreferences({
   currentStepId,
-  lookBeforePreview,
+  themeBeforePreview,
   settingsTheme,
   selectedAgent,
-  agentSurface,
-  settings,
   setTheme,
   applyTheme,
   updateSettings,
@@ -160,22 +145,16 @@ export async function prepareSkippedOnboardingPreferences({
   try {
     // Why: theme tiles save immediately for a stable preview, but skip must not keep this step's choice.
     if (currentStepId === 'theme') {
-      const themeToRestore = lookBeforePreview?.theme ?? settingsTheme
+      const themeToRestore = themeBeforePreview ?? settingsTheme
       if (themeToRestore) {
         setTheme(themeToRestore)
         applyTheme(themeToRestore)
-        await updateSettings({ ...lookBeforePreview, theme: themeToRestore })
+        await updateSettings({ theme: themeToRestore })
       }
     }
-    // Later confirms the visible page without replacing an unvisited agent choice.
-    if (currentStepId === 'agent_surface' || currentStepId === 'agent') {
-      const updates: Partial<GlobalSettings> = {
-        ...agentSurfaceSettingsUpdate(settings, agentSurface),
-        ...(currentStepId === 'agent' ? { defaultTuiAgent: selectedAgent ?? 'blank' } : {})
-      }
-      if (Object.keys(updates).length > 0) {
-        await updateSettings(updates)
-      }
+    // Why: skipping bypasses step persistence, so save the visible agent choice before closing.
+    if (currentStepId === 'agent' && selectedAgent) {
+      await updateSettings({ defaultTuiAgent: selectedAgent })
     }
     return true
   } catch (err) {

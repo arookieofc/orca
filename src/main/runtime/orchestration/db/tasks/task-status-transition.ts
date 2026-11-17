@@ -1,8 +1,7 @@
 import { OrchestrationError } from '../../orchestration-error'
-import type { TaskRow, TaskStatus } from '../orchestration-records'
+import type { TaskRow, TaskStatus } from '../../types'
 import { settleActiveDispatchesForTask } from '../dispatch-context/dispatch-completion'
 import type { OrchestrationDb } from '../orchestration-db'
-import { remoteHoldOnTask } from '../remote-owned/remote-placements'
 import {
   beginLifecycleWriteTransaction,
   commitLifecycleWriteTransaction,
@@ -29,22 +28,18 @@ export function updateTaskStatus(
       commitLifecycleWriteTransaction(this.db, transaction)
       return undefined
     }
-    const localActive = this.db
+    const active = this.db
       .prepare(
         `SELECT id FROM dispatch_contexts
          WHERE task_id = ? AND status IN ('pending', 'dispatched')
          ORDER BY rowid DESC LIMIT 1`
       )
       .get(id) as { id: string } | undefined
-    // A Task placed on a paired server is held by its attempt there exactly as by a local one.
-    const remote = remoteHoldOnTask(this, id)
-    const remoteDispatch = { id: remote?.dispatchId ?? '(a start on a paired server)' }
-    const active = localActive ?? (remote?.active ? remoteDispatch : undefined)
     // A live supervised worker forbids Task reopening; a dispatched no-op remains legal (#16904).
     const reopensUnderWorker = requiresActiveDispatch && task.status !== 'dispatched'
     const activeWorker =
       terminalStatus || reopensUnderWorker
-        ? ((this.db
+        ? (this.db
             .prepare(
               `SELECT active.id
              FROM dispatch_contexts active
@@ -53,8 +48,7 @@ export function updateTaskStatus(
                AND worker.state NOT IN ('failed', 'succeeded', 'stopped', 'abandoned')
              ORDER BY active.rowid DESC LIMIT 1`
             )
-            .get(id) as { id: string } | undefined) ??
-          (remote?.liveWorker ? remoteDispatch : undefined))
+            .get(id) as { id: string } | undefined)
         : undefined
     if (activeWorker) {
       throw new OrchestrationError(

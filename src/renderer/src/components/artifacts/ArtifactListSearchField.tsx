@@ -2,8 +2,8 @@ import { useRef } from 'react'
 import { Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
+import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 
 export function ArtifactListSearchField({
   query,
@@ -16,7 +16,6 @@ export function ArtifactListSearchField({
   onClear: () => void
   className?: string
 }): React.JSX.Element {
-  const t = useTranslate()
   const inputRef = useRef<HTMLInputElement>(null)
   const hasText = query !== ''
 
@@ -28,11 +27,11 @@ export function ArtifactListSearchField({
         type="text"
         autoFocus
         value={query}
-        aria-label={t(
+        aria-label={translate(
           'auto.components.artifacts.ArtifactListSearchField.label',
           'Search artifacts'
         )}
-        placeholder={t(
+        placeholder={translate(
           'auto.components.artifacts.ArtifactListSearchField.placeholder',
           'Search...'
         )}
@@ -57,7 +56,10 @@ export function ArtifactListSearchField({
           variant="ghost"
           size="icon-xs"
           className="absolute right-1 top-1/2 -translate-y-1/2"
-          aria-label={t('auto.components.artifacts.ArtifactListSearchField.clear', 'Clear search')}
+          aria-label={translate(
+            'auto.components.artifacts.ArtifactListSearchField.clear',
+            'Clear search'
+          )}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => {
             onClear()

@@ -1,25 +1,22 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { useAppStore } from '@/store/index'
-import { getIndexedAllWorktrees } from '@/store/slices/worktrees/listing/worktree-catalog-index'
-import { persistWorktreeSortOrderByHost } from '@/lib/workspace/persistence/worktree-sort-order-persistence'
-import type { Repo } from '../../../../../../shared/repository/repo-types'
+import { useAppStore } from '@/store'
+import { getAllWorktreesFromState } from '@/store/selectors'
+import { persistWorktreeSortOrderByHost } from '@/lib/worktree-sort-order-persistence'
+import type { Repo } from '../../../../../../shared/repo-types'
 import {
   NO_LIVE_SMART_SORT_SOURCES,
-  rankWorktreesForSort
-} from '../../../../../../shared/sidebar-list/sorting/smart-sort'
-import type { WorkspaceSortBy as SortBy } from '../../../../../../shared/workspace-view/workspace-row-sort'
+  rankWorktreesForSort,
+  type SortBy
+} from '../../../../../../shared/sidebar-list/smart-sort'
 import {
   ranksFollowPersistedOrder,
   smartSortPhase
-} from '../../../../../../shared/sidebar-list/sorting/smart-sort-phase'
+} from '../../../../../../shared/sidebar-list/smart-sort-phase'
 import { useReusedArrayIdentity } from './use-reused-array-identity'
-import { useSidebarListSession } from '@/components/sidebar/sidebar-feed/sidebar-list-session'
-import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../../../shared/sidebar-list/feed/sidebar-inputs-switch'
-import {
-  getWorktreeHostIdentity,
-  getWorktreeIdFromHostIdentity
-} from '../../../../../../shared/worktree/host-qualified-identity'
-import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
+import { useSidebarListSession } from '@/lib/sidebar-list-session'
+import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../../../shared/sidebar-inputs-switch'
+import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
+import { selectWorktreesByRepo } from '@/store/workspace-record-selectors'
 
 // Compute settled order synchronously; selection side effects must not reorder rows under the user.
 function useSettledSidebarWorktreeSortOrder(args: {
@@ -43,27 +40,15 @@ function useSettledSidebarWorktreeSortOrder(args: {
   const recomputedSort = useMemo(() => {
     const state = useAppStore.getState()
     const ranking = rankWorktreesForSort({
-      worktrees: getIndexedAllWorktrees(selectWorktreesByRepo(state)).filter(
-        (worktree) => !worktree.isArchived
-      ),
+      worktrees: getAllWorktreesFromState(state).filter((worktree) => !worktree.isArchived),
       sortBy,
       latched: sessionHasHadLiveSmartSignal.current,
       repoMap,
       now: Date.now(),
-      sources: {
-        ...state,
-        attentionForWorktree: (worktree, now) =>
-          state.agentStatusByPaneKey.projection.attention(
-            worktree.id,
-            worktree.lastActivityAt,
-            now
-          ),
-        hasFreshAttributedStatus: () => state.agentStatusByPaneKey.projection.hasFreshEvidence()
-      }
+      sources: state
     })
     return {
-      // Why host identity: same-id copies on two machines are separate cards with their own ranks.
-      sortedIds: ranking.sorted.map(getWorktreeHostIdentity),
+      sortedIds: ranking.sorted.map((w) => w.id),
       detectedLiveSmartSignal: ranking.detectedLiveSmartSignal
     }
     // settledSortEpoch is an intentional trigger not read in the memo; its change signals a recompute.
@@ -91,10 +76,7 @@ function useSettledSidebarWorktreeSortOrder(args: {
       return
     }
     // Why: sortOrder lives in each host's worktreeMeta, so persist each host's ids on that host.
-    persistWorktreeSortOrderByHost(
-      useAppStore.getState(),
-      sortedIds.map(getWorktreeIdFromHostIdentity)
-    )
+    persistWorktreeSortOrderByHost(useAppStore.getState(), sortedIds)
   }, [sortedIds, sortBy])
 
   return sortedIds
@@ -110,7 +92,7 @@ function useStampSidebarWorktreeSortOrder(args: {
   const ranked = useMemo(
     () =>
       rankWorktreesForSort({
-        worktrees: getIndexedAllWorktrees(worktreesByRepo).filter(
+        worktrees: getAllWorktreesFromState({ worktreesByRepo }).filter(
           (worktree) => !worktree.isArchived
         ),
         sortBy,

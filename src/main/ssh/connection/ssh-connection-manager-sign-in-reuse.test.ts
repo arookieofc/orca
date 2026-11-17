@@ -4,48 +4,45 @@ import {
   emitSshEvent,
   eventHandlers,
   ssh2Mock
-} from './testing/ssh-connection-test-client'
-import { resetSshConnectionMocks } from './testing/ssh-connection-test-harness'
-import { createCallbacks, createTarget } from './testing/ssh-connection-test-fixtures'
+} from '../__tests__/ssh-connection-test-client'
+import { resetSshConnectionMocks } from './ssh-connection-test-harness'
+import { createCallbacks, createTarget } from './ssh-connection-test-fixtures'
 import { SshConnectionManager } from './ssh-connection-manager'
-import { recordSshCredentialDeclined } from '../authentication/ssh-credential-decline'
+import {
+  recordSshCredentialDeclined,
+  resetSshCredentialDeclinesForTests
+} from '../ssh-credential-decline'
 
-vi.mock('../authentication/ssh2-module-load', async () =>
-  (await import('./testing/ssh-connection-test-client')).createSsh2LoaderModule()
+vi.mock('ssh2', async () =>
+  (await import('../__tests__/ssh-connection-test-client')).createSsh2Module()
 )
 vi.mock('../system-transport/system-ssh-binary', async () =>
-  (await import('./testing/ssh-connection-test-harness')).createSystemSshBinaryModule()
+  (await import('./ssh-connection-test-harness')).createSystemSshBinaryModule()
 )
 vi.mock('../system-transport/system-ssh-args', async (importOriginal) =>
-  (await import('./testing/ssh-connection-test-harness')).withSystemSshArgsMocks(
-    await importOriginal()
-  )
+  (await import('./ssh-connection-test-harness')).withSystemSshArgsMocks(await importOriginal())
 )
 vi.mock('../system-transport/system-ssh-command', async (importOriginal) =>
-  (await import('./testing/ssh-connection-test-harness')).withSystemSshCommandMocks(
+  (await import('./ssh-connection-test-harness')).withSystemSshCommandMocks(await importOriginal())
+)
+vi.mock('../system-transport/system-ssh-file-binary-transfer', async (importOriginal) =>
+  (await import('./ssh-connection-test-harness')).withSystemSshFileBinaryTransferMocks(
     await importOriginal()
   )
 )
-vi.mock(
-  '../system-transport/file-transfer/system-ssh-file-binary-transfer',
-  async (importOriginal) =>
-    (await import('./testing/ssh-connection-test-harness')).withSystemSshFileBinaryTransferMocks(
-      await importOriginal()
-    )
-)
-vi.mock('../system-transport/file-transfer/system-ssh-file-transfer', async (importOriginal) =>
-  (await import('./testing/ssh-connection-test-harness')).withSystemSshFileTransferMocks(
+vi.mock('../system-transport/system-ssh-file-transfer', async (importOriginal) =>
+  (await import('./ssh-connection-test-harness')).withSystemSshFileTransferMocks(
     await importOriginal()
   )
 )
-vi.mock('../system-transport/ssh-control-socket', async () =>
-  (await import('./testing/ssh-connection-test-harness')).createControlSocketModule()
+vi.mock('../ssh-control-socket', async () =>
+  (await import('./ssh-connection-test-harness')).createControlSocketModule()
 )
 vi.mock('../config/ssh-config-parser', async () =>
-  (await import('./testing/ssh-connection-test-harness')).createSshConfigParserModule()
+  (await import('./ssh-connection-test-harness')).createSshConfigParserModule()
 )
 vi.mock('../config/ssh-g-config-resolution', async (importOriginal) =>
-  (await import('./testing/ssh-connection-test-harness')).withSshGConfigResolutionMocks(
+  (await import('./ssh-connection-test-harness')).withSshGConfigResolutionMocks(
     await importOriginal()
   )
 )
@@ -63,6 +60,7 @@ describe('SshConnectionManager on a password host', () => {
 
   beforeEach(async () => {
     resetSshConnectionMocks()
+    resetSshCredentialDeclinesForTests()
     vi.stubEnv('SSH_AUTH_SOCK', '')
     onCredentialRequest.mockClear()
     manager = new SshConnectionManager(createCallbacks({ onCredentialRequest }))
@@ -88,6 +86,17 @@ describe('SshConnectionManager on a password host', () => {
     expect(replacement.getState().status).toBe('connected')
     expect(lastConnectPassword()).toBe('hunter2')
     expect(onCredentialRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not ask again after a background owner closed the connection it opened', async () => {
+    await manager.disconnectConnection('target-1', manager.getConnection('target-1')!)
+
+    ssh2Mock.connectSequence = ['ready']
+    await manager.connect(createTarget())
+
+    expect(lastConnectPassword()).toBe('hunter2')
+    expect(onCredentialRequest).toHaveBeenCalledTimes(1)
+    expect(manager.hasCachedCredential(createTarget())).toBe(true)
   })
 
   it('keeps the sign-in across a replacement that failed for a reason other than sign-in', async () => {

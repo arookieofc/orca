@@ -7,7 +7,6 @@ import {
 } from './visibility-state'
 import { allocatePtyLifecycleSequence } from '../host-env/types'
 import { makePtyDataPayload, sendPtyDataToRenderer } from './payload'
-import { makeDroppedOutputPayload } from './pending'
 import { getRendererInFlightCharsForPty } from './accounting'
 import { clearFlushTimerIfIdle } from './flush'
 import type { PtyIpcSession } from '../session'
@@ -87,7 +86,11 @@ function preparePtyExitForRenderer(
     if (remaining) {
       if (remaining.droppedOutput === true) {
         // Preserve the drop flag even when only salvaged query bytes remain.
-        sendPtyDataToRenderer(session, payload.id, makeDroppedOutputPayload(payload.id, remaining))
+        sendPtyDataToRenderer(session, payload.id, {
+          id: payload.id,
+          data: remaining.data,
+          droppedOutput: true
+        })
       } else {
         sendPtyDataToRenderer(
           session,
@@ -99,7 +102,7 @@ function preparePtyExitForRenderer(
             remaining.containsBackgroundOutput,
             remaining.rawLength,
             remaining.transformed,
-            remaining.startEscapeBoundary
+            remaining.gapEscapeState
           )
         )
       }

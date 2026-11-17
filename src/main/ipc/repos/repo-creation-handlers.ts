@@ -1,33 +1,20 @@
-import { type BrowserWindow, ipcMain } from 'electron'
+import type { BrowserWindow } from 'electron'
+import { ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { access, mkdir, readdir, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
-import type { Store } from '../../persistence/loading-store/store'
-import type { Repo } from '../../../shared/repository/repo-types'
-import type { RepositoryMetadataOwner } from '../../workspaces/catalog/imported-folder-project-link'
-import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/repository/appearance/repo-badge-color'
-import { getDefaultWorkspaceDir } from '../../../shared/orca-profiles/constants'
-import { normalizeRuntimePathForComparison } from '../../../shared/file-access/cross-platform-path'
-import {
-  getRepoExecutionHostId,
-  LOCAL_EXECUTION_HOST_ID
-} from '../../../shared/execution-host/execution-host'
-import { getEffectiveHostSetting } from '../../../shared/execution-host/host-setting-overrides'
-import { probeGitAvailability } from '../../git/command-runner/host-routing/git-availability'
-import { gitExecFileAsync } from '../../git/command-runner/git-exec-file'
-import { inspectGitRepoForRegistrationAsync } from '../../git/repositories/discovery/repo-detection'
-import {
-  getClonePathComparisonKey,
-  getSavedProjectPathKeys
-} from '../../git/repositories/cloning/repo-clone-path'
-import { detectRepoLocalMetadata } from '../../repository-icons/repo-icon-autodetect'
-import { prepareLocalWorktreeRootForRepo } from '../../workspaces/creation/worktree-root-preparation'
-import { invalidateAuthorizedRootsCache } from '../worktrees/removal/registered-worktree-roots-cache'
-import {
-  repoCreateFailure,
-  type RepoCreateFailure
-} from '../../../shared/repository/creation/repo-create-failure-copy'
+import type { Store } from '../../persistence'
+import type { Repo } from '../../../shared/repo-types'
+import { DEFAULT_REPO_BADGE_COLOR, getDefaultWorkspaceDir } from '../../../shared/constants'
+import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
+import { getEffectiveHostSetting } from '../../../shared/host-setting-overrides'
+import { probeGitAvailability } from '../../git/git-availability'
+import { gitExecFileAsync } from '../../git/runner'
+import { detectRepoIconAndUpstream } from '../../repo-icon-autodetect'
+import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation'
+import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cache'
 import { emitRepoAdded } from './repo-added-telemetry'
 import { notifyReposChanged } from './repos-changed-notification'
 import { addLocalRepoFromPath } from './local-repo-registration'
@@ -61,11 +48,7 @@ function getDefaultCreateProjectParent(store: Store): string {
   return join(home, 'orca', 'projects')
 }
 
-export function registerRepoCreationHandlers(
-  mainWindow: BrowserWindow,
-  store: Store,
-  enqueueMetadata: RepositoryMetadataOwner['enqueueRepositoryMetadata']
-): void {
+export function registerRepoCreationHandlers(mainWindow: BrowserWindow, store: Store): void {
   ipcMain.handle('repos:isGitAvailable', () => probeLocalGitAvailability())
   ipcMain.handle('repos:getDefaultCreateProjectParent', () => getDefaultCreateProjectParent(store))
 
@@ -84,7 +67,6 @@ export function registerRepoCreationHandlers(
       }
       invalidateAuthorizedRootsCache()
       notifyReposChanged(mainWindow)
-      enqueueMetadata([result.repo])
       emitRepoAdded('folder_picker', result.alreadyExisted, result.repo.kind === 'git')
       return { repo: result.repo }
     }
@@ -96,36 +78,31 @@ export function registerRepoCreationHandlers(
     async (
       _event,
       args: { parentPath: string; name: string; kind: 'git' | 'folder' }
-    ): Promise<{ repo: Repo } | RepoCreateFailure> => {
+    ): Promise<{ repo: Repo } | { error: string }> => {
       const name = args.name?.trim() ?? ''
       const parentPath = args.parentPath?.trim() ?? ''
       // Untrusted IPC kinds must not skip Git initialization yet persist as Git projects.
       const repoKind: 'git' | 'folder' = args.kind === 'folder' ? 'folder' : 'git'
 
       if (!name) {
-        return repoCreateFailure('nameEmpty')
+        return { error: 'Name cannot be empty' }
       }
       // Reject traversal even for direct IPC callers.
       if (/[\\/]/.test(name) || name === '.' || name === '..') {
-        return repoCreateFailure('nameInvalid')
+        return { error: 'Name cannot contain slashes or be "." / ".."' }
       }
       if (!parentPath) {
-        return repoCreateFailure('parentRequired')
+        return { error: 'Parent directory is required' }
       }
       // Absolute parents keep target paths stable across process cwd changes.
       if (!isAbsolute(parentPath)) {
-        return repoCreateFailure('parentNotAbsolute')
+        return { error: 'Parent directory must be an absolute path' }
       }
 
       const targetPath = join(parentPath, name)
-      let targetPathKeys = await getSavedProjectPathKeys(targetPath)
-      // This creates a folder on this machine, so a remote project at the same path is not it.
-      const isTargetRepo = (r: Repo): boolean =>
-        targetPathKeys.includes(getClonePathComparisonKey(r.path)) &&
-        getRepoExecutionHostId(r) === LOCAL_EXECUTION_HOST_ID
 
       // Repeated Create requests must share one registration.
-      const existing = store.getRepos().find(isTargetRepo)
+      const existing = store.getRepos().find((r) => r.path === targetPath)
       if (existing) {
         emitRepoAdded('folder_picker', true, repoKind === 'git')
         return { repo: existing }
@@ -150,7 +127,7 @@ export function registerRepoCreationHandlers(
           (code === undefined && err instanceof Error && /ENOENT/.test(err.message))
         if (!looksLikeEnoent) {
           const message = err instanceof Error ? err.message : String(err)
-          return repoCreateFailure('targetInaccessible', { detail: message })
+          return { error: `Cannot access target path: ${message}` }
         }
       }
 
@@ -158,11 +135,13 @@ export function registerRepoCreationHandlers(
         try {
           const entries = await readdir(targetPath)
           if (entries.length > 0) {
-            return repoCreateFailure('targetNotEmpty', { name })
+            return {
+              error: `"${name}" already exists at this location and is not empty.`
+            }
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
-          return repoCreateFailure('readDirectoryFailed', { detail: message })
+          return { error: `Failed to read directory: ${message}` }
         }
       } else {
         try {
@@ -176,15 +155,13 @@ export function registerRepoCreationHandlers(
               : undefined
           const isEexist = code === 'EEXIST' || (err instanceof Error && /EEXIST/.test(err.message))
           if (isEexist) {
-            const raceWinner = store.getRepos().find(isTargetRepo)
+            const raceWinner = store.getRepos().find((r) => r.path === targetPath)
             if (raceWinner) {
               return { repo: raceWinner }
             }
           }
           const message = err instanceof Error ? err.message : String(err)
-          return repoCreateFailure('createDirectoryFailed', {
-            detail: message
-          })
+          return { error: `Failed to create directory: ${message}` }
         }
       }
 
@@ -192,59 +169,52 @@ export function registerRepoCreationHandlers(
         // The failing Git step controls attribution and commit-only identity hints.
         let step: 'init' | 'commit' = 'init'
         try {
-          // Host Git on purpose: the new repo has no project yet, even inside one.
-          await gitExecFileAsync(['init'], { cwd: targetPath, hostGit: true })
+          await gitExecFileAsync(['init'], { cwd: targetPath })
           step = 'commit'
           await gitExecFileAsync(['commit', '--allow-empty', '-m', 'Initial commit'], {
-            cwd: targetPath,
-            // Host Git on purpose: the new repo has no project yet, even inside one.
-            hostGit: true
+            cwd: targetPath
           })
         } catch (err) {
           // Rollback may remove only what this request created; preserve preexisting folders.
           if (createdDir) {
             await rm(targetPath, { recursive: true, force: true }).catch(() => {})
           } else if (step === 'commit') {
-            await rm(join(targetPath, '.git'), {
-              recursive: true,
-              force: true
-            }).catch(() => {})
+            await rm(join(targetPath, '.git'), { recursive: true, force: true }).catch(() => {})
           }
           const message = err instanceof Error ? err.message : String(err)
           if (
             step === 'commit' &&
             /Please tell me who you are|user\.name|user\.email/i.test(message)
           ) {
-            return repoCreateFailure('gitIdentityMissing')
+            return {
+              error:
+                'Git author identity is not configured. Run `git config --global user.name "Your Name"` and `git config --global user.email "you@example.com"`, then try again.'
+            }
           }
-          return repoCreateFailure(step === 'init' ? 'gitInitFailed' : 'initialCommitFailed', {
-            detail: message
-          })
+          const stepLabel =
+            step === 'init'
+              ? 'Failed to initialize git repository'
+              : 'Failed to create initial commit'
+          return { error: `${stepLabel}: ${message}` }
         }
       }
 
       // IPC calls interleave while awaiting filesystem and Git work; recheck before registration.
-      targetPathKeys = await getSavedProjectPathKeys(targetPath)
-      const raceWinner = store.getRepos().find(isTargetRepo)
+      const raceWinner = store.getRepos().find((r) => r.path === targetPath)
       if (raceWinner) {
         // A concurrent winner owns the directory even if this request created it.
         emitRepoAdded('folder_picker', true, repoKind === 'git')
         return { repo: raceWinner }
       }
 
-      // Register Git's checkout path so the new project stays its own selected checkout.
-      const repoPath =
-        repoKind === 'git'
-          ? (await inspectGitRepoForRegistrationAsync(targetPath)).rootPath
-          : targetPath
-      const detected = await detectRepoLocalMetadata({
-        repoPath,
+      const detected = await detectRepoIconAndUpstream({
+        repoPath: targetPath,
         kind: repoKind,
         executionHostId: LOCAL_EXECUTION_HOST_ID
       })
       const repo: Repo = {
         id: randomUUID(),
-        path: repoPath,
+        path: targetPath,
         displayName: name,
         badgeColor: DEFAULT_REPO_BADGE_COLOR,
         ...detected,
@@ -259,7 +229,6 @@ export function registerRepoCreationHandlers(
       }
 
       store.addRepo(repo)
-      enqueueMetadata([repo])
       await prepareLocalWorktreeRootForRepo(store, repo)
       invalidateAuthorizedRootsCache()
       notifyReposChanged(mainWindow)

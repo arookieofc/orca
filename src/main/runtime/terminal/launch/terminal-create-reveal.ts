@@ -1,18 +1,7 @@
-import type { TerminalCreateOptions } from './terminal-create-options'
-import type { RuntimeTerminalCreate } from '../../../../shared/terminal/runtime/runtime-terminal-create-contract'
-import { createTerminalRevealWarning, ownerSurfacing } from './terminal-presentation'
-import type { RuntimeNotifier } from '../../client/events/runtime-notifier-contract'
-import type { TerminalWorkspaceLaunchScope } from '../../orchestration/terminal-authority/structured-sessions/runtime-legacy-worker-terminal-recovery-types'
-import type { RuntimeTerminalPresentation } from '../../../../shared/terminal/runtime/runtime-terminal-contracts'
-
-function terminalRevealViewerOptions(
-  opts: Pick<TerminalCreateOptions, 'surfaceOwner' | 'agentLaunchViewer'>
-) {
-  return {
-    ...ownerSurfacing(opts.surfaceOwner !== false),
-    ...(opts.agentLaunchViewer ? { agentLaunchViewer: opts.agentLaunchViewer() } : {})
-  }
-}
+import * as dependencies from '../../orca-runtime-create-terminal-dependencies'
+import type { RuntimeNotifier } from '../../runtime-notifier-contract'
+import type { TerminalWorkspaceLaunchScope } from '../../runtime-legacy-worker-terminal-recovery-types'
+import type { RuntimeTerminalPresentation } from '../../../../shared/runtime-types'
 
 export function revealCreatedTerminal(args: {
   notifier: Pick<RuntimeNotifier, 'revealTerminalSession' | 'rememberLaunchRecipe'> | null
@@ -20,18 +9,18 @@ export function revealCreatedTerminal(args: {
   ptyId: string
   handle: string
   cwd: string
-  launchOpts: TerminalCreateOptions
-  effectiveLaunchConfig: TerminalCreateOptions['launchConfig']
+  launchOpts: dependencies.TerminalCreateOptions
+  effectiveLaunchConfig: dependencies.TerminalCreateOptions['launchConfig']
   launchToken: string | undefined
   /** An adopted pane already ran; its recipe and spent launch token must not be re-registered. */
   adoptedStablePane: boolean
   presentation: RuntimeTerminalPresentation | undefined
-  opts: TerminalCreateOptions
+  opts: dependencies.TerminalCreateOptions
   tabId: string
   leafId: string
 }):
-  | Pick<RuntimeTerminalCreate, 'surface' | 'warning'>
-  | Promise<Pick<RuntimeTerminalCreate, 'surface' | 'warning'>> {
+  | Pick<dependencies.RuntimeTerminalCreate, 'surface' | 'warning'>
+  | Promise<Pick<dependencies.RuntimeTerminalCreate, 'surface' | 'warning'>> {
   const {
     notifier,
     workspace,
@@ -72,7 +61,7 @@ export function revealCreatedTerminal(args: {
           ...(launchOpts.viewMode ? { viewMode: launchOpts.viewMode } : {}),
           activate: presentation === 'focused',
           ...(presentation ? { presentation } : {}),
-          ...terminalRevealViewerOptions(opts),
+          ...dependencies.terminalRevealViewerOptions(opts),
           tabId,
           leafId
         })
@@ -82,7 +71,7 @@ export function revealCreatedTerminal(args: {
         rememberLaunchRecipe()
         return {
           surface: 'background' as const,
-          warning: createTerminalRevealWarning(handle, err)
+          warning: dependencies.createTerminalRevealWarning(handle, err)
         }
       }
     })()
@@ -90,6 +79,7 @@ export function revealCreatedTerminal(args: {
   rememberLaunchRecipe()
   return {
     surface: 'background',
-    warning: presentation !== 'background' ? createTerminalRevealWarning(handle) : undefined
+    warning:
+      presentation !== 'background' ? dependencies.createTerminalRevealWarning(handle) : undefined
   }
 }

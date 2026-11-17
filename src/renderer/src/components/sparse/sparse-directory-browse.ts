@@ -1,4 +1,4 @@
-import type { DirEntry } from '../../../../shared/file-listing/directory-entry'
+import type { DirEntry } from '../../../../shared/filesystem-entry-types'
 
 const HIDDEN_BROWSE_DIRECTORIES = new Set(['.git', 'node_modules'])
 

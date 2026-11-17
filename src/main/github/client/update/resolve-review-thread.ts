@@ -1,9 +1,6 @@
-import { ghExecFileAsync } from '../../../git/command-runner/hosted-cli/gh-exec-file'
-import { acquire, release } from '../../execution/github-operation-slots'
-import type { LocalGitExecOptions } from '../../repositories/github-repository-identity'
-import { resolveGitHubRepoExecution } from '../../repositories/github-api-repository'
-import type { GitHubRepositoryIdentity as GitHubApiRepository } from '../../../../shared/github/repositories/repository-identity'
-import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from '../../api/rate-limit'
+import { ghExecFileAsync, acquire, release, type LocalGitExecOptions } from '../../gh-utils'
+import { resolveGitHubRepoExecution, type GitHubApiRepository } from '../../github-api-repository'
+import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from '../../rate-limit'
 export async function resolveReviewThread(
   repoPath: string,
   threadId: string,

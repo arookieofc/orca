@@ -1,8 +1,7 @@
-import { taskProviderErrorMessage } from '@/lib/work-items/task-provider-error-copy'
 import type { JiraIssue, JiraMutationResult } from '../../../shared/jira/jira-types'
-import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
-import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
-import { getJiraReadIdentity } from '@/store/slices/jira/jira-read-coordination'
+import type { GlobalSettings } from '../../../shared/global-settings-types'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
+import { getJiraReadIdentity } from '@/store/slices/jira-read-coordination'
 import {
   editedJiraIssueFields,
   jiraIssueRollbackPatch,
@@ -114,7 +113,7 @@ export function enqueueJiraIssueMutation({
     try {
       const result = await update()
       if (!result.ok) {
-        throw new Error(taskProviderErrorMessage(result))
+        throw new Error(result.error)
       }
       saved = true
       write.confirmed = { ...write.confirmed, ...optimistic }

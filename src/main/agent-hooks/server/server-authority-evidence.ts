@@ -7,7 +7,6 @@ import type {
   EnrichedAgentHookEventPayload
 } from './server-types'
 import { AgentHookServerStatusRetries } from './server-status-retries'
-import { authorityCommitmentsMatch } from './server-persistence-validation'
 
 export abstract class AgentHookServerAuthorityEvidence extends AgentHookServerStatusRetries {
   attestCompatibilityAuthority(candidate: {
@@ -67,14 +66,8 @@ export abstract class AgentHookServerAuthorityEvidence extends AgentHookServerSt
     const evidence = this.toAuthorityEvidence(payload)
     if (evidence) {
       this.currentAuthorityObservations.set(evidence.paneKey, evidence)
-      // Why: the revision feeds the urgent-persist fingerprint; bumping it for an unchanged
-      // authority (only observedAt moved) rewrote last-status.json on every hook event.
-      this.persistedAuthorityCommitmentsByPaneKey.setIfChanged(
-        evidence.paneKey,
-        evidence,
-        authorityCommitmentsMatch
-      )
-      this.hydratedLaunchTokenHashByPaneKey.setIfChanged(evidence.paneKey, evidence.launchTokenHash)
+      this.persistedAuthorityCommitmentsByPaneKey.set(evidence.paneKey, evidence)
+      this.hydratedLaunchTokenHashByPaneKey.set(evidence.paneKey, evidence.launchTokenHash)
     }
   }
 

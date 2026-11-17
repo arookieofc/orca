@@ -1,5 +1,5 @@
-import type { GlobalSettings } from '../settings/global-settings-types'
-import type { PersistedUIState } from '../orca-profiles/persisted-ui-state-types'
+import type { GlobalSettings } from '../global-settings-types'
+import type { PersistedUIState } from '../persisted-ui-state-types'
 import {
   moveDisposition,
   notApplicableDisposition,
@@ -22,19 +22,18 @@ export const UI_STATE_DISPOSITIONS = {
     rewriteDesktopCopy: true,
     newManifestSection: true
   }),
-  gitGraphFiltersByWorktree: moveDisposition(38, { rewriteDesktopCopy: true }),
   showDotfilesByWorktree: moveDisposition(38, { rewriteDesktopCopy: true }),
-  notificationsMutedByWorktree: moveDisposition(38, { rewriteDesktopCopy: true }),
   filterRepoIds: moveDisposition(38),
   agentsFilterRepoIds: moveDisposition(38),
   setupScriptPromptDismissedRepoIds: moveDisposition(38),
   acknowledgedAgentsByPaneKey: moveDisposition(38, { note: 'Pane keys are kept.' }),
   activityClearedAtByPaneKey: moveDisposition(38, { note: 'Pane keys are kept.' }),
   manuallyUnreadTurnsByPaneKey: moveDisposition(38, { note: 'Pane keys are kept.' }),
-  trustedOrcaHooks: notApplicableDisposition(
-    40,
-    'Kept by repoId, which the move keeps; wsl-moved-repo-ui-retention.ts stops the trust prune dropping it.'
-  ),
+  trustedOrcaHooks: {
+    disposition: 'rewrite-desktop',
+    item: 40,
+    note: 'Kept by repoId; the trust prune must not drop it while the repo is between hosts.'
+  },
   collapsedGroups: {
     disposition: 'rewrite-desktop',
     item: 38,
@@ -67,18 +66,14 @@ export const UI_STATE_DISPOSITIONS = {
   automationHostFilter: {
     disposition: 'rewrite-desktop',
     item: 38,
-    note: 'Single-select: a filter on this desktop widens to All hosts once, if the move carried automations.'
+    note: "A 'local' filter also covers the WSL host."
   },
   jiraQuickFilterState: notApplicableDisposition(38, 'Filters belong to the Jira host.'),
   jiraSavedFilterState: notApplicableDisposition(
     38,
     'Filters belong to the Jira host, not a moved workspace.'
   ),
-  taskResumeState: notApplicableDisposition(38),
-  hiddenWslMovedProjectKeys: notApplicableDisposition(
-    38,
-    'Names already-moved projects by the ids a move keeps; pruned once a project is no longer moved.'
-  )
+  taskResumeState: notApplicableDisposition(38)
 } as const satisfies Partial<Record<keyof PersistedUIState, WslMoveFieldDisposition>>
 
 export const UI_STATE_GLOBAL_FIELDS = [
@@ -89,7 +84,6 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'rightSidebarTab',
   'rightSidebarExplorerView',
   'rightSidebarWidth',
-  'activityBarPosition',
   'markdownTocPanelWidth',
   'combinedDiffFileTreeWidth',
   'groupBy',
@@ -117,7 +111,6 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'editorFontZoomLevel',
   'worktreeCardProperties',
   '_worktreeCardModeDefaulted',
-  'showAgentModels',
   'agentActivityDisplayMode',
   'workspaceStatuses',
   'workspaceBoardOpacity',
@@ -127,7 +120,6 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'statusBarVisible',
   'usagePercentageDisplay',
   'statusBarUsageMode',
-  'statusBarUsageFormat',
   'dismissedUpdateVersion',
   'dismissedUnexpectedSignoutVersion',
   'lastUpdateCheckAt',
@@ -136,7 +128,6 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'dismissedUpdateNudgeId',
   'notificationPermissionRequested',
   'updateReassuranceSeen',
-  'seenMacosUpdateRequirement',
   'setupGuideSidebarDismissed',
   'setupGuideBrowserMilestoneMigrated',
   'setupGuideBrowserMilestoneLegacyComplete',
@@ -148,15 +139,10 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'usagePercentageDisplayChangeNoticeDismissed',
   'statusBarCompactChangeNoticeDismissed',
   'usageEmptyStateDismissed',
-  'pluginsAlphaNoticeDismissed',
   'codexTerminalServerIsolationNoticeSeen',
   'codexSharedSettingsNoticeSeen',
-  'worktreeCardsUpdateNoticeSeen',
-  'worktreeCardsIntroNoticeSeen',
-  'speechModelUpdateNoticeSeen',
   'claudeDiffPanelNoticeSeen',
   'claudeAccountSignInNoticeSeen',
-  'wslMovedSectionCollapsed',
   'browserDefaultUrl',
   'browserDefaultSearchEngine',
   'browserDefaultZoomLevel',
@@ -164,7 +150,6 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'browserDevToolsDock',
   'windowBounds',
   'windowMaximized',
-  'windowFullScreen',
   'dashboardPopoutBounds',
   'starNagBaselineAgents',
   'starNagAppVersion',
@@ -189,7 +174,6 @@ export const UI_STATE_GLOBAL_FIELDS = [
   '_cursorStatusBarDefaultAdded',
   '_expandedWorktreeCardPropertiesDefaulted',
   '_explorerDisplayRootMigrated',
-  '_gitBlameStatusBarDefaultAdded',
   '_grokStatusBarDefaultAdded',
   '_hostWorktreeCardPropertyDefaulted',
   '_inlineAgentsDefaultedForAllUsers',
@@ -197,7 +181,6 @@ export const UI_STATE_GLOBAL_FIELDS = [
   '_jiraIssueWorktreeCardPropertyDefaulted',
   '_kimiStatusBarDefaultAdded',
   '_minimaxStatusBarDefaultAdded',
-  '_museStatusBarDefaultAdded',
   '_portsStatusBarDefaultAdded',
   '_sortBySmartMigrated',
   '_workspaceStatusesDefaultOrderMigrated',

@@ -1,61 +1,53 @@
-import type { PluginEventName } from '../../shared/plugins/contributions/plugin-event-contribution'
+import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
 import {
   capabilityKinds,
   type PluginCapabilityKind
-} from '../../shared/plugins/capabilities/plugin-capabilities'
-import type {
-  PluginActivationState,
-  PluginConsentLists
-} from '../../shared/plugins/approval/plugin-consent-state'
+} from '../../shared/plugins/plugin-capabilities'
+import {
+  getPluginActivationState,
+  type PluginConsentLists
+} from '../../shared/plugins/plugin-consent-state'
+import type { PluginPanelActionOutcome } from '../../shared/plugins/plugin-panel-bridge'
+import { createPluginExtensionRegistry } from '../../shared/plugins/plugin-extension-registry'
 import {
   discoverPlugins,
   getPluginsDataDir,
   getUserPluginsDir,
   type DiscoveredPlugin,
   type ValidDiscoveredPlugin
-} from './discovery/plugin-discovery'
-import { PluginAuditLog, type PluginAuditEntry } from './logging/plugin-audit-log'
-import { PluginContentVerifier } from './artifacts/plugin-content-integrity'
-import type { PluginRuntimeDelegate } from './workers/host-api/plugin-host-service-bindings'
-import {
-  createPluginServiceHostCall,
-  pluginPanelBridgeServices,
-  resolvePluginServiceHostCallPolicy,
-  type PluginServiceHostCall
-} from './runtime/plugin-service-host-call'
-import { PluginPanelBridge } from './panels/plugin-panel-bridge'
-import { PluginPanelController } from './panels/plugin-panel-controller'
-import { PluginWorkerController } from './workers/plugin-worker-controller'
-import { PluginServiceHousekeeping } from './development/plugin-service-housekeeping'
-import {
-  collectApprovedWorkerSpecs,
-  isApprovedWorkerSpec
-} from './workers/worker-admission/plugin-worker-reconciliation'
-import type { PluginRunState } from './workers/worker-supervision/plugin-supervisor'
-import {
-  isPluginApproved,
-  livePluginActivationState,
-  pluginPolicyBlockError,
-  snapshotPluginConsentLists
-} from './activation/plugin-activation-policy'
-import { createPluginContentPacks } from './contributions/plugin-content-pack-registry'
+} from './plugin-discovery'
+import { PluginEventBus } from './plugin-event-bus'
+import { PluginAuditLog } from './plugin-audit-log'
+import { executePluginHostCallRequest } from './plugin-host-call-adapter'
+import { PluginContentVerifier } from './plugin-content-integrity'
+import { bindPluginHostServices, type PluginRuntimeDelegate } from './plugin-host-service-bindings'
+import { PluginPanelController } from './plugin-panel-controller'
+import { PluginWorkerController } from './plugin-worker-controller'
+import { PluginServiceHousekeeping } from './plugin-service-housekeeping'
+import { collectApprovedWorkerSpecs } from './plugin-worker-reconciliation'
+import type { PluginRunState } from './plugin-supervisor'
+import { isPluginApproved, snapshotPluginConsentLists } from './plugin-activation-policy'
+import { PluginContentPackRegistry } from './plugin-content-pack-registry'
 import type { PluginServiceOptions } from './plugin-service-options'
-import type { PluginChangeEvent } from '../../shared/plugins/events/plugin-change-event'
-import { waitForPluginRefreshSettlement } from './activation/plugin-refresh-settlement'
-import { invokePluginWorkerCommand } from './commands/plugin-command-invocation'
-import { deliverPluginEvent, pluginWorkersWantEvent } from './events/plugin-event-delivery'
-import type { PluginEventDeliveryContext } from './events/plugin-event-delivery'
-import { PluginInstallationState } from './installation/plugin-installation-state'
+import type { PluginChangeEvent } from '../../shared/plugins/plugin-change-event'
+import { waitForPluginRefreshSettlement } from './plugin-refresh-settlement'
+import { assertPluginWorkerCommand } from './plugin-command-invocation'
+import { deliverPluginEvent } from './plugin-event-delivery'
+import { PluginInstallationState } from './plugin-installation-state'
+
+export type { PluginRuntimeDelegate } from './plugin-host-service-bindings'
+export type { PluginLogLine } from './plugin-log-buffer'
+export type { PluginServiceOptions } from './plugin-service-options'
 
 export class PluginService {
   readonly options: PluginServiceOptions
+  private readonly registry = createPluginExtensionRegistry()
+  private readonly eventBus = new PluginEventBus()
   private readonly audit: PluginAuditLog
   private readonly workerController: PluginWorkerController
   private readonly contentVerifier = new PluginContentVerifier()
-  readonly contentPacks: ReturnType<typeof createPluginContentPacks>
+  readonly contentPacks: PluginContentPackRegistry
   readonly panels: PluginPanelController
-  readonly panelBridge: PluginPanelBridge
-  private readonly hostCall: PluginServiceHostCall
   private readonly changeListeners = new Set<(event: PluginChangeEvent) => void>()
   private readonly housekeeping = new PluginServiceHousekeeping()
   private runtimeDelegate: PluginRuntimeDelegate | null = null
@@ -71,62 +63,42 @@ export class PluginService {
 
   constructor(options: PluginServiceOptions) {
     this.options = options
-    this.contentPacks = createPluginContentPacks(this.contentVerifier, options)
-    this.audit = new PluginAuditLog(getPluginsDataDir(options.userDataPath))
-    const resolveApproved = (pluginKey: string, allowRefreshPause = false) =>
-      this.findApprovedPlugin(pluginKey, allowRefreshPause)
-    this.panelBridge = new PluginPanelBridge({
-      findApprovedPlugin: (pluginKey) => resolveApproved(pluginKey),
-      grantedCapabilities: (pluginKey) => this.getGrantedCapabilities(pluginKey),
-      ensureWorker: (plugin) => this.workerController.ensure(plugin),
-      runningWorker: (pluginKey) => this.workerController.runningHandle(pluginKey),
-      log: (pluginKey) => this.installed.captureLog(pluginKey, 'warn'),
-      runtimeDelegate: () => this.runtimeDelegate
-    })
-    this.hostCall = createPluginServiceHostCall((pluginKey, caller) =>
-      resolvePluginServiceHostCallPolicy({
-        pluginKey,
-        caller,
-        findApprovedPlugin: resolveApproved,
-        runtimeDelegate: this.runtimeDelegate,
-        pluginsDataDir: getPluginsDataDir(this.options.userDataPath),
-        desktop: this.options.getDesktopFrameServices?.(),
-        panels: pluginPanelBridgeServices(this.panelBridge),
-        sinks: this.options,
-        audit: this.audit,
-        log: (pluginKey) => this.installed.captureLog(pluginKey, 'info')
-      })
+    this.contentPacks = new PluginContentPackRegistry(this.contentVerifier, (pluginKey) =>
+      Boolean(this.options.getPluginKillListEntry?.(pluginKey))
     )
+    this.audit = new PluginAuditLog(getPluginsDataDir(options.userDataPath))
     this.panels = new PluginPanelController({
-      resolveApprovedPlugin: resolveApproved,
+      resolveApprovedPlugin: (pluginKey) => {
+        const plugin = this.findValidPlugin(pluginKey)
+        return plugin && this.canStartPluginWork(plugin) ? plugin : null
+      },
       contentVerifier: this.contentVerifier,
-      executeHostCall: (pluginKey, method, params, surface, caller) =>
-        this.executeHostCall(pluginKey, method, params, surface, caller),
-      log: (pluginKey) => this.installed.captureLog(pluginKey, 'error'),
-      onSessionClosed: (panelId) => this.panelBridge.close(panelId)
+      executeHostCall: (pluginKey, method, params) =>
+        this.executeHostCall(pluginKey, method, params, { viaPanel: true }),
+      log: (pluginKey) => this.installed.captureLog(pluginKey, 'error')
     })
     this.workerController = new PluginWorkerController({
       entryPath: options.hostEntryPath ?? '',
       maxActive: options.maxActiveWorkers,
       idleReapMs: options.idleReapMs,
       workerFactory: options.workerFactory,
+      registry: this.registry,
       contentVerifier: this.contentVerifier,
       capabilities: (pluginKey) => this.getGrantedCapabilities(pluginKey),
-      isCurrentApproved: (spec) => isApprovedWorkerSpec(spec, resolveApproved(spec.pluginKey)),
-      isApprovalKept: (spec) => isApprovedWorkerSpec(spec, resolveApproved(spec.pluginKey, true)),
-      executeHostCall: (pluginKey, method, params, signal) =>
-        this.executeHostCall(pluginKey, method, params, 'worker', signal ? { signal } : undefined),
-      onPanelPost: (pluginKey, post) => this.panelBridge.onWorkerPost(pluginKey, post),
+      isCurrentApproved: (plugin) =>
+        this.findValidPlugin(plugin.pluginKey) === plugin && this.canStartPluginWork(plugin),
+      invokeCommand: (pluginKey, commandId, args) => this.invokeCommand(pluginKey, commandId, args),
+      executeHostCall: (pluginKey, method, params) =>
+        this.executeHostCall(pluginKey, method, params, { viaPanel: false }),
       log: (pluginKey) => this.installed.logs.capture(pluginKey),
-      onStateChanged: () => this.notifyChanged(false)
+      onStateChanged: () => this.notifyChanged(false),
+      onWorkerGone: (pluginKey) => this.eventBus.clear(pluginKey)
     })
   }
 
   setRuntimeDelegate(delegate: PluginRuntimeDelegate | null): void {
     this.runtimeDelegate = delegate
   }
-
-  readonly notifyAppearanceChanged = () => this.notifyChanged(true)
 
   onChanged(listener: (event: PluginChangeEvent) => void): () => void {
     this.changeListeners.add(listener)
@@ -146,7 +118,7 @@ export class PluginService {
 
   async whenReady(): Promise<void> {
     await (this.initPromise ?? Promise.resolve()).catch(() => undefined)
-    // Client reads must wait for rollback-based content validation to settle.
+    // Wait through rollback validation so clients never observe partial activation.
     await waitForPluginRefreshSettlement(() => this.refreshChain)
   }
 
@@ -155,14 +127,11 @@ export class PluginService {
     const enabled = this.options.isPluginSystemEnabled()
     const devPaths = this.options.getDevPluginPaths()
     const consentLists = snapshotPluginConsentLists(this.options)
-    return this.enqueue(() => this.performRefresh(enabled, devPaths, consentLists))
-  }
-
-  /** Serializes discovery, removal, and reconciliation so none sees another's partial state. */
-  private enqueue(work: () => Promise<void>): Promise<void> {
-    const queued = this.refreshChain.then(work)
-    this.refreshChain = queued.catch(() => undefined)
-    return queued
+    const refresh = this.refreshChain.then(() =>
+      this.performRefresh(enabled, devPaths, consentLists)
+    )
+    this.refreshChain = refresh.catch(() => undefined)
+    return refresh
   }
 
   private async performRefresh(
@@ -174,6 +143,7 @@ export class PluginService {
       return
     }
     this.contentPacksReady = false
+    this.contentVerifier.clear()
     if (!enabled) {
       this.panels.revokeAll()
     }
@@ -198,7 +168,7 @@ export class PluginService {
     const nextSpecs = collectApprovedWorkerSpecs(next, (plugin) => this.isRuntimeApproved(plugin))
     // Notify before slow shutdown so feature-off unmounts panels immediately.
     this.notifyChanged(true)
-    await this.workerController.reconcile(nextSpecs, (key) => this.findValidPlugin(key))
+    await this.workerController.reconcile(nextSpecs)
     if (this.disposed) {
       return
     }
@@ -215,41 +185,35 @@ export class PluginService {
     return this.installed.discovered
   }
 
-  recordApprovalAudit(entry: PluginAuditEntry): Promise<void> {
-    return this.audit.record(entry)
+  getLogs(pluginKey: string) {
+    return this.installed.logs.get(pluginKey)
   }
-
-  readonly getLogs = (pluginKey: string) => this.installed.logs.get(pluginKey)
-
-  readonly getLogsSince = (key: string, cursor?: string) => this.installed.logs.since(key, cursor)
-
-  /** A log writer for one plugin that goes inert once the plugin is removed. */
-  readonly captureLog = (pluginKey: string) => this.installed.logs.capture(pluginKey)
 
   findValidPlugin(pluginKey: string): ValidDiscoveredPlugin | null {
     return this.installed.findValid(pluginKey)
   }
 
-  /** Enabled, consented and not being removed: what may open frames or hand out its files. */
-  findApprovedPlugin(pluginKey: string, allowRefreshPause = false): ValidDiscoveredPlugin | null {
-    const plugin = this.findValidPlugin(pluginKey)
-    return plugin && this.canStartPluginWork(plugin, allowRefreshPause) ? plugin : null
+  activationState(plugin: ValidDiscoveredPlugin): ReturnType<typeof getPluginActivationState> {
+    // Feature-off revokes authority immediately, before asynchronous reconciliation.
+    if (!this.options.isPluginSystemEnabled()) {
+      return 'disabled'
+    }
+    return getPluginActivationState(plugin.pluginKey, plugin.consentFingerprint, {
+      pluginConsents: this.options.getPluginConsents(),
+      disabledPlugins: this.options.getDisabledPlugins()
+    })
   }
 
-  activationState(plugin: ValidDiscoveredPlugin): PluginActivationState {
-    return livePluginActivationState(this.options, plugin)
+  private canStartPluginWork(plugin: ValidDiscoveredPlugin): boolean {
+    return !this.installed.isRemoving(plugin) && this.isRuntimeApproved(plugin)
   }
 
-  private canStartPluginWork(plugin: ValidDiscoveredPlugin, allowRefreshPause = false): boolean {
-    return !this.installed.isRemoving(plugin) && this.isRuntimeApproved(plugin, allowRefreshPause)
-  }
-
-  private isRuntimeApproved(plugin: ValidDiscoveredPlugin, allowRefreshPause = false): boolean {
+  private isRuntimeApproved(plugin: ValidDiscoveredPlugin): boolean {
     return (
-      (allowRefreshPause || this.contentPacksReady) &&
+      this.contentPacksReady &&
       this.activationState(plugin) === 'approved' &&
       !this.contentPacks.error(plugin.pluginKey) &&
-      !pluginPolicyBlockError(this.options, plugin.pluginKey)
+      !this.options.getPluginKillListEntry?.(plugin.pluginKey)
     )
   }
 
@@ -258,53 +222,78 @@ export class PluginService {
   }
 
   activationError(pluginKey: string): string | null {
+    const blocked = this.options.getPluginKillListEntry?.(pluginKey)
     return (
-      pluginPolicyBlockError(this.options, pluginKey) ??
+      (blocked ? `Blocked by Orca's plugin safety list: ${blocked.reason}` : null) ??
       this.contentPacks.error(pluginKey) ??
       this.workerController.activationError(pluginKey)
     )
   }
 
-  /** Null uniformly denies unapproved or departing plugins without exposing why. */
+  /** Null uniformly denies unapproved plugins without exposing why. */
   getGrantedCapabilities(pluginKey: string): PluginCapabilityKind[] | null {
-    const plugin = this.findApprovedPlugin(pluginKey)
-    return plugin ? capabilityKinds(plugin.manifest.capabilities) : null
+    const plugin = this.findValidPlugin(pluginKey)
+    return plugin && this.isRuntimeApproved(plugin)
+      ? capabilityKinds(plugin.manifest.capabilities)
+      : null
   }
 
-  executeHostCall(...args: Parameters<PluginServiceHostCall>): ReturnType<PluginServiceHostCall> {
-    return this.hostCall(...args)
+  async executeHostCall(
+    pluginKey: string,
+    method: string,
+    params: unknown,
+    options: { viaPanel: boolean }
+  ): Promise<PluginPanelActionOutcome> {
+    return executePluginHostCallRequest({
+      pluginKey,
+      request: { method, params },
+      viaPanel: options.viaPanel,
+      resolvePolicy: (boundPluginKey) => ({
+        grantedCapabilities: this.getGrantedCapabilities(boundPluginKey),
+        services: this.runtimeDelegate
+          ? bindPluginHostServices({
+              delegate: this.runtimeDelegate,
+              pluginsDataDir: getPluginsDataDir(this.options.userDataPath),
+              subscribeEvents: (key, events) => this.eventBus.subscribe(key, events)
+            })
+          : null,
+        audit: this.audit
+      })
+    })
   }
 
-  invokeCommand(pluginKey: string, commandId: string, args?: unknown, startBy?: number) {
-    const [plugin, workers] = [this.findApprovedPlugin(pluginKey), this.workerController]
-    return invokePluginWorkerCommand(pluginKey, plugin, workers, commandId, args, startBy)
-  }
-
-  wantsEvent(event: PluginEventName): boolean {
-    return (
-      this.panelBridge.hasSubscribers(event) ||
-      pluginWorkersWantEvent(event, this.installed.discovered, (p) => this.canStartPluginWork(p))
-    )
+  async invokeCommand(pluginKey: string, commandId: string, args?: unknown): Promise<unknown> {
+    const plugin = this.findValidPlugin(pluginKey)
+    if (!plugin || !this.canStartPluginWork(plugin)) {
+      throw new Error(`plugin ${pluginKey} is not enabled`)
+    }
+    assertPluginWorkerCommand(plugin, commandId)
+    const handle = await this.workerController.ensure(plugin)
+    if (!handle.commands.includes(commandId)) {
+      throw new Error(`plugin ${pluginKey} registered no handler for ${commandId}`)
+    }
+    return handle.invokeCommand(commandId, args)
   }
 
   emitEvent(event: PluginEventName, payload: unknown): void {
-    if (this.options.isPluginSystemEnabled() && !this.disposed) {
-      deliverPluginEvent({ event, payload, ...this.eventDelivery })
-      this.panelBridge.publishEvent(event, payload)
+    if (!this.options.isPluginSystemEnabled() || this.disposed) {
+      return
     }
-  }
-
-  /** The real event path; `orca plugin dev emit` reuses it for one development plugin. */
-  readonly eventDelivery: PluginEventDeliveryContext = {
-    plugins: () => this.installed.discovered,
-    ensureWorker: (plugin) => this.workerController.ensure(plugin),
-    isRuntimeApproved: (plugin) => this.canStartPluginWork(plugin),
-    grantedCapabilities: (pluginKey) => this.getGrantedCapabilities(pluginKey),
-    logWarning: (pluginKey) => this.installed.captureLog(pluginKey, 'warn')
+    deliverPluginEvent({
+      event,
+      payload,
+      plugins: this.installed.discovered,
+      eventBus: this.eventBus,
+      workerController: this.workerController,
+      isRuntimeApproved: (plugin) => this.canStartPluginWork(plugin),
+      logWarning: (pluginKey) => this.installed.captureLog(pluginKey, 'warn')
+    })
   }
 
   removePlugin(pluginKey: string, remove: () => Promise<void>): Promise<void> {
-    return this.enqueue(() => this.installed.remove(pluginKey, remove))
+    const removal = this.refreshChain.then(() => this.installed.remove(pluginKey, remove))
+    this.refreshChain = removal.catch(() => undefined)
+    return removal
   }
 
   async deactivatePlugin(pluginKey: string): Promise<void> {
@@ -314,7 +303,9 @@ export class PluginService {
 
   /** Reconcile consent/enablement without rereading files or starting workers. */
   async reconcileActivationState(): Promise<void> {
-    return this.enqueue(() => this.performActivationStateReconciliation())
+    const reconcile = this.refreshChain.then(() => this.performActivationStateReconciliation())
+    this.refreshChain = reconcile.catch(() => undefined)
+    return reconcile
   }
 
   private async performActivationStateReconciliation(): Promise<void> {
@@ -336,9 +327,8 @@ export class PluginService {
     this.disposed = true
     this.housekeeping.dispose()
     this.panels.dispose()
-    this.panelBridge.dispose()
-    // Why stop workers first: a refresh may be waiting on a worker slot only shutdown releases.
-    await Promise.all([this.workerController.dispose(), this.refreshChain.catch(() => undefined)])
+    await this.refreshChain.catch(() => undefined)
+    await this.workerController.dispose()
     await this.audit.flush()
   }
 }

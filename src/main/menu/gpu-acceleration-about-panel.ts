@@ -1,4 +1,3 @@
-import { translateMain } from '../i18n/main-i18n'
 export type GpuAccelerationAboutPanelOptions = {
   appName: string
   appVersion: string
@@ -12,26 +11,26 @@ export function describeGpuAcceleration(
   gpuFallbackActive: boolean
 ): string {
   if (gpuFallbackActive) {
-    return translateMain('native.about.gpu.safeMode', 'Disabled (Safe Graphics Mode)')
+    return 'Disabled (Safe Graphics Mode)'
   }
 
   const compositing = gpuFeatureStatus?.gpu_compositing.trim().toLowerCase()
   if (!compositing || compositing === 'undefined') {
-    return translateMain('native.about.gpu.unknownStatus', 'Status unavailable')
+    return 'Status unavailable'
   }
   if (compositing === 'enabled') {
-    return translateMain('native.about.gpu.enabled', 'Enabled')
+    return 'Enabled'
   }
   if (compositing.includes('software')) {
-    return translateMain('native.about.gpu.software', 'Software rendering')
+    return 'Software rendering'
   }
   if (compositing.startsWith('disabled')) {
-    return translateMain('native.about.gpu.disabled', 'Disabled')
+    return 'Disabled'
   }
   if (compositing.startsWith('unavailable')) {
-    return translateMain('native.about.gpu.unavailable', 'Unavailable')
+    return 'Unavailable'
   }
-  return translateMain('native.about.gpu.unknown', 'Unknown ({{status}})', { status: compositing })
+  return `Unknown (${compositing})`
 }
 
 export function createGpuAccelerationAboutPanelOptions({
@@ -41,9 +40,7 @@ export function createGpuAccelerationAboutPanelOptions({
   gpuFallbackActive,
   gpuFeatureStatus
 }: GpuAccelerationAboutPanelOptions): Electron.AboutPanelOptionsOptions {
-  const status = translateMain('native.about.gpu.summary', 'GPU acceleration: {{status}}', {
-    status: describeGpuAcceleration(gpuFeatureStatus, gpuFallbackActive)
-  })
+  const status = `GPU acceleration: ${describeGpuAcceleration(gpuFeatureStatus, gpuFallbackActive)}`
   return {
     applicationName: appName,
     applicationVersion: appVersion,

@@ -1,15 +1,15 @@
-import { resolveAgentPaneAuthorityKey } from '@/store/slices/agent-status/pane-authority/agent-pane-authority'
+import { resolveAgentPaneAuthorityKey } from '@/store/slices/agent-pane-authority'
 import type { AppState } from '../../store/types'
-import { titleHasAgentName } from '../../../../shared/agent-status/title/agent-name-token-match'
+import { titleHasAgentName } from '../../../../shared/agent-detection'
 import type {
   AgentStatusEntry,
+  AgentStatusIpcPayload,
   AgentType,
   ParsedAgentStatusPayload
-} from '../../../../shared/agent-status/contracts/agent-status-types'
-import type { AgentStatusIpcPayload } from '../../../../shared/agent-status/contracts/agent-status-ipc-payload'
-import { resolveAgentStatusIdentity } from '../../../../shared/agent-status/identity/agent-status-identity'
-import { sameAgentStatusTerminalOwner } from '../../../../shared/agent-status/identity/agent-status-terminal-owner'
-import { makePaneKey, parsePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
+} from '../../../../shared/agent-status-types'
+import { resolveAgentStatusIdentity } from '../../../../shared/agent-status-identity'
+import { sameAgentStatusTerminalOwner } from '../../../../shared/agent-status-terminal-owner'
+import { makePaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'
 import type { useAppStore } from '../../store'
 
 export function isAgentStatusForRecentlyClosedTab(
@@ -40,10 +40,7 @@ export function isSeenHostReplay(
   >,
   state: string,
   existing:
-    | Pick<
-        NonNullable<ReturnType<AppState['agentStatusByPaneKey']['get']>>,
-        'state' | 'stateStartedAt' | 'turnEndedAt'
-      >
+    | Pick<AppState['agentStatusByPaneKey'][string], 'state' | 'stateStartedAt' | 'turnEndedAt'>
     | undefined
 ): boolean {
   if (data.isReplay !== true) {
@@ -162,3 +159,5 @@ export function isInheritedFromActivePane(
     }).inheritedFromActivePane
   )
 }
+
+export { resolvePaneKey } from '../../lib/agent-status-pane-ownership'

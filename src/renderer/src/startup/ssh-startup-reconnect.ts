@@ -1,4 +1,4 @@
-import type { SshConnectionState } from '../../../shared/remote-runtime/ssh/ssh-types'
+import type { SshConnectionState } from '../../../shared/ssh-types'
 
 export type SshStartupReconnectResult = {
   timedOut: boolean

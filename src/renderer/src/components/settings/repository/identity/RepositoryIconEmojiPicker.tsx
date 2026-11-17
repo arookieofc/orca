@@ -1,9 +1,10 @@
 import { toast } from 'sonner'
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react'
-import type { RepoIcon } from '../../../../../../shared/repository/appearance/repo-icon'
-import { sanitizeRepoIcon } from '../../../../../../shared/repository/appearance/repo-icon'
-import { useDocumentDarkTheme } from '@/hooks/use-document-dark-theme'
-import { useTranslate } from '@/i18n/use-translate'
+import type { RepoIcon } from '../../../../../../shared/repo-icon'
+import { sanitizeRepoIcon } from '../../../../../../shared/repo-icon'
+import { useAppStore } from '@/store/index'
+import { useSystemPrefersDark } from '@/components/terminal-pane/use-system-prefers-dark'
+import { translate } from '@/i18n/i18n'
 
 type RepositoryIconEmojiPickerProps = {
   selectedEmoji: string
@@ -15,16 +16,17 @@ export function RepositoryIconEmojiPicker({
   selectedEmoji,
   onSetIcon
 }: RepositoryIconEmojiPickerProps): React.JSX.Element {
-  const t = useTranslate()
-  // Theme.AUTO only follows the OS setting, which can disagree with Orca's painted theme.
-  const isDarkTheme = useDocumentDarkTheme()
+  const settingsTheme = useAppStore((state) => state.settings?.theme ?? 'system')
+  const systemPrefersDark = useSystemPrefersDark()
+  // Theme.AUTO only follows the OS setting, which can disagree with Orca's manual theme.
+  const isDarkTheme = settingsTheme === 'dark' || (settingsTheme === 'system' && systemPrefersDark)
 
   const handleEmojiClick = (emojiData: EmojiClickData): void => {
     // ZWJ/skin-tone sequences can exceed sanitizeRepoIcon’s UTF-16 cap.
     const repoIcon = sanitizeRepoIcon({ type: 'emoji', emoji: emojiData.emoji })
     if (!repoIcon) {
       toast.error(
-        t(
+        translate(
           'auto.components.settings.RepositoryIconPicker.emojiTooLongForRepoIcon',
           "This emoji can't be used as a repo icon."
         )
@@ -46,7 +48,7 @@ export function RepositoryIconEmojiPicker({
           lazyLoadEmojis
           onEmojiClick={handleEmojiClick}
           previewConfig={{ showPreview: true }}
-          searchPlaceholder={t(
+          searchPlaceholder={translate(
             'auto.components.settings.RepositoryIconPicker.searchEmojiPlaceholder',
             'Search emoji'
           )}
@@ -55,7 +57,7 @@ export function RepositoryIconEmojiPicker({
       </div>
       {selectedEmoji ? (
         <p className="mt-2 text-[11px] text-muted-foreground">
-          {t(
+          {translate(
             'auto.components.settings.RepositoryIconPicker.currentEmojiSelection',
             'Current: {{value0}}',
             { value0: selectedEmoji }

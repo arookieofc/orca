@@ -1,22 +1,11 @@
-import { canShowRightSidebarForView } from '@/components/right-sidebar/visibility/right-sidebar-visibility'
-import { runBuiltInOrReplacement } from '@/lib/plugins/commands/plugin-command-replacements'
-import { showTerminalShortcutCaptureNotification } from '@/lib/notifications/terminal-shortcut-capture-notification'
-import { TOGGLE_FLOATING_TERMINAL_EVENT } from '@/components/floating-terminal/workspace/floating-workspace-open-intent'
+import { canShowRightSidebarForView } from '@/lib/right-sidebar-visibility'
+import { getShortcutPlatform } from '@/lib/shortcut-platform'
+import { showTerminalShortcutCaptureNotification } from '@/lib/terminal-shortcut-capture-notification'
+import { TOGGLE_FLOATING_TERMINAL_EVENT } from '@/lib/floating-terminal'
 import { subscribeToUnpairedDeviceAuthNotification } from '../unpaired-device-auth-notification'
 import { translate } from '@/i18n/i18n'
 import { toast } from 'sonner'
-import { useAppStore } from '../../store/index'
-import { openPluginInstallLink } from '../../store/plugins/navigation/plugin-preview-request'
-
-function getShortcutPlatform(): NodeJS.Platform {
-  if (navigator.userAgent.includes('Mac')) {
-    return 'darwin'
-  }
-  if (navigator.userAgent.includes('Windows')) {
-    return 'win32'
-  }
-  return 'linux'
-}
+import { useAppStore } from '../../store'
 
 export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): void {
   unsubs.push(
@@ -48,18 +37,6 @@ export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): voi
       .then((shareId) => {
         if (shareId) {
           useAppStore.getState().openSkillShare(shareId)
-        }
-      })
-      .catch(() => {})
-  }
-
-  unsubs.push(window.api.ui.onOpenPluginInstallLink?.(openPluginInstallLink) ?? (() => {}))
-  const pendingPluginLink = window.api.ui.consumePendingPluginInstallLink?.()
-  if (pendingPluginLink && typeof pendingPluginLink.then === 'function') {
-    void pendingPluginLink
-      .then((link) => {
-        if (link) {
-          openPluginInstallLink(link)
         }
       })
       .catch(() => {})
@@ -105,6 +82,16 @@ export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): voi
       useAppStore.getState().openModal('feature-wall', { source: 'help_menu' })
     })
   )
+
+  if (window.api.ui.onToggleAppearance) {
+    unsubs.push(
+      window.api.ui.onToggleAppearance((key) => {
+        const store = useAppStore.getState()
+        const current = store.settings?.[key]
+        void store.updateSettings({ [key]: current === false })
+      })
+    )
+  }
 
   // Why: View > Appearance toggles settings in main and broadcasts; merge into the store for an immediate re-render.
   unsubs.push(
@@ -158,7 +145,7 @@ export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): voi
 
   unsubs.push(
     window.api.ui.onToggleLeftSidebar(() => {
-      runBuiltInOrReplacement('sidebar.left.toggle', () => useAppStore.getState().toggleSidebar())
+      useAppStore.getState().toggleSidebar()
     })
   )
 
@@ -168,7 +155,7 @@ export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): voi
       if (!canShowRightSidebarForView(store.activeView)) {
         return
       }
-      runBuiltInOrReplacement('sidebar.right.toggle', () => store.toggleRightSidebar())
+      store.toggleRightSidebar()
     })
   )
 

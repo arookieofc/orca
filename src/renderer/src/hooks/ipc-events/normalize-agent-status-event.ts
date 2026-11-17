@@ -1,9 +1,9 @@
-import type { AgentStatusMetadata } from '../../store/slices/agent-status/contracts/agent-status-contract'
+import type { AgentStatusMetadata } from '../../store/slices/agent-status/agent-status-contract'
 import {
   normalizeAgentStatusPayload,
+  type AgentStatusIpcPayload,
   type ParsedAgentStatusPayload
-} from '../../../../shared/agent-status/contracts/agent-status-types'
-import type { AgentStatusIpcPayload } from '../../../../shared/agent-status/contracts/agent-status-ipc-payload'
+} from '../../../../shared/agent-status-types'
 
 export function normalizeAgentStatusEvent(
   data: AgentStatusIpcPayload
@@ -31,22 +31,13 @@ export function normalizeAgentStatusMetadata(
   data: AgentStatusIpcPayload,
   authorityRestartId?: string
 ): AgentStatusMetadata | undefined {
-  if (
-    !data.providerSession &&
-    !data.launchToken &&
-    data.launchConfig === undefined &&
-    !authorityRestartId &&
-    !data.paneOwner &&
-    data.orcaSessionId === undefined
-  ) {
+  if (!data.providerSession && !data.launchToken && !authorityRestartId && !data.paneOwner) {
     return undefined
   }
   return {
     ...(authorityRestartId ? { authorityRestartId } : {}),
     ...(data.providerSession ? { providerSession: data.providerSession } : {}),
-    ...(data.orcaSessionId !== undefined ? { orcaSessionId: data.orcaSessionId } : {}),
     ...(data.launchToken ? { launchToken: data.launchToken } : {}),
-    ...(data.launchConfig !== undefined ? { launchConfig: data.launchConfig } : {}),
     ...(data.paneOwner ? { paneOwner: data.paneOwner } : {})
   }
 }

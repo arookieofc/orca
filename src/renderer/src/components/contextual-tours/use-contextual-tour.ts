@@ -1,26 +1,20 @@
 import { useEffect, useRef } from 'react'
-import type { ContextualTourId } from '../../../../shared/feature-education/contextual-tours/contextual-tours'
+import type { ContextualTourId } from '../../../../shared/contextual-tours'
 import {
   hasFeatureInteraction,
   type FeatureInteractionState
-} from '../../../../shared/feature-education/interactions/feature-interactions'
+} from '../../../../shared/feature-interactions'
 import { useAppStore } from '@/store'
-import {
-  isContextualTourSessionConsumed,
-  isContextualTourStartBlockedByProgress
-} from '@/store/slices/ui/ui-slice-tour-actions'
 
 const TOUR_SOURCES = {
   'workspace-board': 'workspace_board_visible',
   'workspace-agent-sessions': 'workspace_agent_sessions_visible',
   browser: 'browser_visible',
-  'browser-extensions': 'browser_extensions_visible',
   'client-hosted-browser': 'client_hosted_browser_visible',
   tasks: 'tasks_open',
   automations: 'automations_open',
   'floating-workspace': 'floating_workspace_visible',
-  'workspace-creation': 'workspace_creation_visible',
-  'projects-collapse-all': 'project_header_collapsed'
+  'workspace-creation': 'workspace_creation_visible'
 } satisfies Record<ContextualTourId, string>
 
 export type UseContextualTourOptions = {
@@ -80,12 +74,11 @@ export function useContextualTour(
   )
   const contextualToursSeenIds = useAppStore((s) => s.contextualToursSeenIds)
   const contextualToursAutoEligible = useAppStore((s) => s.contextualToursAutoEligible)
-  const contextualToursStartedThisSession = useAppStore((s) => s.contextualToursStartedThisSession)
+  const contextualTourShownThisSession = useAppStore((s) => s.contextualTourShownThisSession)
   const contextualToursOnboardingVisible = useAppStore((s) => s.contextualToursOnboardingVisible)
   const contextualToursBlockingSurfaceVisible = useAppStore(
     (s) => s.contextualToursBlockingSurfaceVisible
   )
-  const featureInteractions = useAppStore((s) => s.featureInteractions)
   const enabledInteractionSnapshotRef = useRef<{
     id: ContextualTourId
     source: string
@@ -174,16 +167,8 @@ export function useContextualTour(
       contextualToursOnboardingVisible ||
       contextualToursBlockingSurfaceVisible ||
       activeContextualTourId !== null ||
-      contextualToursSeenIds.includes(id) ||
-      isContextualTourSessionConsumed(
-        { contextualToursSeenIds, contextualToursStartedThisSession },
-        id
-      ) ||
-      // Don't watch the page for a tour that can't start.
-      isContextualTourStartBlockedByProgress(
-        { featureInteractions, contextualToursStartedThisSession },
-        id
-      )
+      contextualTourShownThisSession ||
+      contextualToursSeenIds.includes(id)
     ) {
       return
     }
@@ -193,7 +178,7 @@ export function useContextualTour(
     let requestPending = false
     let cancelled = false
     const request = (): void => {
-      if (cancelled || frame !== null || requestPending) {
+      if (frame !== null || requestPending) {
         return
       }
       requestPending = true
@@ -207,14 +192,14 @@ export function useContextualTour(
         getContextualToursSeenIds: () => useAppStore.getState().contextualToursSeenIds
       }).then((shouldRequest) => {
         requestPending = false
-        if (cancelled || !shouldRequest) {
+        if (!shouldRequest) {
           return
         }
         attempts += 1
         frame = window.requestAnimationFrame(() => {
           frame = null
           const latestSnapshot = enabledInteractionSnapshotRef.current
-          if (cancelled || useAppStore.getState().contextualToursSeenIds.includes(id)) {
+          if (useAppStore.getState().contextualToursSeenIds.includes(id)) {
             return
           }
           requestContextualTour(
@@ -263,11 +248,10 @@ export function useContextualTour(
     contextualToursBlockingSurfaceVisible,
     activeModal,
     contextualToursAutoEligible,
-    contextualToursStartedThisSession,
+    contextualTourShownThisSession,
     contextualToursOnboardingVisible,
     contextualToursSeenIds,
     enabled,
-    featureInteractions,
     id,
     persistedUIReady,
     requestContextualTour,

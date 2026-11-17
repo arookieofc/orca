@@ -1,23 +1,19 @@
-import { githubBodyImageUrls, githubBodyMediaHeaders } from '../attachments/body-image-urls'
-import { assertPositiveInt, validateSlugArgs } from './project-argument-validation'
-import { projectGhExecOptions } from './project-host-execution'
-import { runRest } from './project-rest'
-import type { PRComment } from '../../../shared/github/comments/comment-types'
+import { assertPositiveInt, projectGhExecOptions, runRest, validateSlugArgs } from './internals'
+import type { PRComment } from '../../../shared/github/comment-types'
 import type {
   GitHubProjectCommentMutationResult,
   GitHubProjectMutationResult
-} from '../../../shared/github/projects/project-result-types'
+} from '../../../shared/github/project-result-types'
 import type {
   AddIssueCommentBySlugArgs,
   DeleteIssueCommentBySlugArgs,
   UpdateIssueCommentBySlugArgs
-} from '../../../shared/github/projects/project-request-types'
+} from '../../../shared/github/project-request-types'
 
 type RawIssueCommentResponse = {
   id?: number
   user?: { login?: string; avatar_url?: string; type?: string } | null
   body?: string
-  body_html?: string | null
   created_at?: string
   html_url?: string
 }
@@ -28,7 +24,6 @@ function mapIssueComment(data: RawIssueCommentResponse, fallbackBody: string): P
     author: data.user?.login ?? 'You',
     authorAvatarUrl: data.user?.avatar_url ?? '',
     body: data.body ?? fallbackBody,
-    bodyImageUrls: githubBodyImageUrls(data.body ?? fallbackBody, data.body_html),
     createdAt: data.created_at ?? new Date().toISOString(),
     url: data.html_url ?? '',
     isBot: data.user?.type === 'Bot'
@@ -47,20 +42,12 @@ export async function addIssueCommentBySlug(
     return { ok: false, error: number.error }
   }
   if (typeof args.body !== 'string' || !args.body.trim()) {
-    return {
-      ok: false,
-      error: {
-        type: 'validation_error',
-        message: 'Comment body required.',
-        reason: 'comment_body_required'
-      }
-    }
+    return { ok: false, error: { type: 'validation_error', message: 'Comment body required.' } }
   }
   const result = await runRest<RawIssueCommentResponse>(
     [
       '-X',
       'POST',
-      ...githubBodyMediaHeaders(args.body),
       `repos/${args.owner}/${args.repo}/issues/${args.number}/comments`,
       '--raw-field',
       `body=${args.body}`
@@ -86,14 +73,7 @@ export async function updateIssueCommentBySlug(
     return { ok: false, error: number.error }
   }
   if (typeof args.body !== 'string' || !args.body.trim()) {
-    return {
-      ok: false,
-      error: {
-        type: 'validation_error',
-        message: 'Comment body required.',
-        reason: 'comment_body_required'
-      }
-    }
+    return { ok: false, error: { type: 'validation_error', message: 'Comment body required.' } }
   }
   const result = await runRest<unknown>(
     [

@@ -1,28 +1,23 @@
+import type { WorktreeSlice } from '../../worktree-helpers'
 import { runtimeTargetForWorktreeOwner } from '../listing/worktree-owner-target'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
-import { normalizeWorkspaceAttachmentUpdate } from '../../../../../../shared/workspace-attachments/workspace-attachments'
-import type { WorktreeSlice } from '../worktree-slice-contract'
-import { getRepoIdFromWorktreeId } from '../../../../../../shared/worktree/id'
-import { deriveGitIdentityDisplayName } from './detached-head-display-name'
-import {
-  hostedReviewClearUpdates,
-  type HostedReviewClearUpdates
-} from '../../../../../../shared/worktree/hosted-review/hosted-review-branch-ownership'
-import { observeDetachedHostedReviewOwner } from './detached-hosted-review-owners'
+import { normalizeWorkspaceAttachmentUpdate } from '../../../../../../shared/workspace-attachments'
+import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
+import { branchName } from '@/lib/git-utils'
+import { detachedHeadAutoDerivedDisplayNames } from './detached-head-display-name'
 import {
   applyHostedReviewLinkClear,
+  canonicalHostedReviewBranchIdentity,
+  CLEARED_HOSTED_REVIEW_LINK_UPDATES,
   getHostedReviewLinkMutationGeneration,
   getHostedReviewLinkUpdates,
+  hasBranchScopedHostedReviewContext,
   hostedReviewLinkClearTombstonesByCopy,
   hostedReviewLinksAreCleared,
   rememberHostedReviewLinkClear,
   resolveHostedReviewLinkWorktreeId
 } from './hosted-review-link-mutation'
-import {
-  canonicalHostedReviewBranchIdentity,
-  CLEARED_HOSTED_REVIEW_LINK_UPDATES
-} from '../../../../../../shared/worktree/hosted-review/hosted-review-links'
 import {
   reviewClearTombstoneKey,
   worktreeCopyOwnerKey,
@@ -30,18 +25,15 @@ import {
 } from './worktree-copy-review-clear'
 import { persistWorktreeMeta } from './worktree-meta-persist'
 import { withRepoHostOwnership } from '../listing/worktree-host-ownership'
-import { getRepoRegistrationHostIds } from '../../../../../../shared/repository/repo-host-identity'
+import { getRepoRegistrationHostIds } from '../../../../../../shared/repo-host-identity'
 import { isRuntimeSelectorNotFoundError } from '../listing/runtime-worktree-rpc-errors'
-import {
-  parseExecutionHostId,
-  type ExecutionHostId
-} from '../../../../../../shared/execution-host/execution-host'
+import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import { hostWorktreeTarget } from '../../../../../../shared/worktree/host-qualified-identity'
 import {
   selectWorkspaceByHostTarget,
+  selectWorktreesByRepo,
   type WorkspaceRecordState
-} from '../../../workspaces/selection/workspace-host-target'
-import { selectWorktreesByRepo } from '../../../workspaces/catalog/workspace-record-fields'
+} from '../../../workspace-record-selectors'
 
 type GitIdentityTargets = {
   rows: Set<Worktree>
@@ -97,7 +89,6 @@ export function createUpdateWorktreeGitIdentity(
     let clearedCopy: WorktreeCopyClear | undefined
     let clearedOnTwin = false
     let clearGeneration = getHostedReviewLinkMutationGeneration(worktreeId)
-    let clearUpdates: HostedReviewClearUpdates = CLEARED_HOSTED_REVIEW_LINK_UPDATES
     const repoId = getRepoIdFromWorktreeId(worktreeId)
     const nextHeadFor = (worktree: Worktree): string => identity.head ?? worktree.head
     const nextBranchFor = (worktree: Worktree): string =>
@@ -129,6 +120,11 @@ export function createUpdateWorktreeGitIdentity(
           return worktree
         }
         changed = true
+        const hostedReviewBranchChanged =
+          canonicalHostedReviewBranchIdentity(nextBranch) !==
+          canonicalHostedReviewBranchIdentity(worktree.branch)
+        const shouldClearHostedReviewContext =
+          hostedReviewBranchChanged && hasBranchScopedHostedReviewContext(worktree)
         // Why the copy: a same-path twin shares the id, so every guard and clear names this row.
         // Keyed by the stamp the next listing gives the row, so legacy or partial stamps still match.
         // Only missing parts are filled in; a row's own host or publishing server is never replaced.
@@ -149,24 +145,14 @@ export function createUpdateWorktreeGitIdentity(
           rowOwner: worktreeCopyOwnerKey(worktree),
           hostId: worktree.hostId
         }
-        const owner = observeDetachedHostedReviewOwner(worktreeId, copy.owner, worktree, nextBranch)
-        const clear = hostedReviewClearUpdates(owner, nextBranch, worktree)
-        if (clear) {
+        if (shouldClearHostedReviewContext) {
           shouldPersistHostedReviewClear = true
           clearedBranch = nextBranch
           clearedCopy = copy
           clearedOnTwin = targets.isTwin
           clearGeneration = getHostedReviewLinkMutationGeneration(worktreeId)
-          clearUpdates = clear
-          rememberHostedReviewLinkClear(
-            worktreeId,
-            nextBranch,
-            clearGeneration,
-            nextHead,
-            copy,
-            clearUpdates
-          )
-        } else if (nextBranch !== '') {
+          rememberHostedReviewLinkClear(worktreeId, nextBranch, clearGeneration, nextHead, copy)
+        } else {
           const tombstoneKey = reviewClearTombstoneKey(worktreeId, copy.owner)
           const tombstone = hostedReviewLinkClearTombstonesByCopy.get(tombstoneKey)
           if (tombstone) {
@@ -179,28 +165,41 @@ export function createUpdateWorktreeGitIdentity(
               branchIdentity: nextBranchIdentity,
               head: nextHead
             })
-            // Why attached only: a detached observation never proves the cleared review moved on.
-            if (nextBranchIdentity !== tombstone.branchIdentity) {
+            if (hostedReviewBranchChanged) {
               shouldPersistHostedReviewClear = true
               clearedBranch = nextBranch
               clearGeneration = tombstone.generation
-              clearUpdates = tombstone.updates
             }
           }
         }
         // Why: terminal branch switches only patch branch/head here; re-derive auto titles like full listing does.
-        const nextDisplayName = deriveGitIdentityDisplayName(
-          worktree,
-          worktreeId,
-          nextBranch,
-          identity.branch
-        )
+        const currentBranchName = branchName(worktree.branch)
+        const wasAutoDerived =
+          worktree.displayNameMode === 'automatic' ||
+          (worktree.displayNameMode === undefined &&
+            worktree.cliProvenance?.kind !== 'created-by-cli' &&
+            worktree.displayName === currentBranchName)
+        const wasDetachedAutoDerived =
+          worktree.branch === '' &&
+          nextBranch !== '' &&
+          detachedHeadAutoDerivedDisplayNames.get(worktreeId) === worktree.displayName
+        const nextDisplayName =
+          (wasAutoDerived || wasDetachedAutoDerived) && nextBranch
+            ? branchName(nextBranch)
+            : worktree.displayName
+        if (identity.branch === null && wasAutoDerived) {
+          detachedHeadAutoDerivedDisplayNames.set(worktreeId, worktree.displayName)
+        } else if (identity.branch !== undefined) {
+          detachedHeadAutoDerivedDisplayNames.delete(worktreeId)
+        }
         return {
           ...worktree,
           head: nextHead,
           branch: nextBranch,
           displayName: nextDisplayName,
-          ...(clear ? normalizeWorkspaceAttachmentUpdate(worktree, clear) : {})
+          ...(shouldClearHostedReviewContext
+            ? normalizeWorkspaceAttachmentUpdate(worktree, CLEARED_HOSTED_REVIEW_LINK_UPDATES)
+            : {})
         }
       })
 
@@ -245,9 +244,9 @@ export function createUpdateWorktreeGitIdentity(
           ) {
             return
           }
-          if (!hostedReviewLinksAreCleared(current as Worktree, clearUpdates)) {
+          if (!hostedReviewLinksAreCleared(current as Worktree)) {
             // Why: a refetch can rehydrate stale linked-review metadata before this async clear starts; clear it again.
-            applyHostedReviewLinkClear(set, currentWorktreeId, clearCopy, clearUpdates)
+            applyHostedReviewLinkClear(set, currentWorktreeId, clearCopy)
             current = readRow(currentWorktreeId)
             if (!current || current.branch !== clearedBranch) {
               return
@@ -256,7 +255,7 @@ export function createUpdateWorktreeGitIdentity(
           await persistWorktreeMeta(
             persistTo(currentWorktreeId),
             currentWorktreeId,
-            clearUpdates,
+            CLEARED_HOSTED_REVIEW_LINK_UPDATES,
             persistHostId
           )
           const migratedWorktreeId = resolveHostedReviewLinkWorktreeId(currentWorktreeId)
@@ -270,7 +269,7 @@ export function createUpdateWorktreeGitIdentity(
         if (
           !latest ||
           latest.branch !== clearedBranch ||
-          hostedReviewLinksAreCleared(latest as Worktree, clearUpdates)
+          hostedReviewLinksAreCleared(latest as Worktree)
         ) {
           return
         }
@@ -286,7 +285,7 @@ export function createUpdateWorktreeGitIdentity(
           return
         }
         // Why: a refetch can rehydrate old metadata before the branch-switch clear reaches disk; don't write the stale link back.
-        applyHostedReviewLinkClear(set, currentWorktreeId, clearCopy, clearUpdates)
+        applyHostedReviewLinkClear(set, currentWorktreeId, clearCopy)
       })
       .catch((err) => {
         if (isRuntimeSelectorNotFoundError(err)) {

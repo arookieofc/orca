@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
-import { sourceControlConnectionId, useSourceControlScope } from '../panel/worktree-scope'
-import { isSyncPushStageError } from '@/lib/source-control/remote/source-control-remote-error'
-import { shouldForcePushWithLeaseForUpstream } from '../../../../../../shared/git/remotes/git-upstream-status'
+import { getConnectionId } from '@/lib/connection-context'
+import { isSyncPushStageError } from '@/lib/source-control-remote-error'
+import { shouldForcePushWithLeaseForUpstream } from '../../../../../../shared/git-upstream-status'
 import {
   captureSourceControlRecoveryEntrySnapshot,
   type SourceControlActionError,
@@ -44,15 +44,16 @@ export function useSourceControlRemoteActionRunner({
   fetchBranch,
   grouped,
   handleCommit,
-  operationStore,
   pullBranch,
   pushBranch,
   rebaseFromBase,
   refreshActiveGitStatusAfterMutation,
   refreshBranchCompareRef,
   refreshGitHistoryRef,
+  remoteActionErrorSequenceByWorktreeRef,
   remoteStatus,
   remoteStatusForActions,
+  setRemoteActionErrors,
   syncBranch,
   worktreePath
 }: {
@@ -65,19 +66,19 @@ export function useSourceControlRemoteActionRunner({
   fetchBranch: SourceControlStoreActions['fetchBranch']
   grouped: SourceControlFileListing['grouped']
   handleCommit: SourceControlCommitAction['handleCommit']
-  operationStore: SourceControlWorktreeOperationState['operationStore']
   pullBranch: SourceControlStoreActions['pullBranch']
   pushBranch: SourceControlStoreActions['pushBranch']
   rebaseFromBase: SourceControlStoreActions['rebaseFromBase']
   refreshActiveGitStatusAfterMutation: SourceControlStatusRefresh['refreshActiveGitStatusAfterMutation']
   refreshBranchCompareRef: React.RefObject<() => Promise<void>>
   refreshGitHistoryRef: React.RefObject<() => Promise<void>>
+  remoteActionErrorSequenceByWorktreeRef: SourceControlWorktreeOperationState['remoteActionErrorSequenceByWorktreeRef']
   remoteStatus: SourceControlWorktreeContext['remoteStatus']
   remoteStatusForActions: SourceControlWorktreeContext['remoteStatus']
+  setRemoteActionErrors: SourceControlWorktreeOperationState['setRemoteActionErrors']
   syncBranch: SourceControlStoreActions['syncBranch']
   worktreePath: string | null
 }) {
-  const scope = useSourceControlScope()
   const runRemoteAction = useCallback(
     async (
       kind: SourceControlRemoteActionKind,
@@ -93,15 +94,15 @@ export function useSourceControlRemoteActionRunner({
               target: activeRepoTarget,
               worktreeId: activeWorktreeId,
               worktreePath,
-              connectionId: sourceControlConnectionId(scope, activeWorktreeId),
+              connectionId: getConnectionId(activeWorktreeId) ?? undefined,
               pushTarget: activeWorktree?.pushTarget
             }
           : null)
       if (!target) {
         return { status: 'skipped' }
       }
-      const sequence = operationStore.getState().remoteActionSequence + 1
-      operationStore.setState({ remoteActionSequence: sequence, remoteActionError: null })
+      const sequence = (remoteActionErrorSequenceByWorktreeRef.current[target.worktreeId] ?? 0) + 1
+      remoteActionErrorSequenceByWorktreeRef.current[target.worktreeId] = sequence
       const targetIsActiveWorktree = target.worktreeId === activeWorktreeId
       const recoveryEntrySnapshot = captureSourceControlRecoveryEntrySnapshot(
         targetIsActiveWorktree
@@ -113,6 +114,7 @@ export function useSourceControlRemoteActionRunner({
           : []
       )
       const failureBranchName = targetIsActiveWorktree ? branchName || null : null
+      setRemoteActionErrors((prev) => ({ ...prev, [target.worktreeId]: null }))
       try {
         if (kind === 'publish') {
           await pushBranch(
@@ -206,13 +208,13 @@ export function useSourceControlRemoteActionRunner({
             runtimeTarget: target.target
           }
         )
-        if (operationStore.getState().remoteActionSequence === sequence) {
-          operationStore.setState({ remoteActionError: null })
+        if (remoteActionErrorSequenceByWorktreeRef.current[target.worktreeId] === sequence) {
+          setRemoteActionErrors((prev) => ({ ...prev, [target.worktreeId]: null }))
         }
         return { status: 'ok' }
       } catch (error) {
         // Keep failures inline after dropdowns close; store actions already own the toast.
-        if (operationStore.getState().remoteActionSequence !== sequence) {
+        if (remoteActionErrorSequenceByWorktreeRef.current[target.worktreeId] !== sequence) {
           return { status: 'superseded' }
         }
         const actionError: SourceControlActionError = {
@@ -226,12 +228,11 @@ export function useSourceControlRemoteActionRunner({
           entriesSnapshotTotalCount: recoveryEntrySnapshot.totalCount,
           sequence
         }
-        operationStore.setState({ remoteActionError: actionError })
+        setRemoteActionErrors((prev) => ({ ...prev, [target.worktreeId]: actionError }))
         return { status: 'failed', error: actionError }
       } finally {
         if (!options?.target) {
           refreshSourceControlAfterRemoteAction({
-            worktreeId: target.worktreeId,
             refreshGitStatus: refreshActiveGitStatusAfterMutation,
             refreshBranchCompare: refreshBranchCompareRef.current,
             refreshGitHistory: refreshGitHistoryRef.current
@@ -240,7 +241,6 @@ export function useSourceControlRemoteActionRunner({
       }
     },
     [
-      scope,
       activeRepoTarget,
       activeWorktree?.pushTarget,
       activeWorktreeId,
@@ -251,13 +251,14 @@ export function useSourceControlRemoteActionRunner({
       grouped.staged,
       grouped.unstaged,
       grouped.untracked,
-      operationStore,
       pullBranch,
       pushBranch,
       rebaseFromBase,
       refreshActiveGitStatusAfterMutation,
       refreshBranchCompareRef,
       refreshGitHistoryRef,
+      remoteActionErrorSequenceByWorktreeRef,
+      setRemoteActionErrors,
       syncBranch,
       worktreePath
     ]

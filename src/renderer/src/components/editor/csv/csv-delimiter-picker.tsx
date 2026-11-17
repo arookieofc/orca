@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 export type CsvDelimiterChoice = 'auto' | 'comma' | 'semicolon' | 'tab'
 
@@ -20,17 +20,16 @@ export function CsvDelimiterPicker({
   detectedDelimiter: string
   onChange: (choice: CsvDelimiterChoice) => void
 }): React.JSX.Element {
-  const t = useTranslate()
   const id = useId()
-  const comma = t('auto.components.editor.CsvViewer.delimiterComma', 'Comma')
-  const semicolon = t('auto.components.editor.CsvViewer.delimiterSemicolon', 'Semicolon')
-  const tab = t('auto.components.editor.CsvViewer.delimiterTab', 'Tab')
+  const comma = translate('auto.components.editor.CsvViewer.delimiterComma', 'Comma')
+  const semicolon = translate('auto.components.editor.CsvViewer.delimiterSemicolon', 'Semicolon')
+  const tab = translate('auto.components.editor.CsvViewer.delimiterTab', 'Tab')
   const detectedName =
     detectedDelimiter === ',' ? comma : detectedDelimiter === ';' ? semicolon : tab
   const choices = [
     {
       value: 'auto',
-      label: t('auto.components.editor.CsvViewer.delimiterAuto', 'Auto ({{delimiter}})', {
+      label: translate('auto.components.editor.CsvViewer.delimiterAuto', 'Auto ({{delimiter}})', {
         delimiter: detectedName
       })
     },
@@ -41,7 +40,9 @@ export function CsvDelimiterPicker({
 
   return (
     <div className="ms-auto flex items-center gap-2">
-      <Label htmlFor={id}>{t('auto.components.editor.CsvViewer.delimiter', 'Delimiter')}</Label>
+      <Label htmlFor={id}>
+        {translate('auto.components.editor.CsvViewer.delimiter', 'Delimiter')}
+      </Label>
       <Select
         value={value}
         onValueChange={(nextValue) => {

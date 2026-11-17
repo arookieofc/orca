@@ -1,20 +1,19 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { encodePairingOffer } from '../../../shared/remote-runtime/pairing/pairing'
-import { PAIRING_OFFER_VERSION } from '../../../shared/remote-runtime/pairing/mobile-relay-pairing-offer'
-import { addManagedOrcadEnvironment } from '../../../shared/remote-runtime/host-store/runtime-environment-managed-orcad-store'
-import type { SshTarget } from '../../../shared/remote-runtime/ssh/ssh-types'
+import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../../shared/pairing'
+import { addManagedOrcadEnvironment } from '../../../shared/runtime-environment-managed-orcad-store'
+import type { SshTarget } from '../../../shared/ssh-types'
 import type { ServeReadiness } from '../../server/serve-readiness'
-import { getRemoteHostPlatform } from '../../ssh/remote-host/ssh-remote-platform'
+import { getRemoteHostPlatform } from '../../ssh/ssh-remote-platform'
 import { SshTargetOrcadClaims } from '../../ssh/targets/ssh-target-orcad-claims'
-import { emptyDependentStateStore } from '../../ssh/targets/testing/ssh-target-orcad-dependents-fixture'
+import { emptyDependentStateStore } from '../../ssh/targets/ssh-target-orcad-dependents-fixture'
 
 export const MANAGED_VERSION = '0.2.0+abc'
 export const MANAGED_PREVIOUS_VERSION = '0.1.0+def'
 export const MANAGED_LOCAL_PORT = 46_768
 
-export async function createManagedLifecycleHarness() {
+export function createManagedLifecycleHarness() {
   const userDataPath = mkdtempSync(join(tmpdir(), 'orcad-managed-lifecycle-'))
   let target: SshTarget = {
     id: 'ssh-1',
@@ -25,7 +24,7 @@ export async function createManagedLifecycleHarness() {
     generation: 4,
     orcadFence: { environmentId: 'environment-1' }
   }
-  const environment = await addManagedOrcadEnvironment(userDataPath, {
+  const environment = addManagedOrcadEnvironment(userDataPath, {
     id: 'environment-1',
     name: 'Managed',
     pairingCode: encodePairingOffer({

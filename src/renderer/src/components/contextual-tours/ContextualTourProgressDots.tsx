@@ -1,6 +1,6 @@
 import type { JSX } from 'react'
-import { cn } from '@/lib/class-names'
-import { useTranslate } from '@/i18n/use-translate'
+import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
 
 export function ContextualTourProgressDots({
   current,
@@ -9,7 +9,6 @@ export function ContextualTourProgressDots({
   current: number
   total: number
 }): JSX.Element {
-  const t = useTranslate()
   if (total <= 1) {
     return <span aria-hidden="true" className="h-1.5 w-4" />
   }
@@ -20,7 +19,7 @@ export function ContextualTourProgressDots({
       aria-valuemin={1}
       aria-valuemax={total}
       aria-valuenow={current}
-      aria-label={t(
+      aria-label={translate(
         'auto.components.contextual.tours.ContextualTourProgressDots.dcd6e6b03e',
         'Step {{value0}} of {{value1}}',
         { value0: current, value1: total }
@@ -46,11 +45,9 @@ export function ContextualTourProgressDots({
         })}
       </span>
       <span className="whitespace-nowrap text-[11px] font-medium leading-none text-muted-foreground">
-        {t(
-          'auto.components.contextual.tours.ContextualTourProgressDots.stepOfTotal',
-          '{{current}} of {{total}}',
-          { current, total }
-        )}
+        {current}{' '}
+        {translate('auto.components.contextual.tours.ContextualTourProgressDots.7734cb8ad3', 'of')}{' '}
+        {total}
       </span>
     </div>
   )

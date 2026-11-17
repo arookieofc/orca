@@ -3,8 +3,8 @@ import { PanelLeftOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { isPRFileViewed } from '@/components/github/pr-file-content-size'
-import { useTranslate } from '@/i18n/use-translate'
-import type { GitHubPRFile } from '../../../../../shared/github/pull-requests/pull-request-types'
+import { translate } from '@/i18n/i18n'
+import type { GitHubPRFile } from '../../../../../shared/github/pull-request-types'
 
 export function PRFilesDiffToolbar({
   files,
@@ -23,7 +23,6 @@ export function PRFilesDiffToolbar({
   onToggleAllCollapsed: () => void
   onToggleSideBySide: () => void
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-3 py-1.5">
       <div className="flex min-w-0 items-center gap-2">
@@ -34,23 +33,23 @@ export function PRFilesDiffToolbar({
                 type="button"
                 variant="ghost"
                 size="icon-xs"
-                aria-label={t('auto.components.PullRequestPage.319cf2d54b', 'Show file tree')}
+                aria-label={translate(
+                  'auto.components.PullRequestPage.319cf2d54b',
+                  'Show file tree'
+                )}
                 onClick={onShowFileTree}
               >
                 <PanelLeftOpen className="size-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              {t('auto.components.PullRequestPage.319cf2d54b', 'Show file tree')}
+              {translate('auto.components.PullRequestPage.319cf2d54b', 'Show file tree')}
             </TooltipContent>
           </Tooltip>
         )}
         <span className="truncate text-xs text-muted-foreground">
-          {t('auto.components.PullRequestPage.filesViewed', '{{viewed}} / {{count}} files viewed', {
-            viewed: files.filter(isPRFileViewed).length,
-            count: files.length,
-            defaultValue_one: '{{viewed}} / {{count}} file viewed'
-          })}
+          {files.filter(isPRFileViewed).length} / {files.length}{' '}
+          {translate('auto.components.PullRequestPage.89e80af1c7', 'files viewed')}
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -62,8 +61,8 @@ export function PRFilesDiffToolbar({
           onClick={onToggleAllCollapsed}
         >
           {allSectionsCollapsed
-            ? t('auto.components.PullRequestPage.eb722a5a8c', 'Expand All')
-            : t('auto.components.PullRequestPage.dd94111c18', 'Collapse All')}
+            ? translate('auto.components.PullRequestPage.eb722a5a8c', 'Expand All')
+            : translate('auto.components.PullRequestPage.dd94111c18', 'Collapse All')}
         </Button>
         <Button
           type="button"
@@ -73,8 +72,8 @@ export function PRFilesDiffToolbar({
           onClick={onToggleSideBySide}
         >
           {sideBySide
-            ? t('auto.components.PullRequestPage.e5f4a24f78', 'Inline')
-            : t('auto.components.PullRequestPage.1378d79e83', 'Side by Side')}
+            ? translate('auto.components.PullRequestPage.e5f4a24f78', 'Inline')
+            : translate('auto.components.PullRequestPage.1378d79e83', 'Side by Side')}
         </Button>
       </div>
     </div>

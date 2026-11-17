@@ -1,12 +1,7 @@
 import { createHash } from 'node:crypto'
 import { realpath } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
-import type {
-  RuntimeFileStatLike,
-  TerminalFileContentBlocks,
-  TerminalFileGrant
-} from './file-grants'
-import { isBinaryBuffer } from '../../../../shared/file-preview/binary-buffer'
+import type { RuntimeFileStatLike, TerminalFileGrant } from './file-grants'
 import {
   LOCAL_PREVIEWABLE_BINARY_MAX_BYTES,
   MOBILE_FILE_READ_MAX_BYTES
@@ -29,43 +24,20 @@ export async function readFileHandleBufferBounded(
   return buffer.subarray(0, bytesRead)
 }
 
-export const TERMINAL_ARTIFACT_CONTENT_BLOCK_BYTES = 64 * 1024
-
-/** Per-block digests, so one page is checked against the grant without re-hashing the file. */
-export function terminalArtifactContentBlocks(buffer: Buffer): TerminalFileContentBlocks {
-  const digests: string[] = []
-  for (let start = 0; start < buffer.byteLength; start += TERMINAL_ARTIFACT_CONTENT_BLOCK_BYTES) {
-    digests.push(
-      terminalArtifactContentDigest(
-        buffer.subarray(start, start + TERMINAL_ARTIFACT_CONTENT_BLOCK_BYTES)
-      )
-    )
-  }
-  return { byteLength: buffer.byteLength, digests }
-}
-
-/** Pin all returnable bytes; size-rejected files need no digest. Binary is null where unread. */
+/** Pin all returnable bytes; size-rejected files need no digest. */
 export async function localTerminalArtifactContentDigest(
   handle: FileHandle,
   size: number
-): Promise<{
-  contentDigest: string | null
-  contentBlocks: TerminalFileContentBlocks | null
-  binary: boolean | null
-}> {
+): Promise<string | null> {
   if (size > LOCAL_PREVIEWABLE_BINARY_MAX_BYTES) {
-    return { contentDigest: null, contentBlocks: null, binary: null }
+    return null
   }
   // Why: hover probes mint grants for any path, so read only the file; procfs reports size 0 for real content.
   const buffer = await readFileHandleBufferBounded(
     handle,
     size === 0 ? LOCAL_PREVIEWABLE_BINARY_MAX_BYTES + 1 : size + 1
   )
-  return {
-    contentDigest: terminalArtifactContentDigest(buffer),
-    contentBlocks: terminalArtifactContentBlocks(buffer),
-    binary: isBinaryBuffer(buffer)
-  }
+  return terminalArtifactContentDigest(buffer)
 }
 
 export function terminalArtifactContentDigest(buffer: Buffer): string {
@@ -85,7 +57,7 @@ export function assertTerminalArtifactContentUnchanged(
   }
 }
 
-// Host-local: grants never leave this process. ctime catches rewrites that keep size and mtime, which utimes can reset but ctime cannot.
+// Remote peers recompute this identity; changes require capability negotiation.
 export function terminalFileStatIdentity(stats: RuntimeFileStatLike): string | null {
   const dev = typeof stats.dev === 'number' ? stats.dev : null
   const ino = typeof stats.ino === 'number' ? stats.ino : null
@@ -97,12 +69,11 @@ export function terminalFileStatIdentity(stats: RuntimeFileStatLike): string | n
       : typeof stats.mtime === 'number'
         ? stats.mtime
         : null
-  const ctimeMs = typeof stats.ctimeMs === 'number' ? stats.ctimeMs : 'unknown'
   if (dev !== null && ino !== null && size !== null && mtimeMs !== null) {
-    return `${dev}:${ino}:${nlink ?? 'unknown'}:${size}:${mtimeMs}:${ctimeMs}`
+    return `${dev}:${ino}:${nlink ?? 'unknown'}:${size}:${mtimeMs}`
   }
   if (size !== null && mtimeMs !== null) {
-    return `${size}:${mtimeMs}:${ctimeMs}`
+    return `${size}:${mtimeMs}`
   }
   return null
 }

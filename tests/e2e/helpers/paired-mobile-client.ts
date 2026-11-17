@@ -1,25 +1,24 @@
-import { MOBILE_RUNTIME_CLIENT_CAPABILITIES } from '../../../mobile/src/transport/connection/mobile-runtime-client-capabilities'
-import { pairedRuntimeConnectionFromOffer } from '../../../src/shared/remote-runtime/pairing/paired-runtime-connection'
-import { decodePairingOffer } from '../../../src/shared/remote-runtime/pairing/pairing'
-import type { PairingOffer } from '../../../src/shared/remote-runtime/pairing/mobile-relay-pairing-offer'
-import { sendRemoteRuntimeRequestOnSocket } from '../../../src/shared/remote-runtime/requests/remote-runtime-request-socket'
-import { subscribeRemoteRuntimeTransport } from '../../../src/shared/remote-runtime/requests/remote-runtime-subscription-transport'
-import type {
-  RemoteRuntimeTransportSubscription,
-  RemoteRuntimeTransportSubscriptionCallbacks
-} from '../../../src/shared/remote-runtime/requests/remote-runtime-subscription-contract'
-import type { RuntimeRpcResponse } from '../../../src/shared/remote-runtime/rpc/runtime-rpc-envelope'
+import { MOBILE_RUNTIME_CLIENT_CAPABILITIES } from '../../../mobile/src/transport/mobile-runtime-client-capabilities'
+import { pairedRuntimeConnectionFromOffer } from '../../../src/shared/paired-runtime-connection'
+import { decodePairingOffer, type PairingOffer } from '../../../src/shared/pairing'
+import {
+  sendRemoteRuntimeRequest,
+  subscribeRemoteRuntimeRequest,
+  type RemoteRuntimeSubscription,
+  type RemoteRuntimeSubscriptionCallbacks
+} from '../../../src/shared/remote-runtime/remote-runtime-client'
+import type { RuntimeRpcResponse } from '../../../src/shared/runtime-rpc-envelope'
 import { openRemoteRuntimePassthroughSocket } from '../../../src/shared/remote-runtime/remote-runtime-passthrough-socket'
-import type { RuntimeCapability } from '../../../src/shared/remote-runtime/protocol/protocol-version'
+import type { RuntimeCapability } from '../../../src/shared/protocol-version'
 import {
   decodeBrowserScreencastFrame,
   type BrowserScreencastFrame
-} from '../../../src/shared/browser/screencast/browser-screencast-protocol'
+} from '../../../src/shared/browser-screencast-protocol'
 import {
   decodeTerminalStreamFrame,
   decodeTerminalStreamText,
   TerminalStreamOpcode
-} from '../../../src/shared/terminal/stream/terminal-stream-protocol'
+} from '../../../src/shared/terminal-stream-protocol'
 import type { RuntimeDesktopPairingOffer } from './paired-electron-client'
 
 const DEFAULT_TIMEOUT_MS = 15_000
@@ -37,9 +36,9 @@ export type PairedMobileClient = {
   subscribe: <T>(
     method: string,
     params: unknown,
-    callbacks: RemoteRuntimeTransportSubscriptionCallbacks<T>,
+    callbacks: RemoteRuntimeSubscriptionCallbacks<T>,
     timeoutMs?: number
-  ) => Promise<RemoteRuntimeTransportSubscription>
+  ) => Promise<RemoteRuntimeSubscription>
   /** One persistent phone socket, as the app holds one; needed for streams and `executionHost`. */
   openSocket: () => Promise<PairedMobileSocket>
   /** Closes every subscription and socket this client opened. */
@@ -49,12 +48,7 @@ export type PairedMobileClient = {
 /** Raw frames over one authenticated phone socket, exactly as the app writes them. */
 export type PairedMobileSocket = {
   token: string
-  frames: {
-    id?: string
-    ok?: boolean
-    result?: unknown
-    error?: { code: string; message?: string }
-  }[]
+  frames: { id?: string; ok?: boolean; result?: unknown; error?: { code: string } }[]
   /** Terminal output text per stream id, decoded from binary frames. */
   output: Map<number, string>
   screencastFrames: BrowserScreencastFrame[]
@@ -81,17 +75,14 @@ export function pairMobileClient(
     params: unknown = {},
     timeoutMs = DEFAULT_TIMEOUT_MS
   ): Promise<RuntimeRpcResponse<T>> =>
-    sendRemoteRuntimeRequestOnSocket<T>(
+    sendRemoteRuntimeRequest<T>(
       connection,
       method,
       params,
       timeoutMs,
       undefined,
       undefined,
-      undefined,
-      capabilities,
-      undefined,
-      undefined
+      capabilities
     )
   return {
     request,
@@ -103,7 +94,7 @@ export function pairMobileClient(
       return response.result
     },
     subscribe: async (method, params, callbacks, timeoutMs = DEFAULT_TIMEOUT_MS) => {
-      const subscription = await subscribeRemoteRuntimeTransport(
+      const subscription = await subscribeRemoteRuntimeRequest(
         connection,
         method,
         params,

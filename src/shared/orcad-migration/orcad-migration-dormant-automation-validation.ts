@@ -1,12 +1,7 @@
-import { AutomationCanonicalLaunchSetup } from '../rpc-contract/automations/automation-params'
-import { automationCanonicalDefinition } from '../automations/launch/automation-launch-setup'
-import { assertAutomationExtraAgentArgs } from '../automations/launch/automation-extra-agent-args-record'
-import { isTuiAgent } from '../agent-launch/catalog/tui-agent-config'
-import type { Automation } from '../automations/automation-definition'
-import type { AutomationRun } from '../automations/history/automation-run'
-import { getAutomationRunRepoId } from '../automations/history/automation-run-identity'
-import { ORCAD_MIGRATION_BLOB_KIND_CONTRACTS } from './orcad-migration-blob-transfer'
-import type { OrcadMigrationAutomationRunHistoryRef } from './orcad-migration-manifest'
+import { assertAutomationExtraAgentArgs } from '../automation-extra-agent-args-record'
+import { isTuiAgent } from '../tui-agent-config'
+import type { Automation, AutomationRun } from '../automations-types'
+import { getAutomationRunRepoId } from '../automation-run-identity'
 import {
   assertUnique,
   boundedArray,
@@ -45,24 +40,6 @@ export function parseOrcadMigrationDormantAutomationRuns(value: unknown): Automa
   const runs = boundedArray(value, parseAutomationRun, 'automation_runs')
   assertUnique(runs, (entry) => entry.id, 'automation_run')
   return runs
-}
-
-export function parseOrcadMigrationAutomationRunHistoryRef(
-  value: unknown
-): OrcadMigrationAutomationRunHistoryRef {
-  const record = requiredRecord(value, 'orcad_migration_dormant_automation_run_history_invalid')
-  const { sha256, byteLength } = record
-  if (
-    typeof sha256 !== 'string' ||
-    !/^[a-f0-9]{64}$/.test(sha256) ||
-    typeof byteLength !== 'number' ||
-    !Number.isSafeInteger(byteLength) ||
-    byteLength < 1 ||
-    byteLength > ORCAD_MIGRATION_BLOB_KIND_CONTRACTS['automation-run-history'].maxBytes
-  ) {
-    throw new Error('orcad_migration_dormant_automation_run_history_invalid')
-  }
-  return { sha256, byteLength }
 }
 
 export function assertOrcadMigrationDormantAutomationReferences(args: {
@@ -106,7 +83,7 @@ function parseAutomation(value: unknown): Automation {
   } catch {
     throw new Error('orcad_migration_dormant_automation_extra_agent_args_invalid')
   }
-  return automationCanonicalDefinition(copy)
+  return copy
 }
 
 /** Throws the specific field error; narrowing only follows these checks. */
@@ -119,20 +96,8 @@ function isMigratedAutomation(value: unknown): value is Automation {
   if (!isTuiAgent(record.agentId)) {
     throw new Error('orcad_migration_dormant_automation_agent_invalid')
   }
-  if (record.surface !== undefined && record.surface !== 'chat' && record.surface !== 'terminal') {
-    throw new Error('orcad_migration_dormant_automation_surface_invalid')
-  }
   if (record.extraAgentArgs !== undefined && typeof record.extraAgentArgs !== 'string') {
     throw new Error('orcad_migration_dormant_automation_extra_agent_args_invalid')
-  }
-  AutomationCanonicalLaunchSetup.parse({
-    ...(record.launchPreferences !== undefined
-      ? { launchPreferences: record.launchPreferences }
-      : {}),
-    ...(record.agentArgs !== undefined ? { agentArgs: record.agentArgs } : {})
-  })
-  if (record.launchSetup !== undefined) {
-    AutomationCanonicalLaunchSetup.parse(record.launchSetup)
   }
   parseContext(record.runContext, 'workspace-run')
   parseContext(record.sourceContext, 'task-source')
@@ -190,12 +155,6 @@ function isMigratedAutomationRun(value: unknown): value is AutomationRun {
   const record = requiredRecord(value, 'orcad_migration_dormant_automation_run_invalid')
   requiredString(record.id, 'orcad_migration_dormant_automation_run_id_invalid')
   requiredString(record.automationId, 'orcad_migration_dormant_automation_run_owner_invalid')
-  AutomationCanonicalLaunchSetup.parse({
-    ...(record.launchPreferences !== undefined
-      ? { launchPreferences: record.launchPreferences }
-      : {}),
-    ...(record.agentArgs !== undefined ? { agentArgs: record.agentArgs } : {})
-  })
   parseContext(record.runContext, 'workspace-run')
   parseContext(record.sourceContext, 'task-source')
   requiredString(record.title, 'orcad_migration_dormant_automation_run_title_invalid')
@@ -214,7 +173,7 @@ function isMigratedAutomationRun(value: unknown): value is AutomationRun {
     record.workspaceDisplayName,
     'orcad_migration_dormant_automation_run_workspace_name_invalid'
   )
-  if (record.sessionKind !== 'terminal' && record.sessionKind !== 'chat') {
+  if (record.sessionKind !== 'terminal') {
     throw new Error('orcad_migration_dormant_automation_run_session_invalid')
   }
   for (const field of [
@@ -226,17 +185,6 @@ function isMigratedAutomationRun(value: unknown): value is AutomationRun {
   ] as const) {
     optionalNullableString(record[field], `orcad_migration_dormant_automation_run_${field}_invalid`)
   }
-  if (
-    record.sessionKind === 'chat' &&
-    [record.terminalSessionId, record.terminalPaneKey, record.terminalPtyId].some(
-      (value) => value != null
-    )
-  ) {
-    throw new Error('orcad_migration_dormant_automation_run_session_invalid')
-  }
-  if (record.sessionKind === 'terminal' && record.chatSessionId != null) {
-    throw new Error('orcad_migration_dormant_automation_run_session_invalid')
-  }
   parseOutputSnapshot(record.outputSnapshot)
   parsePrecheckResult(record.precheckResult)
   parseUsage(record.usage)
@@ -246,7 +194,6 @@ function isMigratedAutomationRun(value: unknown): value is AutomationRun {
     'orcad_migration_dormant_automation_run_dispatched_invalid',
     true
   )
-  optionalFinite(record.launchedAt, 'orcad_migration_dormant_automation_run_launched_invalid')
   requiredFinite(record.createdAt, 'orcad_migration_dormant_automation_run_created_invalid')
   optionalPositiveInteger(record.runNumber, 'orcad_migration_dormant_automation_run_number_invalid')
   optionalPositiveInteger(

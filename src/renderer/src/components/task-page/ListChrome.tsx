@@ -1,8 +1,8 @@
 import type { TaskPageComposerActionsModel } from './use-task-page-composer-actions'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import { TaskPageSourceBar } from './SourceBar'
 import { AlertCircle } from 'lucide-react'
-import { TaskPageGitHubModeControls } from './github/listing/ModeControls'
+import { TaskPageGitHubModeControls } from './github/ModeControls'
 import { TaskPageProviderFilters } from './ProviderFilters'
 export function TaskPageListChrome({
   model

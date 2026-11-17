@@ -1,15 +1,15 @@
-import { execFile } from 'node:child_process'
+import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import os from 'node:os'
-import { getAppEnvironment, type AppEnvironment } from '../../shared/app-lifecycle/app-environment'
+import { getAppEnvironment, type AppEnvironment } from '../../shared/app-environment'
 import type {
   AppMemory,
   MemorySnapshot,
   SessionMemory,
   UsageValues,
   WorktreeMemory
-} from '../../shared/diagnostics/process-stats-types'
-import { ORPHAN_WORKTREE_ID } from '../../shared/terminal/pty/orphan-worktree-id'
+} from '../../shared/process-stats-types'
+import { ORPHAN_WORKTREE_ID } from '../../shared/constants'
 import { listRegisteredPtys } from './pty-registry'
 import { enumerateWindowsProcessResources } from './windows-process-resource-collector'
 import { collectHostMemory } from './host-memory'
@@ -62,7 +62,7 @@ export async function collectMemorySnapshot(store: MemorySnapshotStore): Promise
   return inflight
 }
 
-const execFileAsync = promisify(execFile)
+const execAsync = promisify(exec)
 const PS_EXEC_TIMEOUT_MS = 5_000
 const PS_MAX_BUFFER = 10 * 1024 * 1024
 
@@ -78,7 +78,7 @@ async function enumerateProcesses(): Promise<ProcIndex> {
 async function enumerateUnix(): Promise<ProcRow[]> {
   // Force dot decimals: parseFloat silently truncates locale-formatted comma values.
   try {
-    const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,pcpu=,rss='], {
+    const { stdout } = await execAsync('ps -eo pid=,ppid=,pcpu=,rss=', {
       maxBuffer: PS_MAX_BUFFER,
       timeout: PS_EXEC_TIMEOUT_MS,
       env: { ...process.env, LC_ALL: 'C', LANG: 'C' }

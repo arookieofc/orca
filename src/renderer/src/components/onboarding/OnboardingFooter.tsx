@@ -1,10 +1,10 @@
 import { ChevronLeft, CornerDownLeft, Loader2 } from 'lucide-react'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 type OnboardingFooterProps = {
-  shouldShowSetUpLater: boolean
+  shouldShowSkipToProjectSetup: boolean
   busyLabel: string | null
-  onSetUpLater: () => void
+  onSkipToRepo: () => void
   stepIndex: number
   onBack: () => void
   showPrimary: boolean
@@ -15,9 +15,9 @@ type OnboardingFooterProps = {
 }
 
 export function OnboardingFooter({
-  shouldShowSetUpLater,
+  shouldShowSkipToProjectSetup,
   busyLabel,
-  onSetUpLater,
+  onSkipToRepo,
   stepIndex,
   onBack,
   showPrimary,
@@ -26,16 +26,18 @@ export function OnboardingFooter({
   shortcutModifierLabel,
   onPrimary
 }: OnboardingFooterProps): React.JSX.Element {
-  const t = useTranslate()
   return (
     <footer className="mt-6 flex flex-none items-center justify-between border-t border-border pt-5">
-      {shouldShowSetUpLater ? (
+      {shouldShowSkipToProjectSetup ? (
         <button
           className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-muted-foreground"
           disabled={Boolean(busyLabel)}
-          onClick={onSetUpLater}
+          onClick={onSkipToRepo}
         >
-          {t('auto.components.onboarding.OnboardingFooter.111d3f8d92', 'Set up later')}
+          {translate(
+            'auto.components.onboarding.OnboardingFooter.111d3f8d92',
+            'Skip to project setup'
+          )}
         </button>
       ) : (
         <span />
@@ -48,7 +50,7 @@ export function OnboardingFooter({
             onClick={onBack}
           >
             <ChevronLeft className="size-4" />
-            {t('auto.components.onboarding.OnboardingFooter.ba58547306', 'Back')}
+            {translate('auto.components.onboarding.OnboardingFooter.ba58547306', 'Back')}
           </button>
         )}
         {showPrimary && (

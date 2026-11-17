@@ -2,15 +2,12 @@ import { mkdtemp, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fingerprintPluginConsent } from '../../shared/plugins/approval/plugin-consent-fingerprint'
-import {
-  pluginManifestSchema,
-  type PluginManifest
-} from '../../shared/plugins/manifest/plugin-manifest'
-import { hashPluginTree } from './artifacts/plugin-content-hash'
-import { PluginContentVerifier } from './artifacts/plugin-content-integrity'
+import { fingerprintPluginConsent } from '../../shared/plugins/plugin-consent-fingerprint'
+import { pluginManifestSchema, type PluginManifest } from '../../shared/plugins/plugin-manifest'
+import { hashPluginTree } from './plugin-content-hash'
+import { PluginContentVerifier } from './plugin-content-integrity'
 import { PluginService } from './plugin-service'
-import type { PluginWorkerFactory } from './workers/worker-supervision/plugin-worker-startup'
+import type { PluginWorkerFactory } from './plugin-worker-manager'
 
 const roots: string[] = []
 
@@ -19,18 +16,17 @@ async function createInstalledPlugin(options: { worker: boolean }): Promise<{
   pluginKey: string
   rootDir: string
   manifest: PluginManifest
-  contentHash: string
 }> {
   const userDataPath = await mkdtemp(join(tmpdir(), 'orca-plugin-service-integrity-'))
   roots.push(userDataPath)
-  const pluginKey = 'samples.demo'
+  const pluginKey = 'orca-samples.demo'
   const pluginDir = join(userDataPath, 'plugins', pluginKey)
   const stagingDir = join(pluginDir, 'staging')
   await mkdir(stagingDir, { recursive: true })
   const manifest = pluginManifestSchema.parse({
     manifestVersion: 1,
     id: 'demo',
-    publisher: 'samples',
+    publisher: 'orca-samples',
     name: 'Demo',
     version: '1.0.0',
     engines: { orca: '>=1.0.0' },
@@ -56,14 +52,14 @@ async function createInstalledPlugin(options: { worker: boolean }): Promise<{
   const rootDir = join(pluginDir, content.hash)
   await rename(stagingDir, rootDir)
   await writeFile(join(pluginDir, 'current'), content.hash)
-  return { userDataPath, pluginKey, rootDir, manifest, contentHash: content.hash }
+  return { userDataPath, pluginKey, rootDir, manifest }
 }
 
 function createService(
   plugin: Awaited<ReturnType<typeof createInstalledPlugin>>,
   workerFactory?: PluginWorkerFactory
 ): PluginService {
-  const consentFingerprint = fingerprintPluginConsent(plugin.manifest, plugin.contentHash)
+  const consentFingerprint = fingerprintPluginConsent(plugin.manifest)
   return new PluginService({
     userDataPath: plugin.userDataPath,
     hostVersion: '1.4.0',
@@ -79,7 +75,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
-describe('PluginService content verification on load', () => {
+describe('PluginService lazy content verification', () => {
   it('does not share an in-flight verification across same-key content revisions', async () => {
     const oldPlugin = await createInstalledPlugin({ worker: false })
     const newPlugin = await createInstalledPlugin({ worker: false })
@@ -101,25 +97,13 @@ describe('PluginService content verification on load', () => {
     await expect(newVerification).resolves.toBeUndefined()
   })
 
-  it('detects tampering on the first panel load after discovery', async () => {
+  it('detects tampering only when panel code is first consumed', async () => {
     const plugin = await createInstalledPlugin({ worker: false })
     const service = createService(plugin)
     await service.initialize()
     expect(service.findValidPlugin(plugin.pluginKey)).not.toBeNull()
 
     await writeFile(join(plugin.rootDir, 'payload.txt'), 'tampered after discovery')
-
-    await expect(service.panels.readEntry(plugin.pluginKey, 'panel')).resolves.toBeNull()
-    await service.dispose()
-  })
-
-  it('detects tampering on a later panel load after a successful first load', async () => {
-    const plugin = await createInstalledPlugin({ worker: false })
-    const service = createService(plugin)
-    await service.initialize()
-    await expect(service.panels.readEntry(plugin.pluginKey, 'panel')).resolves.not.toBeNull()
-
-    await writeFile(join(plugin.rootDir, 'payload.txt'), 'tampered after first load')
 
     await expect(service.panels.readEntry(plugin.pluginKey, 'panel')).resolves.toBeNull()
     await service.dispose()
@@ -135,6 +119,7 @@ describe('PluginService content verification on load', () => {
     await expect(service.invokeCommand(plugin.pluginKey, 'run')).rejects.toThrow(
       'integrity verification'
     )
+    expect(workerFactory).not.toHaveBeenCalled()
     await service.dispose()
   })
 })

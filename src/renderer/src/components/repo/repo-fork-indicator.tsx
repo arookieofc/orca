@@ -1,9 +1,8 @@
 import React from 'react'
 import { GitFork } from 'lucide-react'
-import type { GitHubRepositoryIdentity } from '../../../../shared/github/repositories/repository-identity'
+import type { GitHubRepositoryIdentity } from '../../../../shared/github/pull-request-types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
-import { cn } from '@/lib/class-names'
-import { useTranslate } from '@/i18n/use-translate'
+import { cn } from '@/lib/utils'
 
 /** Show fork identity only after resolving an upstream, with its owner/repo tooltip. */
 export function RepoForkIndicator({
@@ -13,13 +12,10 @@ export function RepoForkIndicator({
   upstream: GitHubRepositoryIdentity | null | undefined
   className?: string
 }): React.JSX.Element | null {
-  const t = useTranslate()
   if (!upstream) {
     return null
   }
-  const label = t('auto.components.repo.forkIndicator.forkOf', 'Fork of {{repo}}', {
-    repo: `${upstream.owner}/${upstream.repo}`
-  })
+  const label = `Fork of ${upstream.owner}/${upstream.repo}`
   return (
     <Tooltip>
       <TooltipTrigger asChild>

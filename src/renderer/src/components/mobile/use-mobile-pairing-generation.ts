@@ -4,8 +4,8 @@ import { translate } from '@/i18n/i18n'
 import {
   canMintMobilePairingOffer,
   type MobilePairingConnectionMode
-} from '../../../../shared/remote-runtime/pairing/mobile-pairing-connection-mode'
-import type { MobileRelayMintFailure } from '../../../../shared/remote-runtime/relay/mobile-relay-mint-failure'
+} from '../../../../shared/mobile-pairing-connection-mode'
+import type { MobileRelayMintFailure } from '../../../../shared/mobile-relay-mint-failure'
 
 type MutableRef<T> = { current: T }
 
@@ -20,7 +20,6 @@ export function useMobilePairingGeneration(params: {
   setPairQrDataUrl: (value: string | null) => void
   setPairQrSize: (value: number | null) => void
   setPairingUrl: (value: string | null) => void
-  setPairExpiresAt: (value: number | null) => void
   setPairingQrError: (value: boolean) => void
   setPairLoading: (value: boolean) => void
   setRelayMintFailure: (value: MobileRelayMintFailure | null) => void
@@ -43,7 +42,6 @@ export function useMobilePairingGeneration(params: {
     setPairQrDataUrl,
     setPairQrSize,
     setPairingUrl,
-    setPairExpiresAt,
     setPairingQrError,
     setPairLoading,
     setRelayMintFailure,
@@ -80,7 +78,6 @@ export function useMobilePairingGeneration(params: {
             setPairQrDataUrl(result.qrDataUrl)
             setPairQrSize(result.qrSize)
             setPairingUrl(result.pairingUrl)
-            setPairExpiresAt(result.expiresAt ?? null)
             setPairingQrError(result.qrDataUrl === null)
             setRelayMintFailure(null)
           }
@@ -139,7 +136,6 @@ export function useMobilePairingGeneration(params: {
       setPairQrDataUrl,
       setPairQrSize,
       setPairingUrl,
-      setPairExpiresAt,
       setPairingQrError,
       setRelayMintFailure,
       signedIn

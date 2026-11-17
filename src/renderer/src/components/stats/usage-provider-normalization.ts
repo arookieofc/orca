@@ -1,10 +1,9 @@
-import type { CodexUsageSummary } from '../../../../shared/agent-usage/analytics/codex-usage-types'
-import type { OpenCodeUsageSummary } from '../../../../shared/agent-usage/analytics/opencode-usage-types'
-import type { MuseUsageSummary } from '../../../../shared/agent-usage/analytics/muse-usage-types'
+import type { CodexUsageSummary } from '../../../../shared/codex-usage-types'
+import type { OpenCodeUsageSummary } from '../../../../shared/opencode-usage-types'
+import type { MuseUsageSummary } from '../../../../shared/muse-usage-types'
 import { countActiveDays, getClaudeDailyTotal } from './usage-overview-daily-series'
 import type { UsageOverviewInput, UsageProviderOverview } from './usage-overview-types'
 import { translate } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
 
 function getCodexNewInputTokens(summary: CodexUsageSummary | null): number {
   if (!summary) {
@@ -27,17 +26,14 @@ function getOpenCodeNewInputTokens(summary: OpenCodeUsageSummary | null): number
   return Math.max(summary.inputTokens - summary.cachedInputTokens, 0)
 }
 
-export function createClaudeProvider(
-  input: UsageOverviewInput['claude'],
-  t: Translate = translate
-): UsageProviderOverview {
+export function createClaudeProvider(input: UsageOverviewInput['claude']): UsageProviderOverview {
   const summary = input.summary
   const dailyActiveDays = input.daily
     .filter((entry) => getClaudeDailyTotal(entry) > 0)
     .map((entry) => entry.day)
   return {
     id: 'claude',
-    label: t('auto.components.stats.usage.overview.model.544d6d4c16', 'Claude'),
+    label: translate('auto.components.stats.usage.overview.model.544d6d4c16', 'Claude'),
     enabled: input.scanState?.enabled ?? false,
     isScanning: input.scanState?.isScanning ?? false,
     hasData: summary?.hasAnyClaudeData ?? input.scanState?.hasAnyClaudeData ?? false,
@@ -64,17 +60,14 @@ export function createClaudeProvider(
   }
 }
 
-export function createCodexProvider(
-  input: UsageOverviewInput['codex'],
-  t: Translate = translate
-): UsageProviderOverview {
+export function createCodexProvider(input: UsageOverviewInput['codex']): UsageProviderOverview {
   const summary = input.summary
   const dailyActiveDays = input.daily
     .filter((entry) => entry.totalTokens > 0)
     .map((entry) => entry.day)
   return {
     id: 'codex',
-    label: t('auto.components.stats.usage.overview.model.eb220d193b', 'Codex'),
+    label: translate('auto.components.stats.usage.overview.model.eb220d193b', 'Codex'),
     enabled: input.scanState?.enabled ?? false,
     isScanning: input.scanState?.isScanning ?? false,
     hasData: summary?.hasAnyCodexData ?? input.scanState?.hasAnyCodexData ?? false,
@@ -97,8 +90,7 @@ export function createCodexProvider(
 }
 
 export function createOpenCodeProvider(
-  input: UsageOverviewInput['opencode'],
-  t: Translate = translate
+  input: UsageOverviewInput['opencode']
 ): UsageProviderOverview {
   const summary = input.summary
   const dailyActiveDays = input.daily
@@ -106,7 +98,7 @@ export function createOpenCodeProvider(
     .map((entry) => entry.day)
   return {
     id: 'opencode',
-    label: t('auto.components.stats.usage.overview.model.bc474051e5', 'OpenCode'),
+    label: translate('auto.components.stats.usage.overview.model.bc474051e5', 'OpenCode'),
     enabled: input.scanState?.enabled ?? false,
     isScanning: input.scanState?.isScanning ?? false,
     hasData: summary?.hasAnyOpenCodeData ?? input.scanState?.hasAnyOpenCodeData ?? false,
@@ -128,17 +120,14 @@ export function createOpenCodeProvider(
   }
 }
 
-export function createMuseProvider(
-  input: UsageOverviewInput['muse'],
-  t: Translate = translate
-): UsageProviderOverview {
+export function createMuseProvider(input: UsageOverviewInput['muse']): UsageProviderOverview {
   const summary = input.summary
   const dailyActiveDays = input.daily
     .filter((entry) => entry.totalTokens > 0)
     .map((entry) => entry.day)
   return {
     id: 'muse',
-    label: t('auto.lib.agent.catalog.muse_label', 'Muse'),
+    label: translate('auto.lib.agent.catalog.muse_label', 'Muse'),
     enabled: input.scanState?.enabled ?? false,
     isScanning: input.scanState?.isScanning ?? false,
     hasData: summary?.hasAnyMuseData ?? input.scanState?.hasAnyMuseData ?? false,

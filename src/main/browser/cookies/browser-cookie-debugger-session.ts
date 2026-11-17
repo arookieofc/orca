@@ -1,6 +1,5 @@
-import type { Session } from 'electron'
-import { openHiddenHelperWindow } from '../hidden-helper-window'
-import { acquireElectronDebugger } from '../cdp/debugger/electron-debugger-lease'
+import { BrowserWindow, type Session } from 'electron'
+import { acquireElectronDebugger } from '../electron-debugger-lease'
 
 export type CookieClearDebugger = {
   sendCommand: (method: string, params?: Record<string, unknown>) => Promise<unknown>
@@ -11,6 +10,18 @@ type CookieClearSession = {
   dispose: () => void
 }
 
+function openHiddenCookieWindow(targetSession: Session): BrowserWindow {
+  return new BrowserWindow({
+    show: false,
+    webPreferences: {
+      session: targetSession,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+}
+
 const COOKIE_COMMAND_DEADLINE_MS = 10_000
 
 async function attachCookieClearSession(
@@ -18,7 +29,7 @@ async function attachCookieClearSession(
   signal: AbortSignal
 ): Promise<CookieClearSession> {
   // A dedicated target can be retired without closing a user's tab or another debugger lease.
-  const window = openHiddenHelperWindow(targetSession)
+  const window = openHiddenCookieWindow(targetSession)
   let retired = false
   const retire = () => {
     if (!retired) {

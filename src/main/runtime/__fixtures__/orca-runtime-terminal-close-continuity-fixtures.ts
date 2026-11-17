@@ -1,8 +1,8 @@
-import { withDurableRuntimeStore } from '../orca-runtime-tests/runtime-durable-store-fixture'
+import { withDurableRuntimeStore } from '../runtime-durable-store-fixture'
 import { vi, type Mock } from 'vitest'
-import { makePaneKey } from '../../../shared/workspace-layout/stable-pane-id'
-import type { WorkspaceSessionState } from '../../../shared/workspace-session/workspace-session-state-types'
-import type { RuntimeTerminalListResult } from '../../../shared/terminal/runtime/runtime-terminal-contracts'
+import { makePaneKey } from '../../../shared/stable-pane-id'
+import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
+import type { RuntimeTerminalListResult } from '../../../shared/runtime-types'
 import { OrcaRuntimeService } from '../orca-runtime'
 import { withMainLayout } from './main-layout-close-fixture'
 import {
@@ -27,6 +27,27 @@ import {
 } from './orca-runtime-terminal-close-continuity-state-fixture'
 import { createCloseContinuityGraphFixture } from './orca-runtime-terminal-close-continuity-graph-fixture'
 
+export {
+  CANARY_INCARNATION_ID,
+  CANARY_LEAF_ID,
+  CANARY_PTY_ID,
+  CANARY_TAB_ID,
+  INCARNATION_ID,
+  LEAF_ID,
+  OTHER_WORKTREE_ID,
+  PTY_ID,
+  REPO_ID,
+  RUNTIME_OWNED_PTY_ID,
+  SIBLING_INCARNATION_ID,
+  SIBLING_LEAF_ID,
+  SIBLING_PTY_ID,
+  STALE_TAB_ID,
+  TAB_ID,
+  WORKTREE_ID,
+  WORKTREE_PATH,
+  makeSession
+} from './orca-runtime-terminal-close-continuity-state-fixture'
+
 export type CloseContinuityHarness = {
   runtime: OrcaRuntimeService
   acknowledged: ReturnType<typeof makeDeferred>
@@ -36,11 +57,11 @@ export type CloseContinuityHarness = {
   flushOrThrow: Mock<() => void>
   kill: Mock<(ptyId: string) => boolean>
   stopAndWait: Mock<(ptyId: string, ...args: unknown[]) => Promise<boolean | void>>
-  syncCanaryGraph: () => Promise<unknown>
-  syncEmptyGraph: () => Promise<unknown>
-  syncFixtureGraph: () => Promise<unknown>
-  syncFixtureTabWithoutLeaf: () => Promise<unknown>
-  syncSplitFixtureGraph: () => Promise<unknown>
+  syncCanaryGraph: () => void
+  syncEmptyGraph: () => void
+  syncFixtureGraph: () => void
+  syncFixtureTabWithoutLeaf: () => void
+  syncSplitFixtureGraph: () => void
   getSession: () => WorkspaceSessionState
   editSession: (edit: (session: WorkspaceSessionState) => WorkspaceSessionState) => void
   makeSessionUnavailable: () => void
@@ -55,14 +76,14 @@ export type CloseContinuityHarness = {
   replacePersistedIncarnation: (next: string) => void
 }
 
-async function createHarness(
+function createHarness(
   options: {
     ptyId?: string
     publishMobileSurface?: boolean
     registerPtyBacked?: boolean
     includeCanary?: boolean
   } = {}
-): Promise<CloseContinuityHarness> {
+): CloseContinuityHarness {
   const ptyId = options.ptyId ?? PTY_ID
   let session = makeSession(ptyId, options.includeCanary)
   let sessionAvailable = true
@@ -179,7 +200,7 @@ async function createHarness(
       })
     }
   }
-  await graph.syncFixtureGraph()
+  graph.syncFixtureGraph()
   return withDurableRuntimeStore({
     runtime,
     acknowledged,
@@ -250,20 +271,20 @@ async function createHarness(
   })
 }
 
-async function createPtyBackedPublishedSurfaceHarness(): Promise<CloseContinuityHarness> {
-  const harness = await createHarness({
+function createPtyBackedPublishedSurfaceHarness(): CloseContinuityHarness {
+  const harness = createHarness({
     ptyId: RUNTIME_OWNED_PTY_ID,
     publishMobileSurface: true,
     registerPtyBacked: true
   })
-  await harness.syncFixtureTabWithoutLeaf()
+  harness.syncFixtureTabWithoutLeaf()
   return harness
 }
 
 async function createStaleTabCloseHarness(
   options: { headless?: boolean } = {}
 ): Promise<CloseContinuityHarness & { terminal: RuntimeTerminalListResult['terminals'][number] }> {
-  const harness = await createPtyBackedPublishedSurfaceHarness()
+  const harness = createPtyBackedPublishedSurfaceHarness()
   const terminal = (await harness.runtime.listTerminals(`id:${WORKTREE_ID}`)).terminals.find(
     (candidate) => candidate.ptyId === RUNTIME_OWNED_PTY_ID
   )!
@@ -274,9 +295,15 @@ async function createStaleTabCloseHarness(
   })
   harness.setCloseTerminalTabAction(() => {})
   if (options.headless) {
-    await harness.syncEmptyGraph()
+    harness.syncEmptyGraph()
   }
   return { ...harness, terminal }
 }
 
-export { createHarness, createPtyBackedPublishedSurfaceHarness, createStaleTabCloseHarness }
+export { expectDesktopDropsPane } from './main-layout-close-fixture'
+export {
+  makeDeferred,
+  createHarness,
+  createPtyBackedPublishedSurfaceHarness,
+  createStaleTabCloseHarness
+}

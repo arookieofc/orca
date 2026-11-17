@@ -1,19 +1,10 @@
 // Projects OSC 7501 records onto agent-status payloads so they ride the OSC 9999 terminal-status ingress.
-import type {
-  AgentStatusState,
-  ParsedAgentStatusPayload
-} from '../agent-status/contracts/agent-status-types'
-import type {
-  AgentSubagentSnapshot,
-  AgentSubagentState
-} from '../agent-status/contracts/agent-status-subagent-snapshot'
-import { AGENT_SUBAGENT_ID_MAX_LENGTH } from '../agent-status/contracts/agent-status-subagent-snapshot'
-import type { AgentTurnOutcome } from '../agent-status/lifecycle/agent-turn-outcome'
-import { foldMainAgentWithRowChildWork } from '../agent-hook-listener/state/agent-hook-row-child-work-fold'
-import {
-  heldTurnCountsAsFinished,
-  isAgentStatusHeldOpenByChildWork
-} from '../agent-status/lifecycle/agent-lead-status-fold'
+import type { AgentStatusState, ParsedAgentStatusPayload } from '../agent-status-types'
+import type { AgentSubagentSnapshot, AgentSubagentState } from '../agent-status-subagent-snapshot'
+import { AGENT_SUBAGENT_ID_MAX_LENGTH } from '../agent-status-subagent-snapshot'
+import type { AgentTurnOutcome } from '../agent-turn-outcome'
+import { foldMainAgentWithRowChildWork } from '../agent-hook-row-child-work-fold'
+import { isAgentStatusHeldOpenByChildWork } from '../agent-lead-status-fold'
 import { createProgramStatusOscScanner } from './osc-scanner'
 import {
   programStatusDisplayText,
@@ -27,8 +18,7 @@ import { ProgramStatusRecordSet, type ProgramStatusRecord } from './records'
 /** OSC 7501 `app` ids whose Orca agent id differs. Other apps pass through verbatim. */
 const APP_TO_AGENT_TYPE: Readonly<Record<string, string>> = {
   'claude-code': 'claude',
-  'grok-build': 'grok',
-  'kiro-cli': 'kiro'
+  'grok-build': 'grok'
 }
 
 function agentTypeForProgramStatusApp(app: string | undefined): string | undefined {
@@ -155,17 +145,10 @@ export function createProgramStatusProjector(now: () => number = Date.now): Prog
       case 'error':
         return { state: 'done', outcome: 'failure' }
       case 'idle':
-        if (newInvocation || lastRoot === null || lastRoot.sessionBoundary === true) {
-          return { state: 'done', sessionBoundary: true }
-        }
+        // Idle may follow startup work (Codex), so it proves rest, not cancellation; interrupt keystrokes own that verdict.
         // Keep unseen done results when the same invocation rests.
-        if (lastRoot.state === 'done') {
-          return lastRoot
-        }
-        // OpenCode ends every turn with idle, never done, so its idle after work is a turn end with no verdict.
-        // Others' idle may follow startup work (Codex), so it proves rest; interrupt keystrokes own cancellation.
-        return root.app === 'opencode'
-          ? { state: 'done' }
+        return !newInvocation && lastRoot?.state === 'done' && lastRoot.sessionBoundary !== true
+          ? lastRoot
           : { state: 'done', sessionBoundary: true }
     }
   }
@@ -174,9 +157,7 @@ export function createProgramStatusProjector(now: () => number = Date.now): Prog
     const at = now()
     const live = new Set<string>()
     const children: AgentSubagentSnapshot[] = []
-    // OpenCode keys its records by peer root sessions (its own and other panes'), never by child sessions.
-    const subagentRecords = records.root()?.app === 'opencode' ? [] : records.descendants()
-    for (const record of subagentRecords) {
+    for (const record of records.descendants()) {
       const state = subagentState(record)
       if (record.id === null || state === null) {
         continue
@@ -229,15 +210,13 @@ export function createProgramStatusProjector(now: () => number = Date.now): Prog
     const msg = programStatusDisplayText(root?.msg)
     const subagents = snapshotChildren()
     // Why: async children outlive a finished turn (pi-subagents); failed/idle children and boundaries hold nothing.
-    const held =
+    const state =
       projection.state === 'done' && projection.sessionBoundary !== true
         ? foldMainAgentWithRowChildWork('done', {
             payload: { subagents: subagents.filter(isRowHoldingChild) }
-          })
-        : null
-    const state = held?.stateName ?? projection.state
-    rootDoneHeldOpen ||=
-      held !== null && state !== 'done' && heldTurnCountsAsFinished(held, projection.outcome, false)
+          }).stateName
+        : projection.state
+    rootDoneHeldOpen ||= projection.state === 'done' && state !== 'done'
     const payload: ParsedAgentStatusPayload = {
       state,
       prompt: '',
@@ -249,7 +228,7 @@ export function createProgramStatusProjector(now: () => number = Date.now): Prog
         : {}),
       ...(projection.sessionBoundary ? { sessionBoundary: true } : {}),
       ...(subagents.length > 0 ? { subagents } : {}),
-      // A held turn that counts as finished is announced now; the all-clear restates it so it is not announced twice.
+      // Hook rows announce a held turn's own done now; the all-clear restates it so it is not announced twice.
       ...(rootDoneHeldOpen ? { turnCompletedAt: rootStateStartedAt } : {}),
       mainAgent: {
         state: projection.state,

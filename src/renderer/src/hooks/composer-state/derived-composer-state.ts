@@ -1,36 +1,29 @@
-import { useProjectGroupSetup } from './workspace-setup/use-project-group-setup'
-import { useFolderSetupSupport } from '@/lib/workspace/creation/setup/folder-setup-support'
 import type { DerivedComposerStateInput } from './composer-target-input-contracts'
 
 import { useMemo } from 'react'
-import {
-  normalizeSparseDirectoryLines,
-  sparseDirectoriesMatch
-} from '@/lib/directory-input/sparse-paths'
+import { normalizeSparseDirectoryLines, sparseDirectoriesMatch } from '@/lib/sparse-paths'
 import {
   parseGitHubIssueOrPRNumber,
-  parseGitHubIssueOrPRLink
-} from '../../../../shared/github/repositories/links'
-import { normalizeGitHubLinkQuery } from '../../../../shared/new-workspace/github-links'
-import { githubRepoIdentityKey } from '../../../../shared/github/repositories/repository-identity-key'
-import { getWorkspaceSourceProvider } from '../../../../shared/new-workspace/workspace-source'
+  parseGitHubIssueOrPRLink,
+  normalizeGitHubLinkQuery
+} from '@/lib/github-links'
+import { githubRepoIdentityKey } from '../../../../shared/github/repository-identity-key'
 import {
+  getLinkedWorkItemProvider,
   canUseIssueCommandForLinkedItemProvider,
   getWorkspaceSeedName,
   DEFAULT_ISSUE_COMMAND_TEMPLATE,
   renderIssueCommandTemplate
-} from '@/lib/workspace/creation/new-workspace'
-import { getSetupConfig } from '../../../../shared/workspace-setup/hooks/orca-hook-setup-config'
-import { deriveWorkspaceSetupState } from '@/lib/workspace/creation/setup/workspace-setup-preparation'
+} from '@/lib/new-workspace'
+import type { SetupRunPolicy } from '../../../../shared/orca-yaml-hook-types'
+import { getDefaultSetupDecision, getSetupConfig } from '../../../../shared/orca-hook-setup-config'
 import type { SparsePreset } from '../../../../shared/worktree/create-types'
 import { useRetiredWorktreeNames } from '@/hooks/useRetiredWorktreeNames'
-import { getSuggestedCreatureName } from '@/components/sidebar/workspace-creation/naming/worktree-name-suggestions'
+import { getSuggestedCreatureName } from '@/components/sidebar/worktree-name-suggestions'
 const EMPTY_SPARSE_PRESETS: SparsePreset[] = []
 
 export function useDerivedComposerState(input: DerivedComposerStateInput) {
   const {
-    selectedProjectGroup,
-    isProjectGroupTarget,
     agentPrompt,
     checkedHooksContextKey,
     enableIssueAutomation,
@@ -56,8 +49,6 @@ export function useDerivedComposerState(input: DerivedComposerStateInput) {
     worktreesByRepo,
     yamlHooks
   } = input
-
-  const groupSetup = useProjectGroupSetup(isProjectGroupTarget ? selectedProjectGroup : null)
 
   const sparsePresetsForRepo = sparsePresetsByRepo[repoId]
 
@@ -128,31 +119,26 @@ export function useDerivedComposerState(input: DerivedComposerStateInput) {
 
   const currentYamlHooks = checkedHooksContextKey === selectedRepoHookContextKey ? yamlHooks : null
 
-  const setupSupport = useFolderSetupSupport(selectedRepo)
-  const setupSupported = setupSupport === 'supported'
   const setupConfig = useMemo(
-    () => (selectedRepo && setupSupported ? getSetupConfig(selectedRepo, currentYamlHooks) : null),
-    [currentYamlHooks, selectedRepo, setupSupported]
+    () => (selectedRepoIsGit ? getSetupConfig(selectedRepo, currentYamlHooks) : null),
+    [currentYamlHooks, selectedRepo, selectedRepoIsGit]
   )
+
+  const setupPolicy: SetupRunPolicy = selectedRepo?.hookSettings?.setupRunPolicy ?? 'run-by-default'
+
+  const linkedWorkItemProvider = linkedWorkItem ? getLinkedWorkItemProvider(linkedWorkItem) : null
+
+  const requiresExplicitSetupChoice = Boolean(setupConfig) && setupPolicy === 'ask'
+
+  const resolvedSetupDecision =
+    setupDecision ?? getDefaultSetupDecision(Boolean(setupConfig), setupPolicy)
+
   const isSetupCheckPending =
-    setupSupport === 'pending' ||
-    (setupSupported &&
-      Boolean(selectedRepo) &&
-      Boolean(selectedRepoHookContextKey) &&
-      checkedHooksContextKey !== selectedRepoHookContextKey)
-  const {
-    setupPolicy,
-    requiresExplicitSetupChoice,
-    resolvedSetupDecision,
-    shouldWaitForSetupCheck
-  } = deriveWorkspaceSetupState(
-    selectedRepo,
-    setupConfig,
-    setupDecision,
-    setupSupport !== 'unsupported',
-    isSetupCheckPending
-  )
-  const linkedWorkItemProvider = linkedWorkItem ? getWorkspaceSourceProvider(linkedWorkItem) : null
+    selectedRepoIsGit &&
+    Boolean(selectedRepoHookContextKey) &&
+    checkedHooksContextKey !== selectedRepoHookContextKey
+
+  const shouldWaitForSetupCheck = Boolean(selectedRepo) && selectedRepoIsGit && isSetupCheckPending
 
   // Blank unseeded names need globally unique creature names; exclude retired paths too.
   const retiredNamesRefreshKey = useMemo(
@@ -243,7 +229,6 @@ export function useDerivedComposerState(input: DerivedComposerStateInput) {
   ])
 
   return {
-    groupSetup,
     sparsePresetsForRepo,
     sparsePresets,
     normalizedSparseDirectories,
@@ -253,7 +238,6 @@ export function useDerivedComposerState(input: DerivedComposerStateInput) {
     effectiveLinkedPR,
     currentYamlHooks,
     setupConfig,
-    setupSupport,
     setupPolicy,
     linkedWorkItemProvider,
     requiresExplicitSetupChoice,

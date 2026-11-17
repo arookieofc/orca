@@ -1,14 +1,11 @@
-import type { OrcaHookTrustPrompt } from '../components/hook-trust/OrcaHookTrustDrawer'
 import type {
   GitHubWorkItem,
   GitLabWorkItem,
   GitLabTodo,
-  GitPushTarget,
+  LinearIssue,
   SetupDecision
 } from './mobile-tasks-provider-detail-types'
-import type { LinearMobileIssue as LinearIssue } from './providers/linear/linear-mobile-issue-read'
-import type { WorkspaceAgentChoice } from '../new-workspace/creation/workspace-agent-selection'
-import type { SparsePreset } from '../../../src/shared/worktree/create-types'
+import type { WorkspaceAgentChoice, SparsePreset } from './mobile-tasks-dependencies'
 import type { GitHubProjectRow } from './mobile-tasks-view-state-types'
 import type { JiraIssue } from '../../../src/shared/jira/jira-types'
 
@@ -113,19 +110,15 @@ export type WorkspaceCreateArgs = {
   baseBranchOverride?: string
   branchNameOverride?: string
   sparseCheckoutOverride?: { directories: string[]; presetId?: string }
-  /** The PR/MR start point whose setup was shown, so approval doesn't resolve it again. */
-  hostedStartPoint?: HostedStartPoint
 }
 
-export type HostedStartPoint = { baseBranch: string; pushTarget?: GitPushTarget }
-
-export type OrcaYamlTrustPrompt = WorkspaceCreateArgs &
-  OrcaHookTrustPrompt & {
-    /** The workspace exists; only its skipped setup is under review. Opening it ends the review. */
-    created?: { worktreeId: string; open: (notice?: string) => void }
-    /** An approval is saving or running; the drawer stays busy and ignores other choices. */
-    approving?: true
-  }
+export type OrcaYamlTrustPrompt = WorkspaceCreateArgs & {
+  repoId: string
+  repoName: string
+  scriptContent: string
+  contentHash: string
+  previouslyApproved: boolean
+}
 
 export type WorkspaceCreateDraft = {
   item: ActionableTaskItem

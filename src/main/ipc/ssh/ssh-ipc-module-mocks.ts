@@ -14,9 +14,7 @@ export function createSshIpcMocks(): SshIpcMocks {
       addTarget: vi.fn(),
       updateTarget: vi.fn(),
       removeTarget: vi.fn(),
-      importFromSshConfig: vi.fn().mockResolvedValue({ targets: [], repoReadoptions: [] }),
-      currentSshRouteSnapshot: vi.fn().mockReturnValue(null),
-      refreshSshRouteSnapshot: vi.fn().mockResolvedValue(null),
+      importFromSshConfig: vi.fn().mockReturnValue([]),
       lastRepoReadoptions: [] as {
         oldTargetId: string
         newTargetId: string
@@ -118,12 +116,6 @@ export function createSshIpcMocks(): SshIpcMocks {
         reconnectAttempt: 0
       })),
       publishUnservedHostServer: vi.fn(() => new Error('This SSH host isn’t supported')),
-      restoreKeptHostServer: vi.fn((targetId: string) => ({
-        targetId,
-        status: 'connected',
-        error: null,
-        reconnectAttempt: 0
-      })),
       publishBridgedUnservedHostServer: vi.fn((target: { id: string }) => ({
         targetId: target.id,
         status: 'connected',
@@ -132,6 +124,11 @@ export function createSshIpcMocks(): SshIpcMocks {
       }))
     },
     sshConnectionStore: {
+      isRuntimeOwnedSshTarget: (target: { owner?: unknown }) => target.owner !== undefined,
+      isManagedOrcadSshTarget: (target: { orcadFence?: unknown; orcadProvisioning?: unknown }) =>
+        target.orcadFence !== undefined || target.orcadProvisioning !== undefined,
+      allowsDirectSshRelay: (target: { orcadFence?: unknown; orcadProvisioning?: unknown }) =>
+        target.orcadFence === undefined && target.orcadProvisioning === undefined,
       SshConnectionStore: class MockSshConnectionStore {
         constructor() {
           return mockSshStore

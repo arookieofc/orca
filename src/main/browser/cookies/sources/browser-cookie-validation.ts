@@ -1,4 +1,4 @@
-import { normalizeCookieDomain } from '../policy/cookie-domain'
+import { normalizeCookieDomain } from '../browser-cookie-import-policy'
 import {
   readJsonCookiePartition,
   type SourcePartitionRead

@@ -1,13 +1,13 @@
 import type Database from '../../../../sqlite/sync-database'
-import { isOrcaSessionId } from '../../../../../shared/agent-session/identity/orca-session-address'
+import { isOrcaSessionId } from '../../../../../shared/orca-session-address'
 import {
   STRUCTURED_WORKER_HANDLE_PREFIX,
   isStructuredWorkerHandle
-} from '../../../../../shared/orchestration/workers/structured-worker-handle'
+} from '../../../../../shared/structured-worker-handle'
 import {
   STRUCTURED_WORKER_INCARNATION_PREFIX,
   sessionIdFromStructuredWorkerIncarnation
-} from '../../terminal-authority/structured-sessions/structured-worker-identity'
+} from '../../../structured-worker-identity'
 import { currentRunCoordinatorOrcaSessionIdSql } from '../runs/run-coordinator-orca-session'
 
 const CURRENT_COORDINATOR_ORCA_SESSION_ID_SQL = currentRunCoordinatorOrcaSessionIdSql('runs')
@@ -23,21 +23,9 @@ const RECORDED_WORKER_SESSIONS_SQL = `
   SELECT terminal_handle, process_incarnation FROM worker_terminal_resources
   WHERE terminal_handle GLOB ? AND process_incarnation GLOB ?`
 
-// Partial indexes hold exactly the rows still to backfill, so each open reads those, not every Dispatch.
-const ASSIGNEE_PENDING_SQL = `assignee_orca_session_id IS NULL
-  AND (process_incarnation GLOB '${INCARNATION_GLOB}' OR assignee_handle GLOB '${HANDLE_GLOB}')`
-const CREATOR_PENDING_SQL = `creator_orca_session_id IS NULL AND creator_handle GLOB '${HANDLE_GLOB}'`
-
 /** Backfill only unambiguous local non-WSL structured incarnation evidence, never pane identity or a current recorded id.
- * Repeat on every open because rollback writers can omit these columns after the v42 stamp; SQLite keeps
- * the partial indexes current for every writer, old builds included. */
+ * Repeat on every open because rollback writers can omit these columns after the v42 stamp. */
 export function backfillStructuredWorkerOrcaSessionIds(db: Database.Database): void {
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_dispatch_assignee_orca_session_backfill
-      ON dispatch_contexts(id) WHERE ${ASSIGNEE_PENDING_SQL};
-    CREATE INDEX IF NOT EXISTS idx_dispatch_creator_orca_session_backfill
-      ON dispatch_contexts(id) WHERE ${CREATOR_PENDING_SQL};
-  `)
   let recordedSessions: Map<string, Set<string>> | undefined
   const orcaSessionIdFor = (handle: unknown, incarnation: unknown): string | null => {
     if (incarnation != null && typeof incarnation !== 'string') {
@@ -64,11 +52,11 @@ export function backfillStructuredWorkerOrcaSessionIds(db: Database.Database): v
 
   const assignees = db
     .prepare(
-      `SELECT id, assignee_handle, process_incarnation
-       FROM dispatch_contexts INDEXED BY idx_dispatch_assignee_orca_session_backfill
-       WHERE ${ASSIGNEE_PENDING_SQL}`
+      `SELECT id, assignee_handle, process_incarnation FROM dispatch_contexts
+       WHERE assignee_orca_session_id IS NULL
+         AND (process_incarnation GLOB ? OR assignee_handle GLOB ?)`
     )
-    .all()
+    .all(INCARNATION_GLOB, HANDLE_GLOB)
   const setAssignee = db.prepare(
     `UPDATE dispatch_contexts SET assignee_orca_session_id = ?
      WHERE id = ? AND assignee_orca_session_id IS NULL`
@@ -82,11 +70,10 @@ export function backfillStructuredWorkerOrcaSessionIds(db: Database.Database): v
 
   const creators = db
     .prepare(
-      `SELECT id, creator_handle
-       FROM dispatch_contexts INDEXED BY idx_dispatch_creator_orca_session_backfill
-       WHERE ${CREATOR_PENDING_SQL}`
+      `SELECT id, creator_handle FROM dispatch_contexts
+       WHERE creator_orca_session_id IS NULL AND creator_handle GLOB ?`
     )
-    .all()
+    .all(HANDLE_GLOB)
   const setCreator = db.prepare(
     `UPDATE dispatch_contexts SET creator_orca_session_id = ?
      WHERE id = ? AND creator_orca_session_id IS NULL`

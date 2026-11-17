@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import logo from '../../../../../resources/logo.svg'
-import { useAppStore } from '@/store/index'
+import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -31,26 +31,22 @@ import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { showOnboardingFromRenderer } from '../onboarding/show-onboarding-event'
 import { SetupGuideProgressRing } from '../setup-guide/SetupGuideProgressRing'
 import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
-import { lazyWithRetry } from '@/app-shell/startup/lazy-with-retry'
-import type * as SidebarFeedbackDialogModule from './sidebar-feedback/SidebarFeedbackDialog'
-import { useTranslate } from '@/i18n/use-translate'
-import {
-  getUpdateCheckClickOptions,
-  getUpdateCheckHint
-} from '@/app-shell/updates/update-check-click-options'
-import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
+import { lazyWithRetry } from '@/lib/lazy-with-retry'
+import type * as SidebarFeedbackDialogModule from './SidebarFeedbackDialog'
+import { translate } from '@/i18n/i18n'
+import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
 
 // Keep feedback off the boot graph; menu warming and selection share the same lazy module entry.
 const loadSidebarFeedbackDialog = (): Promise<typeof SidebarFeedbackDialogModule> =>
-  import('./sidebar-feedback/SidebarFeedbackDialog')
+  import('./SidebarFeedbackDialog')
 
 const SidebarFeedbackDialog = lazyWithRetry(
   () => loadSidebarFeedbackDialog().then((module) => ({ default: module.SidebarFeedbackDialog })),
   { reloadKey: 'sidebar-feedback-dialog' }
 )
 
-const DOCS_URL = 'https://orca.dev/docs'
-const CHANGELOG_URL = 'https://orca.dev/changelog'
+const DOCS_URL = 'https://www.onorca.dev/docs'
+const CHANGELOG_URL = 'https://onorca.dev/changelog'
 const GITHUB_URL = 'https://github.com/stablyai/orca'
 const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
 const X_URL = 'https://x.com/orca_build'
@@ -59,6 +55,10 @@ const NO_UPDATE_CHECK_MODIFIERS = {
   ctrlKey: false,
   metaKey: false,
   shiftKey: false
+}
+
+function openExternalUrl(url: string): void {
+  void window.api.shell.openUrl(url)
 }
 
 function DiscordIcon(): React.JSX.Element {
@@ -87,7 +87,7 @@ function ExternalMenuItem({
   icon: React.ReactNode
 }): React.JSX.Element {
   return (
-    <DropdownMenuItem onSelect={() => openAppHttpLink(url)}>
+    <DropdownMenuItem onSelect={() => openExternalUrl(url)}>
       {icon}
       {label}
       <ExternalLink className="ml-auto size-3 text-muted-foreground" />
@@ -96,7 +96,6 @@ function ExternalMenuItem({
 }
 
 export function SidebarSettingsHelpMenu(): React.JSX.Element {
-  const t = useTranslate()
   const openModal = useAppStore((s) => s.openModal)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
@@ -145,12 +144,17 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
       return
     }
     setIsRestartingOrca(true)
-    toast.info(t('auto.components.sidebar.SidebarSettingsHelpMenu.5161eef55d', 'Restarting Orca…'))
+    toast.info(
+      translate('auto.components.sidebar.SidebarSettingsHelpMenu.5161eef55d', 'Restarting Orca…')
+    )
     void window.api.app.restart().catch((error) => {
       if (mountedRef.current) {
         setIsRestartingOrca(false)
         toast.error(
-          t('auto.components.sidebar.SidebarSettingsHelpMenu.4e8f5710d3', "Couldn't restart Orca."),
+          translate(
+            'auto.components.sidebar.SidebarSettingsHelpMenu.4e8f5710d3',
+            "Couldn't restart Orca."
+          ),
           {
             description: error instanceof Error ? error.message : undefined
           }
@@ -192,7 +196,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
               variant="ghost"
               size="icon-xs"
               type="button"
-              aria-label={t(
+              aria-label={translate(
                 'auto.components.sidebar.SidebarSettingsHelpMenu.a428c25998',
                 'Settings'
               )}
@@ -203,7 +207,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
             </Button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={4} className="flex items-center gap-1.5">
-            {t('auto.components.sidebar.SidebarSettingsHelpMenu.a428c25998', 'Settings')}
+            {translate('auto.components.sidebar.SidebarSettingsHelpMenu.a428c25998', 'Settings')}
             {settingsShortcut.keys.length > 0 ? (
               <ShortcutKeyCombo
                 keys={settingsShortcut.keys}
@@ -223,7 +227,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                   variant="ghost"
                   size="icon-xs"
                   type="button"
-                  aria-label={t(
+                  aria-label={translate(
                     'auto.components.sidebar.SidebarSettingsHelpMenu.2991a0106c',
                     'Help'
                   )}
@@ -234,13 +238,13 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={4}>
-              {t('auto.components.sidebar.SidebarSettingsHelpMenu.2991a0106c', 'Help')}
+              {translate('auto.components.sidebar.SidebarSettingsHelpMenu.2991a0106c', 'Help')}
             </TooltipContent>
           </Tooltip>
           <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-52">
             <DropdownMenuItem onSelect={openShortcutsSettings}>
               <Keyboard className="size-3.5" />
-              {t(
+              {translate(
                 'auto.components.sidebar.SidebarSettingsHelpMenu.e565171a7c',
                 'Keyboard Shortcuts'
               )}
@@ -248,7 +252,10 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={handleOpenFeedback}>
               <MessageSquareText className="size-3.5" />
-              {t('auto.components.sidebar.SidebarSettingsHelpMenu.4cf5b868d7', 'Send Feedback')}
+              {translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.4cf5b868d7',
+                'Send Feedback'
+              )}
             </DropdownMenuItem>
             {showMilestones ? (
               <DropdownMenuItem onSelect={openMilestones}>
@@ -258,7 +265,10 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                   aria-hidden="true"
                   className="size-3.5 object-contain invert opacity-55 dark:invert-0"
                 />
-                {t('auto.components.sidebar.SidebarSettingsHelpMenu.f8a2c91d4e', 'Milestones')}
+                {translate(
+                  'auto.components.sidebar.SidebarSettingsHelpMenu.f8a2c91d4e',
+                  'Milestones'
+                )}
                 <SetupGuideProgressRing
                   done={setupProgress.coreDoneCount}
                   total={setupProgress.coreTotal}
@@ -273,32 +283,44 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
               onSelect={handleShowOnboarding}
             >
               <School className="size-3.5" />
-              {t('auto.components.sidebar.SidebarSettingsHelpMenu.b7e4d2a19c', 'Onboarding')}
+              {translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.b7e4d2a19c',
+                'Onboarding'
+              )}
             </DropdownMenuItem>
             <ExternalMenuItem
-              label={t('auto.components.sidebar.SidebarSettingsHelpMenu.cdc87f897e', 'Docs')}
+              label={translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.cdc87f897e',
+                'Docs'
+              )}
               url={DOCS_URL}
               icon={<BookOpen className="size-3.5" />}
             />
             <ExternalMenuItem
-              label={t('auto.components.sidebar.SidebarSettingsHelpMenu.5f83d86d92', 'Changelog')}
+              label={translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.5f83d86d92',
+                'Changelog'
+              )}
               url={CHANGELOG_URL}
               icon={<ScrollText className="size-3.5" />}
             />
             <DropdownMenuSeparator />
             <ExternalMenuItem
-              label={t('auto.components.sidebar.SidebarSettingsHelpMenu.5687ab246a', 'GitHub')}
+              label={translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.5687ab246a',
+                'GitHub'
+              )}
               url={GITHUB_URL}
               icon={<Github className="size-3.5" />}
             />
-            <DropdownMenuItem onSelect={() => openAppHttpLink(DISCORD_URL)}>
+            <DropdownMenuItem onSelect={() => openExternalUrl(DISCORD_URL)}>
               <DiscordIcon />
-              {t('auto.components.sidebar.SidebarSettingsHelpMenu.eb9884e55b', 'Discord')}
+              {translate('auto.components.sidebar.SidebarSettingsHelpMenu.eb9884e55b', 'Discord')}
               <ExternalLink className="ml-auto size-3 text-muted-foreground" />
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => openAppHttpLink(X_URL)}>
+            <DropdownMenuItem onSelect={() => openExternalUrl(X_URL)}>
               <XIcon />
-              {t('auto.components.sidebar.SidebarSettingsHelpMenu.c4f8e1b72a', 'X')}
+              {translate('auto.components.sidebar.SidebarSettingsHelpMenu.c4f8e1b72a', 'X')}
               <ExternalLink className="ml-auto size-3 text-muted-foreground" />
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -313,12 +335,18 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
               ) : (
                 <RefreshCw className="size-3.5" />
               )}
-              {t('auto.components.sidebar.SidebarSettingsHelpMenu.29c56f30ee', 'Check for Updates')}
+              {translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.29c56f30ee',
+                'Check for Updates'
+              )}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={handleRestartOrca} disabled={isRestartingOrca}>
               <RotateCw className="size-3.5" />
-              {t('auto.components.sidebar.SidebarSettingsHelpMenu.ad3d3ed7f1', 'Restart Orca')}
+              {translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.ad3d3ed7f1',
+                'Restart Orca'
+              )}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

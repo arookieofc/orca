@@ -10,11 +10,10 @@ import {
   CommandList
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import { boundHostList } from './bounded-host-list'
 import { HostListOverflowNote } from './HostListOverflowNote'
 import { noHostsMatchLabel, searchHostsLabel } from './host-picker-copy'
-import { useTranslate } from '@/i18n/use-translate'
 
 export type HostComboboxOption = {
   id: string
@@ -50,7 +49,6 @@ export function HostCombobox({
   placeholder,
   ariaLabel,
   size = 'default',
-  notifyOnReselect = false,
   className,
   disabled
 }: {
@@ -63,9 +61,7 @@ export function HostCombobox({
   size?: 'xs' | 'sm' | 'default'
   className?: string
   disabled?: boolean
-  notifyOnReselect?: boolean
 }): React.JSX.Element {
-  const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const selected = options.find((option) => option.id === value)
@@ -103,15 +99,15 @@ export function HostCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[min(20rem,calc(100vw-1rem))]">
-        <Command shouldFilter={false} density="menu" label={searchHostsLabel(t)}>
+        <Command shouldFilter={false} density="menu" label={searchHostsLabel()}>
           <CommandInput
             value={query}
             onValueChange={setQuery}
-            placeholder={searchHostsLabel(t)}
-            aria-label={searchHostsLabel(t)}
+            placeholder={searchHostsLabel()}
+            aria-label={searchHostsLabel()}
           />
           <CommandList>
-            <CommandEmpty>{noHostsMatchLabel(t)}</CommandEmpty>
+            <CommandEmpty>{noHostsMatchLabel()}</CommandEmpty>
             {groupOptions(shown).map((group) => (
               <CommandGroup key={group.heading ?? ''} heading={group.heading}>
                 {group.options.map((option) => (
@@ -122,7 +118,7 @@ export function HostCombobox({
                     disabled={option.disabled}
                     onSelect={() => {
                       setOpen(false)
-                      if (option.id !== value || notifyOnReselect) {
+                      if (option.id !== value) {
                         onChange(option.id)
                       }
                     }}

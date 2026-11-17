@@ -5,8 +5,8 @@ import {
   hasWorkspaceKanbanSidebarDropBoard,
   isWorkspaceKanbanSidebarDropPointInBoard,
   updateWorkspaceKanbanSidebarDropTargetVisual
-} from '../../workspace-board/drag/workspace-kanban-sidebar-drop'
-import { updateSidebarDragPreviewPosition } from './worktree-sidebar-pointer-drag-dom'
+} from '../../workspace-kanban-sidebar-drop'
+import { updateSidebarDragPreviewPosition } from '../../worktree-sidebar-pointer-drag-dom'
 import { getPointerDropStatusTarget, shouldPreferSidebarStatusDropTarget } from './status-target'
 import type {
   ShouldShowWorkspaceBoardDropIndicator,
@@ -46,7 +46,7 @@ function showStatusHoverWithoutInsertionLine(
     ? ctx.computeWorktreeStatusDrop({
         pointerY: drag.currentY,
         status: target.status,
-        draggedKeys: drag.reorderDraggedKeys
+        draggedIds: drag.reorderDraggedIds
       })
     : null
   updateLatestWorktreeStatusDropTarget(drag, target, statusDrop)
@@ -141,10 +141,10 @@ export function flushWorktreePointerDragFrame(args: WorktreePointerDragFrameArgs
           y: drag.currentY
         })
       : NO_WORKTREE_SIDEBAR_DROP_TARGET,
-    drag.pickedCopies
+    drag.draggedIds
   )
-  const lineageParentIdentity = preferredStatusTarget.lineageParentIdentity
-  if (lineageParentIdentity) {
+  const lineageParentId = preferredStatusTarget.lineageParentId
+  if (lineageParentId) {
     drag.reorderIntent = null
     updateLatestWorktreeStatusDropTarget(drag, preferredStatusTarget, null)
     clearWorkspaceKanbanSidebarDropTargetVisual()
@@ -159,7 +159,7 @@ export function flushWorktreePointerDragFrame(args: WorktreePointerDragFrameArgs
     args.setDragOverStatus(null)
     args.setPinDragOver(false)
     args.setWorktreeDragState((prev) =>
-      applyWorktreeLineageDropPreview(prev, lineageParentIdentity, drag.currentY)
+      applyWorktreeLineageDropPreview(prev, lineageParentId, drag.currentY)
     )
     return
   }

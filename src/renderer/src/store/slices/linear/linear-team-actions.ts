@@ -5,8 +5,8 @@ import type {
   LinearSliceGet,
   LinearSliceSet
 } from './linear-slice-contract'
-import { isIntegrationCredentialDecryptionError } from '../../../../../shared/secure-storage/integration-credential-errors'
-import { linearListTeams } from '@/runtime/linear/runtime-linear-project-client'
+import { isIntegrationCredentialDecryptionError } from '../../../../../shared/integration-credential-errors'
+import { linearListTeams } from '@/runtime/runtime-linear-project-client'
 import {
   evictStaleEntries,
   getSelectedWorkspaceId,
@@ -54,7 +54,7 @@ export function createLinearTeamActions(
         inflight &&
         inflight.contextKey === contextKey &&
         inflight.mutationGeneration === getLinearMutationGeneration() &&
-        !options?.force
+        (!options?.force || inflight.force)
       ) {
         return inflight.promise
       }
@@ -123,6 +123,7 @@ export function createLinearTeamActions(
 
       entry = {
         promise,
+        force: Boolean(options?.force),
         generation: requestCacheGeneration,
         contextKey,
         mutationGeneration: requestMutationGeneration

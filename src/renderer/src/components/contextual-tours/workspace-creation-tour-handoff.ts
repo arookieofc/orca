@@ -1,5 +1,4 @@
 import { useAppStore } from '@/store'
-import { getContextualTour } from '../../../../shared/feature-education/contextual-tours/contextual-tours'
 import { requestContextualTourWhenReady } from './request-contextual-tour-when-ready'
 
 export function openWorkspaceCreationComposerWithTourHandoff(): void {
@@ -9,8 +8,7 @@ export function openWorkspaceCreationComposerWithTourHandoff(): void {
   const shouldHandoffFromAgentSessionsTour =
     hasProjects &&
     state.activeContextualTourId === 'workspace-agent-sessions' &&
-    getContextualTour('workspace-agent-sessions').steps[state.activeContextualTourStepIndex]?.id ===
-      'agent-sessions-parallel'
+    state.activeContextualTourStepIndex === 1
 
   if (shouldHandoffFromAgentSessionsTour && state.activeContextualTourSource) {
     // Complete the final create-button action synchronously so modal cancellation cannot block the composer tour handoff.

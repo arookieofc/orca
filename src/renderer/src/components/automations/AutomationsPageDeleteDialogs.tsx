@@ -1,8 +1,5 @@
 import React from 'react'
-import {
-  AutomationDeleteDialog,
-  ExternalAutomationDeleteDialog
-} from './authoring/AutomationDeleteDialogs'
+import { AutomationDeleteDialog, ExternalAutomationDeleteDialog } from './AutomationDeleteDialogs'
 
 type Props = {
   deleteTarget: React.ComponentProps<typeof AutomationDeleteDialog>['deleteTarget']

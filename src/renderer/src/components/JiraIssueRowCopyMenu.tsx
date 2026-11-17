@@ -16,10 +16,9 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import type { JiraIssue } from '../../../shared/jira/jira-types'
 import { copyJiraTextToClipboard } from './jira-issue-workspace-actions'
-import type { IssueCopyTarget } from './issue-copy-target-messages'
 import { buildJiraIssuePrompt } from './jira-prompt-templates'
 import { Popover, PopoverAnchor } from '@/components/ui/popover'
 import { JiraPromptTemplatePopover } from './JiraPromptTemplatePopover'
@@ -31,27 +30,26 @@ export function JiraIssueRowCopyMenu({
   issue: JiraIssue
   children?: ReactNode
 }): React.JSX.Element {
-  const t = useTranslate()
   const [templateOpen, setTemplateOpen] = useState(false)
   const anchorRef = useRef<HTMLElement | null>(null)
   const setAnchor = (element: HTMLDivElement | null) => {
     anchorRef.current = element
   }
-  const actions: { label: string; text: string; copyTarget: IssueCopyTarget }[] = [
+  const actions = [
     {
-      label: t('auto.components.JiraIssueWorkspace.38839801e8', 'Copy key'),
+      label: translate('auto.components.JiraIssueWorkspace.38839801e8', 'Copy key'),
       text: issue.key,
-      copyTarget: 'key'
+      copiedLabel: 'Key'
     },
     {
-      label: t('auto.components.JiraIssueWorkspace.779bb91ee0', 'Copy URL'),
+      label: translate('auto.components.JiraIssueWorkspace.779bb91ee0', 'Copy URL'),
       text: issue.url,
-      copyTarget: 'url'
+      copiedLabel: 'URL'
     },
     {
-      label: t('auto.components.JiraIssueWorkspace.0cc62bd690', 'Copy prompt'),
+      label: translate('auto.components.JiraIssueWorkspace.0cc62bd690', 'Copy prompt'),
       text: buildJiraIssuePrompt(issue),
-      copyTarget: 'prompt'
+      copiedLabel: 'Prompt'
     }
   ]
   const Item = children ? ContextMenuItem : DropdownMenuItem
@@ -60,8 +58,8 @@ export function JiraIssueRowCopyMenu({
     <>
       {actions.map((action) => (
         <Item
-          key={action.copyTarget}
-          onSelect={() => void copyJiraTextToClipboard(action.text, action.copyTarget)}
+          key={action.copiedLabel}
+          onSelect={() => void copyJiraTextToClipboard(action.text, action.copiedLabel)}
         >
           <Clipboard className="size-3.5" />
           {action.label}
@@ -70,7 +68,7 @@ export function JiraIssueRowCopyMenu({
       <Separator />
       <Item onSelect={() => setTemplateOpen(true)}>
         <FileText className="size-3.5" />
-        {t('jira.prompt.dialogTitle', 'Copy prompt from template')}
+        {translate('jira.prompt.dialogTitle', 'Copy prompt from template')}
       </Item>
     </>
   )
@@ -103,7 +101,7 @@ export function JiraIssueRowCopyMenu({
                   <Button
                     variant="ghost"
                     size="icon-xs"
-                    aria-label={t('jira.copy.context', 'Copy context for {{key}}', {
+                    aria-label={translate('jira.copy.context', 'Copy context for {{key}}', {
                       key: issue.key
                     })}
                     onClick={(event) => event.stopPropagation()}
@@ -113,7 +111,7 @@ export function JiraIssueRowCopyMenu({
                 </PopoverAnchor>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent>{t('jira.copy.actions', 'Copy issue context')}</TooltipContent>
+            <TooltipContent>{translate('jira.copy.actions', 'Copy issue context')}</TooltipContent>
           </Tooltip>
           <DropdownMenuContent
             align="end"

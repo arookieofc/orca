@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useAppStore } from '@/store'
 import { useSourceControlAi } from '../ai/use-ai'
 import { useSourceControlFileListing } from '../listing/use-file-listing'
@@ -8,11 +8,7 @@ import { useSourceControlPanelState } from './use-panel-state'
 /** Keep data foundation separate from action hooks so flows cannot become dependencies of the state they mutate. */
 export function useSourceControlPanelFoundation() {
   const panelState = useSourceControlPanelState()
-  const updateSettingsOrThrow = useCallback(
-    (...args: Parameters<ReturnType<typeof useAppStore.getState>['updateSettingsOrThrow']>) =>
-      useAppStore.getState().updateSettingsOrThrow(...args),
-    []
-  )
+  const updateSettingsOrThrow = useAppStore((s) => s.updateSettingsOrThrow)
   const reviewContext = useSourceControlReviewContext(panelState)
   const {
     activeConnectionId,

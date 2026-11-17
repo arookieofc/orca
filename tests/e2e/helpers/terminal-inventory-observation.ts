@@ -1,4 +1,4 @@
-import type { RuntimeTerminalListResult } from '../../../src/shared/terminal/runtime/runtime-terminal-contracts'
+import type { RuntimeTerminalListResult } from '../../../src/shared/runtime-types'
 
 // Retry host liveness and mid-mount binding refusals instead of ending the observation poll.
 const TRANSIENT_INVENTORY_REFUSALS = [

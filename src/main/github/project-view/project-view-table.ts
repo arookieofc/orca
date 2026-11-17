@@ -1,12 +1,9 @@
-import type { GetProjectViewTableArgs } from '../../../shared/github/projects/project-request-types'
-import type { GetProjectViewTableResult } from '../../../shared/github/projects/project-result-types'
-import { githubProjectHost } from '../../../shared/github/projects/project-identity'
-import {
-  type GitHubProjectTable,
-  isRenderableProjectViewLayout
-} from '../../../shared/github/projects/project-types'
-
-import { assertPositiveInt, assertSlug } from './project-argument-validation'
+import type { GetProjectViewTableArgs } from '../../../shared/github/project-request-types'
+import type { GetProjectViewTableResult } from '../../../shared/github/project-result-types'
+import type { GitHubProjectTable } from '../../../shared/github/project-types'
+import { githubProjectHost } from '../../../shared/github/project-identity'
+import { isRenderableProjectViewLayout } from '../../../shared/github/project-types'
+import { assertPositiveInt, assertSlug } from './internals'
 import {
   fetchProjectViewsPage,
   fetchViewFieldsContinuation,
@@ -31,11 +28,7 @@ export async function getProjectViewTable(
   if (args.ownerType !== 'organization' && args.ownerType !== 'user') {
     return {
       ok: false,
-      error: {
-        type: 'validation_error',
-        message: 'Invalid ownerType.',
-        reason: 'invalid_owner_type'
-      }
+      error: { type: 'validation_error', message: 'Invalid ownerType.' }
     }
   }
 
@@ -86,10 +79,7 @@ export async function getProjectViewTable(
     }
   }
   if (!project) {
-    return {
-      ok: false,
-      error: { type: 'not_found', message: 'Project not found.', reason: 'project_not_found' }
-    }
+    return { ok: false, error: { type: 'not_found', message: 'Project not found.' } }
   }
   const noSelector =
     args.viewId === undefined && args.viewNumber === undefined && args.viewName === undefined
@@ -101,14 +91,7 @@ export async function getProjectViewTable(
       null
   }
   if (!selectedRaw) {
-    return {
-      ok: false,
-      error: {
-        type: 'not_found',
-        message: 'Could not find the selected view.',
-        reason: 'view_not_found'
-      }
-    }
+    return { ok: false, error: { type: 'not_found', message: 'Could not find the selected view.' } }
   }
 
   let extraFields: RawProjectV2Field[] = []

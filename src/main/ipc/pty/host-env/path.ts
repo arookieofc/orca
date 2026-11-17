@@ -1,6 +1,6 @@
 import { delimiter } from 'node:path'
-import { isLegacyTerminalShimPathEntry } from '../../../pty/shell-startup/legacy-terminal-shim-dir'
-import { resolvePathEnvKey } from '../../../pty/environment/windows-path-segment-merge'
+import { isLegacyTerminalShimPathEntry } from '../../../pty/legacy-terminal-shim-dir'
+import { resolvePathEnvKey } from '../../../pty/windows-environment-path'
 
 export function readInheritedPath(
   baseEnv: Record<string, string>,

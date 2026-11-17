@@ -2,10 +2,8 @@
 import { z } from 'zod'
 import {
   MAX_ORCAD_MIGRATION_FOLDER_WORKSPACES,
-  MAX_ORCAD_MIGRATION_REPOSITORIES
-} from './orcad-migration-manifest-fields'
-import {
   MAX_ORCAD_MIGRATION_PROJECT_GROUPS,
+  MAX_ORCAD_MIGRATION_REPOSITORIES,
   parseOrcadMigrationManifest
 } from './orcad-migration-manifest-validation'
 import type { OrcadMigrationManifest } from './orcad-migration-manifest'

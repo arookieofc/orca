@@ -1,22 +1,33 @@
-import type { GitBranchCompareSummary } from '../../../../../../shared/git/diff/git-diff-compare-types'
-import type { WorktreeGitIdentityDisplay } from '../../../../../../shared/worktree/row-display/git-identity-display'
+import type { GitBranchCompareSummary } from '../../../../../../shared/git-diff-compare-types'
+import type { WorktreeGitIdentityDisplay } from '../../../../../../shared/worktree/git-identity-display'
 import { translate } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
 
-function formatAheadOfTitle(count: number, ref: string, t: Translate = translate): string {
-  return t(
-    'auto.components.right.sidebar.SourceControl.compareBaseCommitsAhead',
-    '{{count}} commits ahead of {{ref}}',
-    { count, ref, defaultValue_one: '{{count}} commit ahead of {{ref}}' }
-  )
+function formatAheadOfTitle(count: number, ref: string): string {
+  return count === 1
+    ? translate(
+        'auto.components.right.sidebar.SourceControl.compareBaseCommitsAheadOne',
+        '1 commit ahead of {{ref}}',
+        { ref }
+      )
+    : translate(
+        'auto.components.right.sidebar.SourceControl.compareBaseCommitsAheadOther',
+        '{{count}} commits ahead of {{ref}}',
+        { count, ref }
+      )
 }
 
-function formatBehindOfTitle(count: number, ref: string, t: Translate = translate): string {
-  return t(
-    'auto.components.right.sidebar.SourceControl.compareBaseCommitsBehind',
-    '{{count}} commits behind {{ref}}',
-    { count, ref, defaultValue_one: '{{count}} commit behind {{ref}}' }
-  )
+function formatBehindOfTitle(count: number, ref: string): string {
+  return count === 1
+    ? translate(
+        'auto.components.right.sidebar.SourceControl.compareBaseCommitsBehindOne',
+        '1 commit behind {{ref}}',
+        { ref }
+      )
+    : translate(
+        'auto.components.right.sidebar.SourceControl.compareBaseCommitsBehindOther',
+        '{{count}} commits behind {{ref}}',
+        { count, ref }
+      )
 }
 
 // Reserve green/red for line totals; coloring commit arrows too would make adjacent unlike quantities look combined.
@@ -67,8 +78,7 @@ export function shouldShowSourceControlBranchContextChrome(
 // Show both directions against the named base so rebased branches also reveal commits behind it.
 export function buildSourceControlCompareBaseStats(
   summary: GitBranchCompareSummary | null | undefined,
-  baseRef: string,
-  t?: Translate
+  baseRef: string
 ): SourceControlBranchContextStat[] {
   if (summary?.status !== 'ready') {
     return []
@@ -80,7 +90,7 @@ export function buildSourceControlCompareBaseStats(
     stats.push({
       key: 'compare-ahead',
       label: `↑${commitsAhead}`,
-      title: formatAheadOfTitle(commitsAhead, baseLabel, t)
+      title: formatAheadOfTitle(commitsAhead, baseLabel)
     })
   }
   const commitsBehind = summary.commitsBehind
@@ -88,7 +98,7 @@ export function buildSourceControlCompareBaseStats(
     stats.push({
       key: 'compare-behind',
       label: `↓${commitsBehind}`,
-      title: formatBehindOfTitle(commitsBehind, baseLabel, t)
+      title: formatBehindOfTitle(commitsBehind, baseLabel)
     })
   }
   return stats

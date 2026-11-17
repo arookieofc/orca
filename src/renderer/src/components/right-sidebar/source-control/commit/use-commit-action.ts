@@ -1,19 +1,13 @@
-import '@/lib/source-control/graph/git-graph-tab'
-import { GIT_GRAPH_REFRESH_EVENT } from '@/lib/source-control/graph/git-graph-refresh-event'
 import { useCallback } from 'react'
-import { toast } from 'sonner'
-import { requireGitOwnerTarget } from '../sync/worktree-git-owner-target'
-import { translate } from '@/i18n/i18n'
-import { sourceControlConnectionId, useSourceControlScope } from '../panel/worktree-scope'
-import {
-  commitRuntimeGit,
-  completeRuntimeGitMerge
-} from '@/runtime/source-control/git/runtime-git-sync-client'
+import { requireGitOwnerTarget } from '../../worktree-git-owner-target'
+import { getConnectionId } from '@/lib/connection-context'
+import { commitRuntimeGit } from '@/runtime/runtime-git-sync-client'
 import type { SourceControlOperationTarget } from '../listing/operation-target'
 import type { SourceControlStoreActions } from '../listing/use-store-actions'
 import type { SourceControlWorktreeContext } from '../listing/use-worktree-context'
 import type { SourceControlWorktreeOperationState } from '../panel/use-worktree-operation-state'
 import type { SourceControlStatusRefresh } from '../sync/use-status-refresh'
+import { writeCommitDraftForWorktree } from './commit-drafts'
 
 /** Explicit targets keep Create PR commits on their starting worktree after navigation. */
 export function useSourceControlCommitAction({
@@ -21,33 +15,36 @@ export function useSourceControlCommitAction({
   activeWorktree,
   activeWorktreeId,
   beginGitBranchCompareRequest,
+  commitInFlightRef,
   commitMessage,
   compareBaseRef,
-  operationStore,
   refreshActiveGitStatusAfterMutation,
   refreshBranchCompareRef,
   refreshGitHistoryRef,
+  setCommitErrorForWorktree,
+  setCommitInFlightByWorktree,
   stagedCount,
   unresolvedConflictCount,
-  updateCommitDraft,
+  updateCommitDrafts,
   worktreePath
 }: {
   activeRepoTarget: SourceControlWorktreeContext['activeRepoTarget']
   activeWorktree: SourceControlWorktreeContext['activeWorktree']
   activeWorktreeId: string | null
   beginGitBranchCompareRequest: SourceControlStoreActions['beginGitBranchCompareRequest']
+  commitInFlightRef: SourceControlWorktreeOperationState['commitInFlightRef']
   commitMessage: string
   compareBaseRef: string | null
-  operationStore: SourceControlWorktreeOperationState['operationStore']
   refreshActiveGitStatusAfterMutation: SourceControlStatusRefresh['refreshActiveGitStatusAfterMutation']
   refreshBranchCompareRef: React.RefObject<() => Promise<void>>
   refreshGitHistoryRef: React.RefObject<() => Promise<void>>
+  setCommitErrorForWorktree: SourceControlWorktreeOperationState['setCommitErrorForWorktree']
+  setCommitInFlightByWorktree: SourceControlWorktreeOperationState['setCommitInFlightByWorktree']
   stagedCount: number
   unresolvedConflictCount: number
-  updateCommitDraft: SourceControlWorktreeOperationState['updateCommitDraft']
+  updateCommitDrafts: SourceControlWorktreeOperationState['updateCommitDrafts']
   worktreePath: string | null
 }) {
-  const scope = useSourceControlScope()
   const handleCommit = useCallback(
     async (
       messageOverride?: string,
@@ -64,7 +61,7 @@ export function useSourceControlCommitAction({
               target: activeRepoTarget,
               worktreeId: activeWorktreeId,
               worktreePath,
-              connectionId: sourceControlConnectionId(scope, activeWorktreeId),
+              connectionId: getConnectionId(activeWorktreeId) ?? undefined,
               pushTarget: activeWorktree?.pushTarget
             }
           : null)
@@ -80,11 +77,13 @@ export function useSourceControlCommitAction({
         return false
       }
 
-      // Admission reads the owner record synchronously so a double-click or remount cannot resubmit.
-      if (operationStore.getState().isCommitting) {
+      if (commitInFlightRef.current[target.worktreeId]) {
         return false
       }
-      operationStore.setState({ isCommitting: true, commitError: null })
+      commitInFlightRef.current[target.worktreeId] = true
+
+      setCommitInFlightByWorktree((prev) => ({ ...prev, [target.worktreeId]: true }))
+      setCommitErrorForWorktree(target.worktreeId, null)
       try {
         const commitResult = await commitRuntimeGit(
           {
@@ -97,13 +96,19 @@ export function useSourceControlCommitAction({
           message
         )
         if (!commitResult.success) {
-          operationStore.setState({ commitError: commitResult.error ?? 'Commit failed' })
+          setCommitErrorForWorktree(target.worktreeId, commitResult.error ?? 'Commit failed')
           return false
         }
 
         // Clear only an unchanged submitted draft so typing during commit cannot lose new edits.
-        updateCommitDraft((current) => (current.trim() !== message ? current : ''))
-        operationStore.setState({ commitError: null })
+        updateCommitDrafts((prev) => {
+          const current = prev[target.worktreeId]
+          if (current !== undefined && current.trim() !== message) {
+            return prev
+          }
+          return writeCommitDraftForWorktree(prev, target.worktreeId, '')
+        })
+        setCommitErrorForWorktree(target.worktreeId, null)
         if (!options?.target) {
           void refreshActiveGitStatusAfterMutation()
         }
@@ -117,98 +122,41 @@ export function useSourceControlCommitAction({
         }
         if (!options?.target) {
           void refreshBranchCompareRef.current()
-          window.dispatchEvent(
-            new CustomEvent(GIT_GRAPH_REFRESH_EVENT, { detail: target.worktreeId })
-          )
           void refreshGitHistoryRef.current()
         }
         return true
       } catch (error) {
-        operationStore.setState({
-          commitError: error instanceof Error ? error.message : 'Commit failed'
-        })
+        setCommitErrorForWorktree(
+          target.worktreeId,
+          error instanceof Error ? error.message : 'Commit failed'
+        )
         return false
       } finally {
-        operationStore.setState({ isCommitting: false })
+        setCommitInFlightByWorktree((prev) => ({ ...prev, [target.worktreeId]: false }))
+        commitInFlightRef.current[target.worktreeId] = false
       }
     },
     [
-      scope,
       activeRepoTarget,
       activeWorktree?.pushTarget,
       activeWorktreeId,
       beginGitBranchCompareRequest,
+      commitInFlightRef,
       commitMessage,
       compareBaseRef,
-      operationStore,
       refreshActiveGitStatusAfterMutation,
       refreshBranchCompareRef,
       refreshGitHistoryRef,
+      setCommitErrorForWorktree,
+      setCommitInFlightByWorktree,
       stagedCount,
-      updateCommitDraft,
+      updateCommitDrafts,
       unresolvedConflictCount,
       worktreePath
     ]
   )
 
-  const handleCompleteMerge = useCallback(async (): Promise<void> => {
-    if (!activeWorktreeId || !worktreePath || unresolvedConflictCount > 0) {
-      return
-    }
-    if (operationStore.getState().isCommitting) {
-      return
-    }
-    operationStore.setState({ isCommitting: true })
-    let result: { success: boolean; error?: string }
-    try {
-      result = await completeRuntimeGitMerge({
-        target: requireGitOwnerTarget(activeRepoTarget),
-        worktreeId: activeWorktreeId,
-        worktreePath,
-        connectionId: sourceControlConnectionId(scope, activeWorktreeId)
-      })
-    } catch (error) {
-      result = { success: false, error: error instanceof Error ? error.message : undefined }
-    } finally {
-      operationStore.setState({ isCommitting: false })
-    }
-    void refreshActiveGitStatusAfterMutation()
-    if (!result.success) {
-      // The commit area and its inline error stay hidden while the merge is paused.
-      toast.error(
-        translate(
-          'auto.components.right.sidebar.source.control.commit.completeMergeFailed',
-          'Complete merge failed'
-        ),
-        { description: result.error }
-      )
-      return
-    }
-    if (compareBaseRef) {
-      beginGitBranchCompareRequest(
-        activeWorktreeId,
-        `${activeWorktreeId}:${compareBaseRef}:${Date.now()}:post-commit`,
-        compareBaseRef
-      )
-    }
-    void refreshBranchCompareRef.current()
-    window.dispatchEvent(new CustomEvent(GIT_GRAPH_REFRESH_EVENT, { detail: activeWorktreeId }))
-    void refreshGitHistoryRef.current()
-  }, [
-    activeRepoTarget,
-    activeWorktreeId,
-    beginGitBranchCompareRequest,
-    compareBaseRef,
-    operationStore,
-    refreshActiveGitStatusAfterMutation,
-    refreshBranchCompareRef,
-    refreshGitHistoryRef,
-    scope,
-    unresolvedConflictCount,
-    worktreePath
-  ])
-
-  return { handleCommit, handleCompleteMerge }
+  return { handleCommit }
 }
 
 export type SourceControlCommitAction = ReturnType<typeof useSourceControlCommitAction>

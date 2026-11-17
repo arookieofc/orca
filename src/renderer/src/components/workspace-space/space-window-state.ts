@@ -3,7 +3,7 @@ import {
   selectDetectedWorktreesByRepo,
   selectFolderWorkspaces,
   selectWorktreesByRepo
-} from '@/store/workspaces/catalog/workspace-record-fields'
+} from '@/store/workspace-record-selectors'
 
 export function pickSpaceWindowState(state: AppState) {
   return {
@@ -28,6 +28,7 @@ export function pickSpaceWindowState(state: AppState) {
     migrationUnsupportedByPtyId: state.migrationUnsupportedByPtyId,
     runtimePaneTitlesByTabId: state.runtimePaneTitlesByTabId,
     agentStatusEpoch: state.agentStatusEpoch,
+    retainedAgentsByPaneKey: state.retainedAgentsByPaneKey,
     openFiles: state.openFiles,
     editorDrafts: state.editorDrafts,
     browserTabsByWorktree: state.browserTabsByWorktree,
@@ -46,8 +47,6 @@ export function pickSpaceWindowState(state: AppState) {
 }
 
 export type SpaceWindowState = ReturnType<typeof pickSpaceWindowState>
-export type SpaceWindowStateUpdate = Omit<SpaceWindowState, 'editorDrafts'> &
-  Partial<Pick<SpaceWindowState, 'editorDrafts'>>
 
 export function selectSpaceWindowAnalysis(
   current: SpaceWindowState['workspaceSpaceAnalysis'],
@@ -67,7 +66,7 @@ export function selectSpaceWindowAnalysis(
   return detailCount(incoming) > detailCount(current) ? incoming : current
 }
 
-export function isSpaceWindowState(value: unknown): value is SpaceWindowStateUpdate {
+export function isSpaceWindowState(value: unknown): value is SpaceWindowState {
   return (
     value !== null &&
     typeof value === 'object' &&

@@ -1,40 +1,52 @@
-import { rendererStatusReplica } from '../../session-graph/renderer-status-replica'
-import { selectFreshAgentRowForMobileTab } from '../../workspaces/process-listing/runtime-hook-agent-row-selection'
-import { OrcaRuntimeWithSavedConversationTitlePublication } from '../../session-tabs/chat/saved-conversation-title-publication'
-import type { TabGroupLayoutNode } from '../../../../shared/workspace-layout/tab-groups/tab-types'
+import { selectFreshAgentRowForMobileTab } from '../../runtime-hook-agent-row-selection'
+import { OrcaRuntimeWithScheduleMobileSessionTabsChanged } from '../../session-tabs/session-tabs-change-publication'
+import type { TabGroupLayoutNode } from '../../../../shared/tab-types'
 import type {
   RuntimeMobileSessionSnapshotTab,
-  RuntimeMobileSessionTerminalTab
-} from '../../../../shared/remote-runtime/session-graph/runtime-mobile-session-tab-contracts'
-import type {
   RuntimeMobileSessionTabGroup,
   RuntimeMobileSessionTabsResult,
-  RuntimeMobileSessionTabsSnapshot
-} from '../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
-import { mergeMobileSessionTabGroups } from './mobile-session-tab-merge'
-import { buildHeadlessMobileSessionTabGroups } from '../../terminal/surface/mobile-session-layout-projection'
-import { projectRuntimeMobileSessionTabs } from './runtime-mobile-session-projection'
-import type { RuntimeMobileSessionProjectionHost } from './runtime-mobile-session-projection-contract'
-import type { RuntimePtyWorktreeRecord } from '../../terminal/records/runtime-terminal-state-records'
-import type { RuntimeAgentRowSnapshot } from '../../workspaces/process-listing/runtime-hook-agent-row-selection'
+  RuntimeMobileSessionTabsSnapshot,
+  RuntimeMobileSessionTerminalTab
+} from '../../../../shared/runtime-types'
+import { mergeMobileSessionTabGroups } from '../../mobile-session-tab-merge'
+import { buildHeadlessMobileSessionTabGroups } from '../../mobile-session-layout-projection'
+import { projectRuntimeMobileSessionTabs } from '../../runtime-mobile-session-projection'
+import type { RuntimeMobileSessionProjectionHost } from '../../runtime-mobile-session-projection-contract'
+import type { RuntimePtyWorktreeRecord } from '../../runtime-terminal-state-records'
+import type { RuntimeAgentRowSnapshot } from '../../runtime-worktree-agent-rows'
 import type {
   AgentStatusEntry,
+  AgentStatusIpcPayload,
   AgentStatusOrchestrationContext
-} from '../../../../shared/agent-status/contracts/agent-status-types'
-import type { AgentStatusIpcPayload } from '../../../../shared/agent-status/contracts/agent-status-ipc-payload'
-import { buildRuntimeMobileAgentStatus } from './runtime-mobile-agent-status-builder'
-import { FIRST_PANE_ID } from '../../../../shared/workspace-layout/pane-key'
-import { isTerminalLeafId, makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
-import { getStructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/host/structured-agent-session-registry'
-import { structuredWorkerHandleAgentStatus } from '../../orchestration/addressing/groups/structured-worker-group-addressing'
+} from '../../../../shared/agent-status-types'
+import { buildRuntimeMobileAgentStatus } from '../../runtime-mobile-agent-status-builder'
+import { FIRST_PANE_ID } from '../../../../shared/pane-key'
+import { isTerminalLeafId, makePaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'
+import { getStructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-registry'
+import { structuredWorkerHandleAgentStatus } from '../../orchestration/structured-worker-group-addressing'
 import {
-  retitleStructuredConversationTabs,
+  retitleStructuredConversationTab,
   titleStructuredConversationTabs
-} from '../../session-tabs/chat/structured-conversation-tab-title'
-import { structuredChatDisplayName } from '../../../../shared/agent-session/view/structured-chat-row-name'
-import { agentSessionRecordShownName } from '../../agent-session/records/agent-session-record-shown-name'
+} from '../../structured-conversation-tab-title'
+import { structuredChatDisplayName } from '../../../../shared/structured-chat-row-name'
 
-export abstract class OrcaRuntimeWithPruneMobileSessionTabGroupLayout extends OrcaRuntimeWithSavedConversationTitlePublication {
+export abstract class OrcaRuntimeWithPruneMobileSessionTabGroupLayout extends OrcaRuntimeWithScheduleMobileSessionTabsChanged {
+  constructor(
+    ...args: ConstructorParameters<typeof OrcaRuntimeWithScheduleMobileSessionTabsChanged>
+  ) {
+    super(...args)
+    // Desktop chat renames reach main through saved window sessions only.
+    this.store?.onWorkspaceSessionWritten?.(() => {
+      for (const [workspaceId, snapshot] of this.mobileSessionTabsByWorktree) {
+        for (const tab of snapshot.tabs) {
+          if (tab.type === 'agent-session') {
+            this.refreshStructuredConversationTabTitle(workspaceId, tab.sessionId)
+          }
+        }
+      }
+    })
+  }
+
   protected pruneMobileSessionTabGroupLayout(
     layout: TabGroupLayoutNode | null | undefined,
     validGroupIds: ReadonlySet<string>
@@ -82,10 +94,8 @@ export abstract class OrcaRuntimeWithPruneMobileSessionTabGroupLayout extends Or
   protected toMobileSessionTabsResult(
     snapshot: RuntimeMobileSessionTabsSnapshot
   ): RuntimeMobileSessionTabsResult {
-    snapshot = titleStructuredConversationTabs(
-      snapshot,
-      (sessionId) => this.structuredConversationTabName(snapshot.worktree, sessionId),
-      structuredConversationForked
+    snapshot = titleStructuredConversationTabs(snapshot, (sessionId) =>
+      this.structuredConversationTabName(snapshot.worktree, sessionId)
     )
     return projectRuntimeMobileSessionTabs(snapshot, this.getMobileSessionProjectionHost())
   }
@@ -95,18 +105,11 @@ export abstract class OrcaRuntimeWithPruneMobileSessionTabGroupLayout extends Or
     if (!snapshot) {
       return
     }
-    // An older fork's shown name reads its source's, so the source's open forks retitle with it.
-    const store = getStructuredAgentSessionHost()?.deps?.store
-    const names = new Map([[sessionId, this.structuredConversationTabName(workspaceId, sessionId)]])
-    for (const tab of snapshot.tabs) {
-      if (
-        tab.type === 'agent-session' &&
-        store?.getConversation(tab.sessionId)?.forkedFrom?.sessionId === sessionId
-      ) {
-        names.set(tab.sessionId, this.structuredConversationTabName(workspaceId, tab.sessionId))
-      }
-    }
-    const next = retitleStructuredConversationTabs(snapshot, names, structuredConversationForked)
+    const next = retitleStructuredConversationTab(
+      snapshot,
+      sessionId,
+      this.structuredConversationTabName(workspaceId, sessionId)
+    )
     if (next) {
       this.emitMobileSessionTabsSnapshot(this.storeMobileSessionSnapshot(workspaceId, next))
     }
@@ -118,30 +121,20 @@ export abstract class OrcaRuntimeWithPruneMobileSessionTabGroupLayout extends Or
     const customLabel = this.getWorkspaceSessionForWorktree(workspaceId)?.unifiedTabs?.[
       workspaceId
     ]?.find((tab) => tab.contentType === 'agent-session' && tab.entityId === sessionId)?.customLabel
-    const store = getStructuredAgentSessionHost()?.deps?.store
     const conversationName =
-      store && record?.location.workspaceId === workspaceId
-        ? agentSessionRecordShownName(store, record)
-        : null
+      record?.location.workspaceId === workspaceId ? record.conversationName : null
     return structuredChatDisplayName(customLabel, conversationName, '') || null
   }
 
   protected getMobileSessionProjectionHost(): RuntimeMobileSessionProjectionHost {
     return {
-      getRendererStatus: (paneKey) =>
-        this.authoritativeWindowId !== 0 ? rendererStatusReplica(this).get(paneKey) : undefined,
       tabs: this.tabs,
       leaves: this.leaves,
       ptysById: this.ptysById,
-      getPtyAvailability: (ptyId) => this.ptyController?.getPtyAvailability?.(ptyId) ?? null,
-      isSessionTitlePublisher: (worktreeId, surfaceId) =>
-        this.isSessionTitlePublisher(worktreeId, surfaceId),
       getLiveBrowserTabs: (worktreeId) => this.getListedBrowserTabsByPageId(worktreeId),
-      isRendererOwnedMobileBrowserTab: (...args) => this.isRendererOwnedMobileBrowserTab(...args),
       getProviderSessionRows: (paneKey) => this.getAgentProviderSessionRowsForPaneFn?.(paneKey),
       getProviderSessionSnapshot: () => this.getAgentProviderSessionSnapshotFn?.() ?? [],
-      getStatusRows: (paneKey, terminalHandle) =>
-        this.publicPaneStatusFn?.(paneKey, terminalHandle) ?? [],
+      getStatusSnapshot: () => this.getAgentStatusSnapshotFn?.() ?? [],
       getLeafKey: (tabId, leafId) => this.getLeafKey(tabId, leafId),
       findPty: (worktreeId, tab, options) =>
         this.findPtyForMobileTerminalTab(worktreeId, tab, options),
@@ -304,16 +297,29 @@ export abstract class OrcaRuntimeWithPruneMobileSessionTabGroupLayout extends Or
     paneKey: string
   ): AgentStatusOrchestrationContext | undefined {
     const handle = this.getTerminalHandleForPaneKey(paneKey)
-    return handle
-      ? this.agentOrchestrationProjection.getForHandle(handle, undefined, { paneKey })
-      : undefined
+    if (!handle) {
+      return undefined
+    }
+    return this.agentOrchestrationProjection.getForHandle(handle, undefined, { paneKey })
   }
 
   getAgentStatusTerminalHandleForPaneKey(paneKey: string): string | undefined {
     return this.getTerminalHandleForPaneKey(paneKey) ?? undefined
   }
-}
 
-function structuredConversationForked(sessionId: string): boolean {
-  return !!getStructuredAgentSessionHost()?.deps?.store?.getConversation(sessionId)?.forkedFrom
+  getTerminalHandleForPaneKey(paneKey: string): string | null {
+    const parsed = parsePaneKey(paneKey)
+    const leaf = parsed ? this.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId)) : undefined
+    if (leaf?.ptyId && leaf.connected) {
+      return this.issueHandle(leaf)
+    }
+    const panePty = this.getPtyRecordForPaneKey(paneKey)
+    if (panePty?.connected) {
+      return this.issuePtyHandle(panePty)
+    }
+    if (leaf?.ptyId) {
+      return this.issueHandle(leaf)
+    }
+    return panePty ? this.issuePtyHandle(panePty) : null
+  }
 }

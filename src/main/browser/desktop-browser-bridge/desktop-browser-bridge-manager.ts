@@ -1,4 +1,4 @@
-import type { DesktopBrowserBridgeRequest } from '../../../shared/browser/client-hosting/desktop-browser-bridge-protocol'
+import type { DesktopBrowserBridgeRequest } from '../../../shared/desktop-browser-bridge-protocol'
 import {
   DesktopBrowserBridgeConnection,
   type DesktopBrowserBridgeSubscribe
@@ -13,7 +13,7 @@ export type DesktopBrowserBridgeCandidate = {
 
 export type DesktopBrowserBridgeManagerDeps = {
   /** Hosts with the setting enabled, SSH connected and a linked managed environment. */
-  listCandidates(): DesktopBrowserBridgeCandidate[] | Promise<DesktopBrowserBridgeCandidate[]>
+  listCandidates(): DesktopBrowserBridgeCandidate[]
   /** False means unsupported; a throw means the capability could not be checked. */
   supportsBridge(environmentId: string): Promise<boolean>
   subscribe(environmentId: string): DesktopBrowserBridgeSubscribe
@@ -43,27 +43,15 @@ type Entry = {
 export class DesktopBrowserBridgeManager {
   private readonly entries = new Map<string, Entry>()
   private disposed = false
-  private reconcileRevision = 0
 
   constructor(private readonly deps: DesktopBrowserBridgeManagerDeps) {}
 
   reconcile(): void {
-    const revision = ++this.reconcileRevision
-    void this.reconcileCurrent(revision).catch((error: unknown) =>
-      this.deps.log(`reconcile failed: ${String(error)}`)
-    )
-  }
-
-  private async reconcileCurrent(revision: number): Promise<void> {
     if (this.disposed) {
       return
     }
     const wanted = new Map<string, DesktopBrowserBridgeCandidate>()
-    const candidates = await this.deps.listCandidates()
-    if (this.disposed || revision !== this.reconcileRevision) {
-      return
-    }
-    for (const candidate of candidates) {
+    for (const candidate of this.deps.listCandidates()) {
       wanted.set(candidate.environmentId, candidate)
     }
     for (const [environmentId, entry] of this.entries) {
@@ -166,26 +154,18 @@ export class DesktopBrowserBridgeManager {
     }
     const setTimer = this.deps.setTimer ?? ((run, ms) => setTimeout(run, ms))
     entry.retryTimer = setTimer(() => {
-      void this.retryCurrent(environmentId, entry).catch((error: unknown) =>
-        this.retryAfterFailure(environmentId, entry, error)
-      )
+      entry.retryTimer = null
+      // Settings or connection state may have changed during backoff.
+      const stillWanted = this.deps
+        .listCandidates()
+        .some((candidate) => candidate.environmentId === environmentId)
+      if (!stillWanted) {
+        this.detach(environmentId, 'host is no longer allowed or connected')
+        return
+      }
+      void this.start(environmentId, entry)
     }, delayMs)
     entry.retryTimer.unref?.()
-  }
-
-  private async retryCurrent(environmentId: string, entry: Entry): Promise<void> {
-    entry.retryTimer = null
-    // Settings or connection state may have changed during backoff.
-    const candidates = await this.deps.listCandidates()
-    if (this.disposed || this.entries.get(environmentId) !== entry) {
-      return
-    }
-    const stillWanted = candidates.some((candidate) => candidate.environmentId === environmentId)
-    if (!stillWanted) {
-      this.detach(environmentId, 'host is no longer allowed or connected')
-      return
-    }
-    void this.start(environmentId, entry)
   }
 
   private detach(environmentId: string, reason: string): void {

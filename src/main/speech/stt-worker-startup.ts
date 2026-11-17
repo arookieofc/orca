@@ -1,11 +1,7 @@
+import type { Worker } from 'node:worker_threads'
 import type { SttEvent } from './stt-service'
-import type { SttRecognizerInit } from './stt-recognizer'
-import type { SttWorkerProcess } from './stt-worker-process'
 
-/** Session events carry the stream they belong to. */
-export type SttWorkerEvent = SttEvent & { streamId?: string }
-
-export function waitForSttWorkerReady(worker: SttWorkerProcess, timeoutMs: number): Promise<void> {
+export function waitForSttWorkerReady(worker: Worker, timeoutMs: number): Promise<void> {
   const { promise, resolve, reject } = Promise.withResolvers<void>()
   let settled = false
   let startupTimeout: ReturnType<typeof setTimeout> | null = null
@@ -54,13 +50,13 @@ export function waitForSttWorkerReady(worker: SttWorkerProcess, timeoutMs: numbe
 }
 
 export function attachSttWorkerLifecycle(args: {
-  worker: SttWorkerProcess
+  worker: Worker
   isCurrent: () => boolean
-  onMessage: (event: SttWorkerEvent) => void
+  onMessage: (event: SttEvent) => void
   onError: (error: Error) => void
   onExit: () => void
 }): () => void {
-  const onWorkerMessage = (event: SttWorkerEvent): void => {
+  const onWorkerMessage = (event: SttEvent): void => {
     if (args.isCurrent()) {
       args.onMessage(event)
     }
@@ -85,6 +81,17 @@ export function attachSttWorkerLifecycle(args: {
   }
 }
 
-export function initializeSttWorker(worker: SttWorkerProcess, input: SttRecognizerInit): void {
+export function initializeSttWorker(
+  worker: Worker,
+  input: {
+    modelDir: string
+    modelType: string
+    streaming: boolean
+    sampleRate: number
+    files: readonly string[]
+    hotwordsFilePath?: string
+    modelingUnit?: string
+  }
+): void {
   worker.postMessage({ type: 'init', ...input })
 }

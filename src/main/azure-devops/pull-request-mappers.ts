@@ -1,9 +1,4 @@
-import { summarizeProviderChecks } from '../../shared/source-control/checks/provider-check-summary'
-import type {
-  CheckStatus,
-  PRMergeableState,
-  ProviderCheckSummary
-} from '../../shared/github/pull-requests/pull-request-types'
+import type { CheckStatus, PRMergeableState } from '../../shared/github/pull-request-types'
 
 export type RawAzureDevOpsStatus = {
   state?: string | null
@@ -36,7 +31,6 @@ export type AzureDevOpsPullRequestInfo = {
   state: 'open' | 'closed' | 'merged' | 'draft'
   url: string
   status: CheckStatus
-  checksSummary?: ProviderCheckSummary
   updatedAt: string
   mergeable: PRMergeableState
   headSha?: string
@@ -110,27 +104,10 @@ export function deriveAzureDevOpsStatus(statuses: readonly RawAzureDevOpsStatus[
   return 'neutral'
 }
 
-export function summarizeAzureDevOpsStatuses(
-  statuses: readonly RawAzureDevOpsStatus[]
-): ProviderCheckSummary {
-  const summary = summarizeProviderChecks(
-    statuses.map(({ state }) => ({
-      status: 'completed',
-      conclusion: ['canceled', 'cancelled'].includes(state?.trim().toLowerCase() ?? '')
-        ? 'cancelled'
-        : { success: 'success', failure: 'failure', pending: 'pending', neutral: 'neutral' }[
-            classifyAzureDevOpsStatus(state)
-          ]
-    }))
-  )
-  return { ...summary, state: statuses.length ? deriveAzureDevOpsStatus(statuses) : 'none' }
-}
-
 export function mapAzureDevOpsPullRequest(
   raw: RawAzureDevOpsPullRequest,
   status: CheckStatus,
-  webBaseUrl: string,
-  checksSummary?: ProviderCheckSummary
+  webBaseUrl: string
 ): AzureDevOpsPullRequestInfo | null {
   if (typeof raw.pullRequestId !== 'number' || !raw.title) {
     return null
@@ -143,7 +120,6 @@ export function mapAzureDevOpsPullRequest(
     url:
       raw._links?.web?.href ?? `${webBaseUrl.replace(/\/+$/, '')}/pullrequest/${raw.pullRequestId}`,
     status,
-    ...(checksSummary ? { checksSummary } : {}),
     updatedAt: raw.closedDate ?? raw.creationDate ?? '',
     mergeable: mapAzureDevOpsMergeable(raw.mergeStatus),
     ...(headSha ? { headSha } : {})

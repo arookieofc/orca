@@ -1,4 +1,4 @@
-import { createUsageWorktreeResolver } from '../usage/worktree-attribution/usage-worktree-resolver'
+import { createUsageWorktreeResolver } from '../usage/usage-worktree-resolver'
 import {
   getLegacySourceSkipBytesByPath,
   listCodexSessionFiles,
@@ -57,18 +57,15 @@ export async function scanCodexUsageFiles(
     const fileInfo = await getProcessedFileInfo(filePath)
     const previous = previousByPath.get(filePath)
     const mustReclaimDeferred = lostOwnerPath && previous?.hasDeferredClaims !== false
-    // Reuse and resume both build on the cached projections, so a record missing them is reparsed.
-    const hasReusableRecord =
+    const hasGenerationMetadata =
       previous &&
       typeof previous.ctimeMs === 'number' &&
-      (typeof previous.physicalFileId === 'string' || previous.physicalFileId === null) &&
-      Array.isArray(previous.sessions) &&
-      Array.isArray(previous.dailyAggregates)
+      (typeof previous.physicalFileId === 'string' || previous.physicalFileId === null)
     const canReuse =
       !mustReclaimDeferred &&
       legacySourceSkipBytes === 0 &&
       previous &&
-      hasReusableRecord &&
+      hasGenerationMetadata &&
       previous.mtimeMs === fileInfo.mtimeMs &&
       previous.size === fileInfo.size &&
       previous.ctimeMs === fileInfo.ctimeMs &&
@@ -83,7 +80,7 @@ export async function scanCodexUsageFiles(
         !mustReclaimDeferred &&
         legacySourceSkipBytes === 0 &&
         previous &&
-        hasReusableRecord &&
+        hasGenerationMetadata &&
         fileInfo.size > previous.size
       ) {
         const state = await resolveCodexRolloutResume(filePath, previous)

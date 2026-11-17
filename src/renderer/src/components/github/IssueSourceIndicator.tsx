@@ -1,14 +1,11 @@
 import React from 'react'
-import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../shared/github/repositories/repository-identity'
+import type { GitHubOwnerRepo } from '../../../../shared/github/pull-request-types'
 import RepoBadgeLabel from '@/components/repo/RepoBadgeLabel'
-import { Trans } from 'react-i18next'
-import { i18n, translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
+import { cn } from '@/lib/utils'
 import {
   githubRepoIdentityKey,
   isDefaultGitHubHost
-} from '../../../../shared/github/repositories/repository-identity-key'
+} from '../../../../shared/github/repository-identity-key'
 
 export type IssueSourceIndicatorProps = {
   /** Null while unresolved or when the repo has no GitHub remote. */
@@ -22,11 +19,8 @@ export type IssueSourceIndicatorProps = {
 }
 
 // Name the resolved repository, not remote aliases that could imply a stable UI-to-git-config mapping.
-function issueSourceTemplate(variant: 'list' | 'item', t: Translate = translate): string {
-  return variant === 'item'
-    ? t('auto.components.github.IssueSourceIndicator.issueFromRepo', 'Issue from <repo/>')
-    : t('auto.components.github.IssueSourceIndicator.issuesFromRepo', 'Issues from <repo/>')
-}
+const LABEL_PREFIX_LIST = 'Issues from '
+const LABEL_PREFIX_ITEM = 'Issue from '
 
 export function sameGitHubOwnerRepo(
   left: GitHubOwnerRepo | null,
@@ -47,7 +41,6 @@ export default function IssueSourceIndicator({
   localRepo,
   className
 }: IssueSourceIndicatorProps): React.JSX.Element | null {
-  const t = useTranslate()
   if (!issues || !prs) {
     return null
   }
@@ -59,15 +52,14 @@ export default function IssueSourceIndicator({
     host && !isDefaultGitHubHost(host)
       ? `${host}/${issues.owner}/${issues.repo}`
       : `${issues.owner}/${issues.repo}`
-  const template = issueSourceTemplate(variant, t)
-  const label = template.replace('<repo/>', slug)
+  const prefix = variant === 'item' ? LABEL_PREFIX_ITEM : LABEL_PREFIX_LIST
   return (
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded border border-border/50 bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground',
         className
       )}
-      title={localRepo ? `${localRepo.displayName}: ${label}` : label}
+      title={localRepo ? `${localRepo.displayName}: ${prefix}${slug}` : `${prefix}${slug}`}
     >
       {localRepo ? (
         // Disambiguate which local repo this issue-source chip describes in multi-repo views.
@@ -78,15 +70,8 @@ export default function IssueSourceIndicator({
           className="text-[10px] text-muted-foreground"
         />
       ) : null}
-      <span>
-        <Trans
-          i18n={i18n}
-          defaults={template}
-          components={{
-            repo: <span className="font-mono text-foreground/80">{slug}</span>
-          }}
-        />
-      </span>
+      <span className="shrink-0">{prefix}</span>
+      <span className="font-mono text-foreground/80">{slug}</span>
     </span>
   )
 }

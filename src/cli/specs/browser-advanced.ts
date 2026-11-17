@@ -1,27 +1,7 @@
-import type { CommandSpec } from '../discovery/command-spec'
-import { CLI_GLOBAL_FLAGS as GLOBAL_FLAGS } from '../../shared/cli/cli-argument-boundary'
-import { withBrowserPageTarget } from './browser-page-target'
+import type { CommandSpec } from '../args'
+import { GLOBAL_FLAGS } from '../args'
 
-export const BROWSER_ADVANCED_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget([
-  {
-    path: ['extension', 'list'],
-    summary: 'List installed browser extensions and their enabled state',
-    usage: 'orca extension list [--profile <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'profile'],
-    notes: ['Desktop only. Defaults to the default browser profile on this Orca host.']
-  },
-  {
-    path: ['extension', 'reload'],
-    summary: 'Reload an installed unpacked browser extension',
-    usage:
-      'orca extension reload <extension-id> [--json] | orca extension reload --path <folder> [--json]',
-    positionalArgs: ['extension-id'],
-    allowedFlags: [...GLOBAL_FLAGS, 'extension-id', 'path'],
-    notes: [
-      'Desktop only. --path selects an already installed unpacked source folder; it never installs one.',
-      'Like the Settings reload button, this restarts the extension in every profile where it is enabled.'
-    ]
-  },
+export const BROWSER_ADVANCED_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['cookie', 'get'],
     summary: 'Get cookies for the active tab (optionally filter by URL)',
@@ -283,4 +263,4 @@ export const BROWSER_ADVANCED_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarg
     usage: 'orca highlight --selector <ref> [--worktree <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'selector', 'worktree']
   }
-])
+]

@@ -1,13 +1,12 @@
-import { initializeNewRootProjectGroupOrder } from './project-group-update-persistence'
 import type { StateCreator } from 'zustand'
 import { toast } from 'sonner'
 import type { AppState } from '../types'
 import type {
   NestedRepoScanResult,
   ProjectGroupImportResult
-} from '../../../../shared/project/groups/project-group-types'
-import { callRuntimeRpc } from '../../runtime/rpc/calls/runtime-rpc-call'
-import { runtimeTargetForOwnerEnvironment } from '../../runtime/rpc/targets/runtime-client-target'
+} from '../../../../shared/project-group-types'
+import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
+import { runtimeTargetForOwnerEnvironment } from '../../runtime/runtime-client-target'
 import { translate } from '@/i18n/i18n'
 import type { RepoSlice } from '../repos/repo-state'
 
@@ -82,7 +81,6 @@ export function createNestedRepositoryActions(
     importNestedRepos: async (args) => {
       try {
         const target = runtimeTargetForOwnerEnvironment(args.runtimeEnvironmentId)
-        const knownGroupIds = new Set(get().projectGroups.map((group) => group.id))
         const result =
           target.kind === 'local'
             ? await window.api.projectGroups.importNested(args)
@@ -98,9 +96,6 @@ export function createNestedRepositoryActions(
                 },
                 { timeoutMs: 60_000 }
               )
-        if (result.group && !knownGroupIds.has(result.group.id)) {
-          result.group = await initializeNewRootProjectGroupOrder(target, result.group, get())
-        }
         const catalogOptions = { runtimeEnvironmentId: args.runtimeEnvironmentId }
         await get().fetchProjectGroups(catalogOptions)
         await get().fetchFolderWorkspaces(catalogOptions)

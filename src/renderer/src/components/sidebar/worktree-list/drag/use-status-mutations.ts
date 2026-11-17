@@ -4,26 +4,21 @@ import type {
   WorkspaceStatus,
   WorkspaceStatusDefinition
 } from '../../../../../../shared/worktree/types'
-import '../../workspace-status/presentation/workspace-status'
-import {
-  getWorkspaceStatus,
-  getWorkspaceStatusGroupKey
-} from '../../../../../../shared/workspace/status/workspace-statuses'
+import { getWorkspaceStatus, getWorkspaceStatusGroupKey } from '../../workspace-status'
 import {
   buildManualOrderUpdatesForGroupDrop,
   buildManualOrderUpdatesForVisibleGroups,
   shouldWriteManualOrderForGroupDrop
-} from './worktree-manual-order'
-import { buildWorkspaceKanbanSidebarDropUpdates } from '../../workspace-board/drag/workspace-kanban-sidebar-drop'
-import type { WorkspaceSortBy as SortBy } from '../../../../../../shared/workspace-view/workspace-row-sort'
-import { switchSortToManualAfterDrop } from '../listing/manual-sort-switch-toast'
-import { isWorkspaceStatusAllowedOnHost } from '@/store/workspaces/status/host-workspace-status-columns'
+} from '../../worktree-manual-order'
+import { buildWorkspaceKanbanSidebarDropUpdates } from '../../workspace-kanban-sidebar-drop'
+import type { SortBy } from '../../../../../../shared/sidebar-list/smart-sort'
+import { switchSortToManualAfterDrop } from '../../manual-sort-switch-toast'
+import { isWorkspaceStatusAllowedOnHost } from '@/store/host-workspace-status-columns'
 import type { WorktreeReorderArgs, WorktreeStatusDropAtIndexArgs } from './drop-commit-context'
-import type { WorktreeManualOrderCatalog } from './worktree-manual-order-catalog'
+import type { WorktreeManualOrderCatalog } from '../../worktree-manual-order-catalog'
 import {
   collectDropWrites,
   dropWriteRows,
-  uniqueDraggedKeys,
   type DraggedWorktreeCopies
 } from './dragged-worktree-copies'
 
@@ -61,7 +56,7 @@ export function useWorktreeStatusMutations(args: {
         statusIds: worktreeIds,
         status,
         workspaceStatuses,
-        orderUpdatesByKey: new Map()
+        orderUpdates: new Map()
       })
       if (updates.length > 0) {
         void updateWorktreesMeta(updates)
@@ -97,24 +92,22 @@ export function useWorktreeStatusMutations(args: {
         return
       }
       const dropArgs = { ...requestedDrop, worktreeIds }
-      // Sidebar lanes key their cards by host identity: rank only the copies this drop writes.
-      const draggedKeys = uniqueDraggedKeys(dropArgs.worktreeIds.flatMap(rowsFor.status))
       const order = buildManualOrderUpdatesForGroupDrop({
         groups: dropArgs.groups,
         targetGroupKey: getWorkspaceStatusGroupKey(dropArgs.status),
-        draggedIds: draggedKeys,
+        draggedIds: dropArgs.worktreeIds,
         dropIndex: dropArgs.dropIndex,
         now: Date.now(),
-        rankByWorktreeId: manualOrderCatalog.rankByKey,
-        allWorktreeIds: manualOrderCatalog.orderedKeys
+        rankByWorktreeId: manualOrderCatalog.rankByWorktreeId,
+        allWorktreeIds: manualOrderCatalog.orderedIds
       })
-      const dragged = new Set(draggedKeys)
+      const dragged = new Set(dropArgs.worktreeIds)
       const updates = collectDropWrites({
         rowsFor,
         statusIds: dropArgs.worktreeIds,
         status: dropArgs.status,
         workspaceStatuses,
-        orderUpdatesByKey: new Map([...order.updates].filter(([key]) => dragged.has(key)))
+        orderUpdates: new Map([...order.updates].filter(([worktreeId]) => dragged.has(worktreeId)))
       })
       if (updates.length === 0) {
         return
@@ -144,20 +137,17 @@ export function useWorktreeStatusMutations(args: {
   const reorderWorktrees = useCallback(
     (reorderArgs: WorktreeReorderArgs) => {
       const result = buildManualOrderUpdatesForVisibleGroups({
-        groups: reorderArgs.groups,
-        sourceGroupKey: reorderArgs.sourceGroupKey,
-        draggedIds: reorderArgs.draggedKeys,
-        dropIndex: reorderArgs.dropIndex,
+        ...reorderArgs,
         now: Date.now(),
-        rankByWorktreeId: manualOrderCatalog.rankByKey,
-        allWorktreeIds: manualOrderCatalog.orderedKeys
+        rankByWorktreeId: manualOrderCatalog.rankByWorktreeId,
+        allWorktreeIds: manualOrderCatalog.orderedIds
       })
       const updates = collectDropWrites({
         rowsFor: dropWriteRows(useAppStore.getState(), reorderArgs.draggedCopies),
         statusIds: [],
         status: null,
         workspaceStatuses,
-        orderUpdatesByKey: result.updates
+        orderUpdates: result.updates
       })
       if (updates.length === 0) {
         return
@@ -202,8 +192,8 @@ export function useWorktreeStatusMutations(args: {
         workspaceStatuses,
         sortBy,
         now: Date.now(),
-        allWorktreeKeys: manualOrderCatalog.orderedKeys,
-        rankByKey: manualOrderCatalog.rankByKey
+        allWorktreeIds: manualOrderCatalog.orderedIds,
+        rankByWorktreeId: manualOrderCatalog.rankByWorktreeId
       })
       if (result.updates.length === 0) {
         return

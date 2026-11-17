@@ -1,6 +1,6 @@
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
-import type { GitHubRepositoryIdentity as GitHubOwnerRepo } from '../../../../shared/github/repositories/repository-identity'
-import { useTranslate } from '@/i18n/use-translate'
+import type { GitHubOwnerRepo } from '../../../../shared/github/pull-request-types'
+import { translate } from '@/i18n/i18n'
 
 export function GitHubMarkdownComposerPreviewPane({
   value,
@@ -11,7 +11,6 @@ export function GitHubMarkdownComposerPreviewPane({
   minHeightClassName: string
   previewGithubRepo: GitHubOwnerRepo | null
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div
       className={`github-markdown-composer-preview scrollbar-sleek max-h-[360px] overflow-y-auto ${minHeightClassName}`}
@@ -25,7 +24,10 @@ export function GitHubMarkdownComposerPreviewPane({
         />
       ) : (
         <p className="text-[13px] italic text-muted-foreground">
-          {t('auto.components.github.GitHubMarkdownComposer.8f1c2d4e6a', 'Nothing to preview')}
+          {translate(
+            'auto.components.github.GitHubMarkdownComposer.8f1c2d4e6a',
+            'Nothing to preview'
+          )}
         </p>
       )}
     </div>

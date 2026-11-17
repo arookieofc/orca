@@ -1,18 +1,15 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import { ExportTimeoutError, htmlToPdf } from '../lib/html-to-pdf'
-import { abortWhenRendererGone } from './renderer-requests/renderer-lifetime-abort'
-import {
-  pdfExportFailure,
-  type PdfExportResult
-} from '../../shared/document-preview/pdf-export-failure-copy'
 
 export type ExportHtmlToPdfArgs = {
   html: string
   title: string
 }
 
-export type ExportHtmlToPdfResult = PdfExportResult
+export type ExportHtmlToPdfResult =
+  | { success: true; filePath: string }
+  | { success: false; cancelled?: boolean; error?: string }
 
 export function registerExportHandlers(): void {
   ipcMain.removeHandler('export:html-to-pdf')
@@ -21,13 +18,11 @@ export function registerExportHandlers(): void {
     async (event, args: ExportHtmlToPdfArgs): Promise<ExportHtmlToPdfResult> => {
       const { html, title } = args
       if (!html.trim()) {
-        return pdfExportFailure('noContent')
+        return { success: false, error: 'No content to export' }
       }
 
-      const lifetime = abortWhenRendererGone(event.sender)
       try {
-        const pdfBuffer = await htmlToPdf(html, lifetime.signal)
-        lifetime.signal.throwIfAborted()
+        const pdfBuffer = await htmlToPdf(html)
 
         // Keep long titles and Windows-forbidden characters out of suggested save filenames.
         const sanitizedTitle = title.replace(/[/\\:*?"<>|]/g, '_').slice(0, 100) || 'export'
@@ -42,26 +37,20 @@ export function registerExportHandlers(): void {
           ? await dialog.showSaveDialog(parent, dialogOptions)
           : await dialog.showSaveDialog(dialogOptions)
 
-        lifetime.signal.throwIfAborted()
         if (canceled || !filePath) {
           return { success: false, cancelled: true }
         }
 
-        lifetime.dispose()
         await writeFile(filePath, pdfBuffer)
         return { success: true, filePath }
       } catch (error) {
-        if (lifetime.signal.aborted) {
-          return { success: false, cancelled: true }
-        }
         if (error instanceof ExportTimeoutError) {
-          return pdfExportFailure('timedOut')
+          return { success: false, error: 'Export timed out' }
         }
-        return error instanceof Error
-          ? { success: false, error: error.message }
-          : pdfExportFailure('failed')
-      } finally {
-        lifetime.dispose()
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to export PDF'
+        }
       }
     }
   )

@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 type MobilePageToolbarProps = {
   showMobileButton: boolean
@@ -14,13 +14,15 @@ export function MobilePageToolbar({
   onClose,
   onToggleMobileSidebarButton
 }: MobilePageToolbarProps): React.JSX.Element {
-  const t = useTranslate()
   const sidebarToggleLabel = showMobileButton
-    ? t('auto.components.mobile.MobilePageToolbar.c669abcf8f', 'Hide from sidebar')
-    : t('auto.components.mobile.MobilePageToolbar.fb5f28330e', 'Show in sidebar')
+    ? translate('auto.components.mobile.MobilePageToolbar.c669abcf8f', 'Hide from sidebar')
+    : translate('auto.components.mobile.MobilePageToolbar.fb5f28330e', 'Show in sidebar')
   const sidebarToggleTooltip = showMobileButton
-    ? t('auto.components.mobile.MobilePageToolbar.e1c7b4a92d', 'Configure in Settings > Mobile.')
-    : t(
+    ? translate(
+        'auto.components.mobile.MobilePageToolbar.e1c7b4a92d',
+        'Configure in Settings > Mobile.'
+      )
+    : translate(
         'auto.components.mobile.MobilePageToolbar.f3d8e5b71a',
         'Adds the shortcut back to the sidebar.'
       )
@@ -53,7 +55,7 @@ export function MobilePageToolbar({
             size="icon"
             className="mp-page-toolbar-close size-7 shrink-0 rounded-full"
             onClick={onClose}
-            aria-label={t(
+            aria-label={translate(
               'auto.components.mobile.MobilePageToolbar.9883b58693',
               'Close Orca Mobile'
             )}
@@ -62,7 +64,7 @@ export function MobilePageToolbar({
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={6}>
-          {t('auto.components.mobile.MobilePageToolbar.ad2284a9e2', 'Close · Esc')}
+          {translate('auto.components.mobile.MobilePageToolbar.ad2284a9e2', 'Close · Esc')}
         </TooltipContent>
       </Tooltip>
     </div>

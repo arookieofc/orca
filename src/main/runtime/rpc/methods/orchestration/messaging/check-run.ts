@@ -1,27 +1,16 @@
-import type { MessageRow, MessageType } from '../../../../orchestration/db/orchestration-records'
-import type { OrchestrationDb } from '../../../../orchestration/db/orchestration-db'
-import type { MailboxDeliveryBatch } from '../../../../orchestration/db/messages/role-mailbox-delivery'
+import type { MessageRow, MessageType, OrchestrationDb } from '../../../../orchestration/db'
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import type { RpcContext } from '../../../core'
 import { OrchestrationError } from '../../../../orchestration/orchestration-error'
-import { formatMessageBanner } from '../../../../orchestration/mailbox/formatting/message-formatting'
-import {
-  deliveryReceipt,
-  exposeMessages,
-  handsOverBatch,
-  withReportFollowUps
-} from './mailbox-message-receipt'
+import { formatMessageBanner } from '../../../../orchestration/formatter'
+import { exposeMessages } from './mailbox-message-receipt'
 import { interruptedAcknowledgedCheck } from '../routing'
-import { routeAllMailboxPages } from './mailbox-page-routing'
+import { routeAllMailboxPages } from '../schemas'
 import { resolveRunScope } from '../runs/run-scope'
-import type { CheckParams } from '../../../../../../shared/rpc-contract/orchestration/orchestration-params'
+import type { CheckParams } from '../schemas'
 import type { z } from 'zod'
-import type { MessageWake } from '../../../../orchestration/mailbox/runtime-message-waiters'
-import type { OrchestrationEntryCaller } from '../../../../orchestration/addressing/orchestration-caller-identity'
+import type { OrchestrationSessionCaller } from '../../../../orchestration/orchestration-caller-identity'
 import { checkRunPendingMail } from './check-run-pending-mail'
-import type { CheckMailReconciliation } from './check-mail-reconciliation'
-import { withTakenRunCheckNext } from '../receipt-next'
-import { FEDERATION_RELAY_WAIT_REARM_MS } from '../../../../orchestration/federation/relay/federation-relay-scheduler'
 
 type CheckParamsInput = z.infer<typeof CheckParams>
 
@@ -31,15 +20,13 @@ export async function checkRunMailbox(args: {
   db: OrchestrationDb
   handle: string
   paneKey: string | undefined
-  callerSession: OrchestrationEntryCaller | undefined
+  callerSession: OrchestrationSessionCaller | undefined
   typeFilter: MessageType[] | undefined
   signal: AbortSignal | undefined
   legacyCoordinatorRunId: string | undefined
   revalidateLegacyCoordinator: (() => string) | undefined
   orchestrationCompatibilityEvidence: RpcContext['orchestrationCompatibilityEvidence']
   recordMutationReceipt: ((receipt: unknown) => void) | undefined
-  reconciliation: CheckMailReconciliation
-  revalidateCaller: () => void
 }): Promise<unknown> {
   const {
     params,
@@ -86,7 +73,6 @@ export async function checkRunMailbox(args: {
     )
   }
   const revalidateConsumer = (): void => {
-    args.revalidateCaller()
     revalidateLegacyCoordinator?.()
     const currentRun = resolveRunScope(runtime, {
       runId: run.id,
@@ -107,9 +93,6 @@ export async function checkRunMailbox(args: {
   revalidateConsumer()
 
   const pending = await checkRunPendingMail({ ...args, run, revalidateConsumer })
-  if (handsOverBatch(pending.result)) {
-    return pending.result
-  }
   try {
     revalidateConsumer()
   } catch (error) {
@@ -149,51 +132,50 @@ export async function checkRunMailbox(args: {
       : {})
   })
   const readPeek = () => db.getUnreadRunMailbox(run.id, 100, typeFilter)
-  const result = (batch: MailboxDeliveryBatch | undefined) => {
-    const receipt = deliveryReceipt({
-      mailbox: { runId: run.id },
-      batch,
-      acknowledged,
-      format: params.format === true || params.inject === true
-    })
-    return batch?.finalResponse ? receipt : withReportFollowUps(db, receipt)
+  const readDelivery = (wakeTypes?: MessageType[]) =>
+    db.getOrCreateRunDelivery({ runId: run.id, consumerGeneration: generation, wakeTypes })
+  let peeked = params.peek ? readPeek() : []
+  if (params.peek && peeked.length > 0) {
+    return peekResult(peeked)
   }
-  const takeDelivery = (wakeTypes?: MessageType[], wake?: MessageWake) =>
-    args.reconciliation.takeRole({
-      mailbox: { runId: run.id, mailboxHandle: address, consumerGeneration: generation, wakeTypes },
-      revalidate: revalidateConsumer,
-      respond: (batch) =>
-        batch?.finalResponse ? result(batch) : withTakenRunCheckNext(db, result(batch), run.id),
-      record: args.recordMutationReceipt,
-      wake
-    })
-  if (params.peek) {
-    const peeked = readPeek()
-    if (peeked.length > 0 || !params.wait) {
-      return peekResult(peeked)
+  let current = params.peek ? undefined : readDelivery(params.wait ? typeFilter : undefined)
+  if (current) {
+    return {
+      runId: run.id,
+      deliveryId: current.delivery.id,
+      messages: exposeMessages(current.messages),
+      count: current.messages.length,
+      replayed: current.replayed,
+      acknowledged: acknowledged ?? null,
+      timedOut: false,
+      cancelled: false,
+      connectionLost: false,
+      ...(params.format || params.inject
+        ? { formatted: current.messages.map(formatMessageBanner).join('\n\n') }
+        : {})
     }
-  } else {
-    const current = await takeDelivery(params.wait ? typeFilter : undefined)
-    if (current || !params.wait) {
-      return result(current)
+  }
+  if (!params.wait) {
+    if (params.peek) {
+      return peekResult([])
+    }
+    return {
+      runId: run.id,
+      deliveryId: null,
+      messages: [],
+      count: 0,
+      acknowledged: acknowledged ?? null,
+      timedOut: false,
+      cancelled: false,
+      connectionLost: false
     }
   }
 
-  const rearmRelays = setInterval(() => {
-    try {
-      runtime.ensureOrchestrationFederationRelay(run.id, { keepAwake: true })
-    } catch (error) {
-      console.warn('[orchestration] federation relay re-arm failed during check --wait', error)
-    }
-  }, FEDERATION_RELAY_WAIT_REARM_MS)
-  rearmRelays.unref?.()
-  const waitResult = await runtime
-    .waitForMessage(address, {
-      typeFilter: typeFilter as string[] | undefined,
-      timeoutMs: params.timeoutMs ?? undefined,
-      signal
-    })
-    .finally(() => clearInterval(rearmRelays))
+  const waitResult = await runtime.waitForMessage(address, {
+    typeFilter: typeFilter as string[] | undefined,
+    timeoutMs: params.timeoutMs ?? undefined,
+    signal
+  })
   try {
     revalidateConsumer()
   } catch (error) {
@@ -212,17 +194,58 @@ export async function checkRunMailbox(args: {
       'This mailbox consumer was replaced while waiting.'
     )
   }
-  if (waitResult === 'timed_out' || waitResult === 'cancelled') {
-    const ended = {
-      timedOut: waitResult === 'timed_out',
-      cancelled: waitResult === 'cancelled',
-      connectionLost: waitResult === 'cancelled' && signal?.aborted === true
+  if (waitResult === 'timed_out') {
+    if (params.peek) {
+      return { ...peekResult([]), timedOut: true, cancelled: false, connectionLost: false }
     }
-    return params.peek ? { ...peekResult([]), ...ended } : { ...result(undefined), ...ended }
+    return {
+      runId: run.id,
+      deliveryId: null,
+      messages: [],
+      count: 0,
+      acknowledged: acknowledged ?? null,
+      timedOut: true,
+      cancelled: false,
+      connectionLost: false
+    }
+  }
+  if (waitResult === 'cancelled') {
+    if (params.peek) {
+      return {
+        ...peekResult([]),
+        timedOut: false,
+        cancelled: true,
+        connectionLost: signal?.aborted === true
+      }
+    }
+    return {
+      runId: run.id,
+      deliveryId: null,
+      messages: [],
+      count: 0,
+      acknowledged: acknowledged ?? null,
+      timedOut: false,
+      cancelled: true,
+      connectionLost: signal?.aborted === true
+    }
   }
   if (params.peek) {
-    return { ...peekResult(readPeek()), timedOut: false, cancelled: false, connectionLost: false }
+    peeked = readPeek()
+    return { ...peekResult(peeked), timedOut: false, cancelled: false, connectionLost: false }
   }
-  const batch = await takeDelivery(typeFilter, waitResult)
-  return result(batch)
+  current = readDelivery(typeFilter)
+  return {
+    runId: run.id,
+    deliveryId: current?.delivery.id ?? null,
+    messages: exposeMessages(current?.messages ?? []),
+    count: current?.messages.length ?? 0,
+    replayed: current?.replayed ?? false,
+    acknowledged: acknowledged ?? null,
+    timedOut: false,
+    cancelled: false,
+    connectionLost: false,
+    ...(params.format && current
+      ? { formatted: current.messages.map(formatMessageBanner).join('\n\n') }
+      : {})
+  }
 }

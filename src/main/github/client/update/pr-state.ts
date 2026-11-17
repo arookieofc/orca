@@ -1,15 +1,13 @@
-import { invalidateReviewLookupsAfterPRMutation } from '../../pull-requests/refresh/pr-mutation-review-invalidation'
-import type { GitHubPullRequestStateUpdate } from '../../../../shared/work-items/issue-mutation-types'
-import { ghExecFileAsync } from '../../../git/command-runner/hosted-cli/gh-exec-file'
-import { acquire, release } from '../../execution/github-operation-slots'
-import { classifyPullRequestUpdateError } from '../../api/gh-error-classification'
-import type { LocalGitExecOptions } from '../../repositories/github-repository-identity'
-import { resolveGitHubRepoExecution } from '../../repositories/github-api-repository'
-import type { GitHubRepositoryIdentity as GitHubApiRepository } from '../../../../shared/github/repositories/repository-identity'
+import { invalidateReviewLookupsAfterPRMutation } from '../../pr-mutation-review-invalidation'
+import type { GitHubPullRequestStateUpdate } from '../../../../shared/issue-mutation-types'
 import {
-  codeHostFailure,
-  classifiedFailure
-} from '../../../../shared/source-control/code-host-failure-copy'
+  ghExecFileAsync,
+  acquire,
+  release,
+  classifyPullRequestUpdateError,
+  type LocalGitExecOptions
+} from '../../gh-utils'
+import { resolveGitHubRepoExecution, type GitHubApiRepository } from '../../github-api-repository'
 export async function updatePRState(
   repoPath: string,
   prNumber: number,
@@ -25,7 +23,7 @@ export async function updatePRState(
     localGitOptions
   )
   if (!ownerRepo) {
-    return codeHostFailure('github.repoUnresolved')
+    return { ok: false, error: 'Could not resolve GitHub owner/repo for this repository' }
   }
 
   await acquire()
@@ -38,13 +36,13 @@ export async function updatePRState(
         ...ghOptions
       }
     )
+    invalidateReviewLookupsAfterPRMutation(repoPath, connectionId)
     return { ok: true }
   } catch (err) {
     const message =
       err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error'
-    return classifiedFailure(classifyPullRequestUpdateError(message))
+    return { ok: false, error: classifyPullRequestUpdateError(message).message }
   } finally {
-    invalidateReviewLookupsAfterPRMutation(repoPath, connectionId)
     release()
   }
 }

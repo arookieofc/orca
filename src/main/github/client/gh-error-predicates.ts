@@ -1,14 +1,11 @@
-import type { PRRefreshOutcome } from '../../../shared/github/pull-requests/refresh/pull-request-refresh-types'
+import type { PRRefreshOutcome } from '../../../shared/github/pull-request-refresh-types'
 import {
   classifyPRRefreshError,
   safePRRefreshErrorMessage
-} from '../pull-requests/refresh/pr-refresh-error-classification'
-import { classifyGhError } from '../api/gh-error-classification'
+} from '../pr-refresh-error-classification'
+import { classifyGhError } from '../gh-utils'
 // Keep real error parsing available when tests mock gh-utils.
-import {
-  extractExecError,
-  parseRetryAfterMs
-} from '../../git/command-runner/process-capture/exec-error'
+import { extractExecError, parseRetryAfterMs } from '../../git/exec-error'
 export function isNoPullRequestError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err)
   return /no pull requests? found|could not find.*pull request/i.test(message)

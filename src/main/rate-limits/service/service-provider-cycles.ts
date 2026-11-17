@@ -1,9 +1,9 @@
 import { RateLimitServiceFullCycleApplication } from './service-full-cycle-application'
-import { fetchActiveClaudeRateLimits } from '../providers/claude/claude-active-usage-fetch'
-import { fetchCodexRateLimits } from '../providers/codex/codex-fetcher'
-import { fetchGrokRateLimits } from '../providers/grok/grok-fetcher'
-import { readGrokAuthSession } from '../providers/grok/grok-auth'
-import type { ProviderRateLimits } from '../../../shared/agent-usage/rate-limits/rate-limit-types'
+import { fetchClaudeRateLimits } from '../claude-fetcher'
+import { fetchCodexRateLimits } from '../codex-fetcher'
+import { fetchGrokRateLimits } from '../grok-fetcher'
+import { readGrokAuthSession } from '../grok-auth'
+import type { ProviderRateLimits } from './service-types'
 
 export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFullCycleApplication {
   protected async runFetchCodexOnlyCycle(signal: AbortSignal): Promise<void> {
@@ -40,7 +40,6 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
         ? Promise.resolve(missingWslCodexHome)
         : fetchCodexRateLimits({
             codexHomePath,
-            readingAccount: codexHome.readingAccount,
             networkProxySettings: this.networkProxySettingsResolver?.(),
             signal
           })
@@ -72,7 +71,6 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
 
     if (shouldApplyCodex) {
       this.trackActiveFailureStreak('codex', codex)
-      this.rememberUsageReadingAccount('codex', codexTarget, codexHomePath, codexProvenance)
     }
     this.updateState({
       ...this.state,
@@ -95,15 +93,10 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
     // Why: capture before the resolver await so an account switch during it invalidates both the snapshot and the state apply.
     const claudeGeneration = this.claudeFetchGeneration
     const claudeAuthPreparation = await this.claudeAuthPreparationResolver?.(claudeTarget)
-    if (signal.aborted || claudeGeneration !== this.claudeFetchGeneration) {
+    if (signal.aborted) {
       return
     }
     this.rememberClaudeAuthSnapshot(claudeAuthPreparation, claudeGeneration, claudeTarget)
-    // After the snapshot: statusLine posts are dropped until one names the selected account.
-    if (!this.isClaudeOAuthUsageEnabled()) {
-      this.updateState({ ...this.state, claude: this.claudeUsageWithoutOAuth() })
-      return
-    }
     const claudeProvenance = claudeAuthPreparation?.provenance ?? 'system'
     const previousState = this.state
 
@@ -112,12 +105,12 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
       claude: this.withFetchingStatus(previousState.claude, 'claude')
     })
 
-    const claude = await fetchActiveClaudeRateLimits({
+    const claude = await fetchClaudeRateLimits({
       authPreparation: claudeAuthPreparation,
       allowPtyFallback: this.shouldAllowClaudePtyFallback(claudeAuthPreparation),
       allowUsagePanelSupplement: this.shouldAllowClaudeUsagePanelSupplement(),
       networkProxySettings: this.networkProxySettingsResolver?.(),
-      signal: this.claudeUsageFetchSignal(signal)
+      signal
     }).catch((err): ProviderRateLimits => ({
       provider: 'claude',
       session: null,
@@ -143,8 +136,6 @@ export abstract class RateLimitServiceProviderCycles extends RateLimitServiceFul
 
     if (shouldApplyClaude) {
       this.trackActiveFailureStreak('claude', claude)
-      const home = claudeAuthPreparation?.configDir
-      this.rememberUsageReadingAccount('claude', claudeTarget, home, claudeProvenance)
     }
     this.updateState({
       ...this.state,

@@ -1,5 +1,4 @@
-import { createRemoteRefProbeCache } from '../git/remotes/remote-ref-probe-cache'
-import { isAzureDevOpsOrganizationName } from '../../shared/git/remotes/azure-devops-organization-name'
+import { createRemoteRefProbeCache } from '../git/remote-ref-probe-cache'
 
 export type AzureDevOpsRepoRef = {
   host: string
@@ -137,8 +136,7 @@ function parseVisualStudioUrl(url: URL): AzureDevOpsRepoRef | null {
 }
 
 function parseCloudSshPath(host: string, rawPath: string): AzureDevOpsRepoRef | null {
-  const sshHost = host.toLowerCase()
-  if (!isCloudSshHost(sshHost)) {
+  if (host.toLowerCase() !== 'ssh.dev.azure.com') {
     return null
   }
   const parts = splitPath(rawPath)
@@ -149,27 +147,7 @@ function parseCloudSshPath(host: string, rawPath: string): AzureDevOpsRepoRef | 
   if (!organization || !project || !repository) {
     return null
   }
-  if (sshHost === 'ssh.dev.azure.com') {
-    return makeCloudRef('dev.azure.com', organization, project, repository)
-  }
-  // Older orgs' SSH host; match what their https://<org>.visualstudio.com remotes resolve to.
-  if (!isAzureDevOpsOrganizationName(organization)) {
-    return null
-  }
-  const webHost = `${organization.toLowerCase()}.visualstudio.com`
-  const origin = `https://${webHost}`
-  return {
-    host: webHost,
-    organization,
-    project,
-    repository,
-    apiBaseUrl: joinUrl(origin, [project]),
-    webBaseUrl: joinUrl(origin, [project, '_git', repository])
-  }
-}
-
-function isCloudSshHost(host: string): boolean {
-  return host === 'ssh.dev.azure.com' || host === 'vs-ssh.visualstudio.com'
+  return makeCloudRef('dev.azure.com', organization, project, repository)
 }
 
 function parseScpLike(remoteUrl: string): AzureDevOpsRepoRef | null {
@@ -189,7 +167,7 @@ export function parseAzureDevOpsRepoRef(remoteUrl: string): AzureDevOpsRepoRef |
   try {
     const url = new URL(trimmed)
     const host = url.hostname.toLowerCase()
-    if (isCloudSshHost(host)) {
+    if (host === 'ssh.dev.azure.com') {
       return parseCloudSshPath(host, url.pathname)
     }
     if (!['http:', 'https:', 'ssh:', 'git+ssh:'].includes(url.protocol.toLowerCase())) {

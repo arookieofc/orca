@@ -1,51 +1,37 @@
-import type { OrcadManagedDeferral } from '../../../shared/remote-runtime/orcad-lifecycle/orcad-managed-runtime'
-import type { OrcadActivationRecord } from '../activation/orcad-activation-record'
+import type { OrcadManagedDeferral } from '../../../shared/orcad-managed-runtime'
+import { compareAppVersions } from '../../../shared/app-version'
 
 type RecordedDeferral = OrcadManagedDeferral & { deferredAt: string }
 
-/** Which activation a host is on: a version alone repeats when a host moves away and back. */
-export type OrcadIncumbent = Pick<OrcadActivationRecord, 'active' | 'activatedAt'>
-
-type StoredDeferral = RecordedDeferral & {
-  /** The host's activation when the deferral was recorded. */
-  incumbentAtDeferral: OrcadIncumbent
-}
-
-const deferrals = new Map<string, StoredDeferral>()
+const deferrals = new Map<string, RecordedDeferral>()
 
 export function recordManagedOrcadUpdateDeferral(
   environmentId: string,
   deferral: OrcadManagedDeferral,
-  incumbent: OrcadIncumbent,
   now = new Date()
 ): void {
-  deferrals.set(environmentId, {
-    ...deferral,
-    deferredAt: now.toISOString(),
-    incumbentAtDeferral: { active: incumbent.active, activatedAt: incumbent.activatedAt }
-  })
+  deferrals.set(environmentId, { ...deferral, deferredAt: now.toISOString() })
 }
 
 export function clearManagedOrcadUpdateDeferral(environmentId: string): void {
   deferrals.delete(environmentId)
 }
 
-/** Forget a deferral once the host's activation moves, since it described a host state that is gone
- *  (builds of one release differ only by an unorderable content hash, #38400), or once its candidate
- *  is the build the host runs, since nothing is left to update. */
+function readManagedOrcadUpdateDeferral(environmentId: string): RecordedDeferral | null {
+  return deferrals.get(environmentId) ?? null
+}
+
+/** Forget deferrals resolved by another desktop activating the candidate or a newer release. */
 export function currentManagedOrcadUpdateDeferral(
   environmentId: string,
-  incumbent: OrcadIncumbent
+  activeVersion: string | null
 ): RecordedDeferral | null {
-  const stored = deferrals.get(environmentId)
-  if (!stored) {
-    return null
-  }
-  const { incumbentAtDeferral, ...deferral } = stored
+  const deferral = readManagedOrcadUpdateDeferral(environmentId)
   if (
-    incumbent.active === deferral.candidateVersion ||
-    incumbentAtDeferral.active !== incumbent.active ||
-    incumbentAtDeferral.activatedAt !== incumbent.activatedAt
+    deferral &&
+    activeVersion &&
+    (activeVersion === deferral.candidateVersion ||
+      compareAppVersions(activeVersion, deferral.candidateVersion) > 0)
   ) {
     clearManagedOrcadUpdateDeferral(environmentId)
     return null

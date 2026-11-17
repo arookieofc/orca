@@ -3,7 +3,6 @@
 import type { ProviderProcessCloseResult } from './provider-process-close'
 
 export type ProviderAcquisitionConnection = {
-  readonly lastCloseResult?: ProviderProcessCloseResult | null
   close(): Promise<boolean | ProviderProcessCloseResult>
   onExit(listener: () => void): void
 }
@@ -59,18 +58,11 @@ export class ProviderAcquisitionStarts<Connection extends ProviderAcquisitionCon
       return true
     }
     const result = await connection.close().catch(() => false)
-    const proven =
-      typeof result === 'boolean'
-        ? result
-        : result.root === 'exited' || result.killDelivered === true
+    const proven = typeof result === 'boolean' ? result : result.root === 'exited'
     if (proven && this.failed.get(sessionId) === connection) {
       this.failed.delete(sessionId)
     }
     return proven
-  }
-
-  failedConnection(sessionId: string): Connection | undefined {
-    return this.failed.get(sessionId)
   }
 
   failedSessionIds(): string[] {

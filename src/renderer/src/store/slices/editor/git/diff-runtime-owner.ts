@@ -1,5 +1,5 @@
 import type { AppState } from '../../../types'
-import { runtimeEnvironmentIdUnlessTwin } from '@/lib/workspace/ownership/resolve-owner'
+import { runtimeEnvironmentIdUnlessTwin } from '@/lib/resolve-owner'
 
 export function resolveDiffRuntimeEnvironmentId(
   state: AppState,

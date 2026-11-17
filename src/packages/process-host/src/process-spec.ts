@@ -5,6 +5,10 @@ import type {
   StdioOptions
 } from 'node:child_process'
 
+export type ChildProcessHandle = ChildProcess
+
+export type SpawnedProcess = ChildProcess
+
 export type ProcessSpec = {
   /** Prefer an absolute Windows path; stripped Electron PATHs may not resolve bare names. */
   program: string
@@ -13,7 +17,7 @@ export type ProcessSpec = {
   env?: NodeJS.ProcessEnv
   timeoutMs?: number | null
   /** Written to stdin then closed. Omit to leave stdin empty and closed. */
-  input?: string | Uint8Array
+  input?: string
   /** Cap on captured stdout/stderr; output past it is discarded. */
   maxOutputBytes?: number
   /** Capture stdout as bytes without decoding; stdout stays empty in this mode. */
@@ -30,19 +34,21 @@ export type ProcessSpec = {
   stdio?: NodeSpawnOptions['stdio']
   /** Bun and Node require JSON for an IPC channel shared between the two runtimes. */
   serialization?: NodeSpawnOptions['serialization']
-  /** Native POSIX stops require group proof; the final caller deadline never releases physical ownership. */
+  /** Await tree termination or observed root exit, then settle at the final deadline if unverified. */
   terminationBarrier?: boolean | ProcessTerminationBarrier
-  /** Normal close or verified termination; native POSIX close after stop alone is insufficient. */
+  /** Called once when the child exits or tree termination is verified. */
   onChildTerminated?: () => void
   /** Every raw stderr chunk as it arrives, including any past the capture cap. */
   onStderr?: (chunk: Buffer | string) => void
 }
 
+export type PipedChildProcess = ChildProcessWithoutNullStreams
+
 export type PipedProcessSpec = Omit<ProcessSpec, 'stdio'> & {
   stdio?: 'pipe' | ['pipe', 'pipe', 'pipe', ...Exclude<StdioOptions, string>]
 }
 
-export type PipedProcessSpawner = (spec: PipedProcessSpec) => ChildProcessWithoutNullStreams
+export type PipedProcessSpawner = (spec: PipedProcessSpec) => PipedChildProcess
 
 export type ProcessTerminationBarrier = {
   observeStderr?: (chunk: Buffer | string) => void

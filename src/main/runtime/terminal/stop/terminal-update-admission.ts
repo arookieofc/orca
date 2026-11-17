@@ -20,8 +20,7 @@ type ListLiveSessionIds = () => Promise<readonly string[] | null>
 
 // Lazy: the daemon modules' xterm polyfill defines a global `window` on import.
 async function listLiveDaemonSessionIds(): Promise<string[] | null> {
-  const { listLiveDaemonPtyIds } =
-    await import('../../../daemon/providers/lifecycle/daemon-provider-state')
+  const { listLiveDaemonPtyIds } = await import('../../../daemon/daemon-provider-state')
   return listLiveDaemonPtyIds()
 }
 

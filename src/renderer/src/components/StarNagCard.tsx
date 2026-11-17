@@ -3,14 +3,13 @@ import { ExternalLink, Star, X } from 'lucide-react'
 import { Card } from './ui/card'
 import { Button } from './ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 const ORCA_REPO_URL = 'https://github.com/stablyai/orca'
 type StarNagMode = 'gh' | 'web'
 
 /** Main owns visibility thresholds and GitHub checks. Keep the card until explicit action; nonterminal exits persist a cooldown. */
 export function StarNagCard(): React.JSX.Element | null {
-  const t = useTranslate()
   const [visible, setVisible] = useState(false)
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<StarNagMode>('gh')
@@ -134,7 +133,7 @@ export function StarNagCard(): React.JSX.Element | null {
             <div className="flex items-center gap-2">
               <Star className="size-4 fill-amber-400/60 text-amber-400/80" />
               <h3 id="star-nag-heading" className="text-sm font-semibold">
-                {t('auto.components.StarNagCard.5f6df21046', 'Enjoying Orca?')}
+                {translate('auto.components.StarNagCard.5f6df21046', 'Enjoying Orca?')}
               </h3>
             </div>
             <Button
@@ -143,14 +142,14 @@ export function StarNagCard(): React.JSX.Element | null {
               className="size-7 shrink-0"
               onClick={handleClose}
               disabled={busy}
-              aria-label={t('auto.components.StarNagCard.b5e685e4d9', 'Dismiss')}
+              aria-label={translate('auto.components.StarNagCard.b5e685e4d9', 'Dismiss')}
             >
               <X className="size-3.5" />
             </Button>
           </div>
 
           <p className="text-sm text-muted-foreground">
-            {t(
+            {translate(
               'auto.components.StarNagCard.30c36231c1',
               'Orca is open source. If it helped today, a GitHub star helps other developers find it.'
             )}
@@ -171,11 +170,11 @@ export function StarNagCard(): React.JSX.Element | null {
               )}
               {busy
                 ? mode === 'web'
-                  ? t('auto.components.StarNagCard.d32015fec7', 'Opening...')
-                  : t('auto.components.StarNagCard.af3c9bbb37', 'Starring…')
+                  ? translate('auto.components.StarNagCard.d32015fec7', 'Opening...')
+                  : translate('auto.components.StarNagCard.af3c9bbb37', 'Starring…')
                 : mode === 'web'
-                  ? t('auto.components.StarNagCard.157bb5ecbb', 'Open GitHub')
-                  : t('auto.components.StarNagCard.2d67b6c849', 'Star on GitHub')}
+                  ? translate('auto.components.StarNagCard.157bb5ecbb', 'Open GitHub')
+                  : translate('auto.components.StarNagCard.2d67b6c849', 'Star on GitHub')}
             </Button>
             <Button
               variant="secondary"
@@ -184,7 +183,7 @@ export function StarNagCard(): React.JSX.Element | null {
               onClick={handleLater}
               disabled={busy}
             >
-              {t('auto.components.StarNagCard.8c967b4d15', 'Later')}
+              {translate('auto.components.StarNagCard.8c967b4d15', 'Later')}
             </Button>
           </div>
         </div>

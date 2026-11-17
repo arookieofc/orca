@@ -7,21 +7,6 @@
     "32354557bece": {
       "capabilities": "unprobed"
     },
-    "446c5090cdcc": {
-      "status": "fulfilled",
-      "startedAt": 0,
-      "settledAt": 0,
-      "value": {
-        "agentLaunch": false,
-        "branchIntentV2": false,
-        "branchIntentV2Request": false,
-        "hostPlatform": {
-          "$rpc": "null"
-        },
-        "tasksSupported": true,
-        "worktreeCreateIdempotency": false
-      }
-    },
     "452610f318ae": {
       "name": "status.get#2",
       "ordinal": 3,
@@ -85,15 +70,26 @@
         }
       }
     },
+    "8a8da145ef52": {
+      "capabilities": {
+        "agentLaunch": false,
+        "hostPlatform": {
+          "$rpc": "null"
+        },
+        "tasksSupported": true,
+        "worktreeCreateIdempotency": false
+      }
+    },
     "9270aeb7d9c6": {
       "status": "pending",
       "startedAt": 0
     },
-    "a161e33447b4": {
-      "capabilities": {
+    "c7a06214cf1f": {
+      "status": "fulfilled",
+      "startedAt": 0,
+      "settledAt": 0,
+      "value": {
         "agentLaunch": false,
-        "branchIntentV2": false,
-        "branchIntentV2Request": false,
         "hostPlatform": {
           "$rpc": "null"
         },
@@ -176,10 +172,10 @@
           "sender": ["523bdccb77ba", "cc2699f90bbe"],
           "payloads": ["d08f74d65ee6", "f1834177e593"],
           "settlements": {
-            "probe": "446c5090cdcc",
+            "probe": "c7a06214cf1f",
             "migrate": "eb79a9b3682a"
           },
-          "state": "a161e33447b4",
+          "state": "8a8da145ef52",
           "effects": []
         }
       }

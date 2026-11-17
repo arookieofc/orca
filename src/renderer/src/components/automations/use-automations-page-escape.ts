@@ -1,30 +1,29 @@
 import { useEffect } from 'react'
-import { useAppStore } from '@/store/index'
-import { hasVisibleOverlay } from '@/lib/overlay-interaction/visible-overlay'
+import { hasVisibleOverlay } from '@/lib/visible-overlay'
 import type { AutomationsPageLocalState } from './use-automations-page-local-state'
 import type { AutomationsPageStoreState } from './use-automations-page-store-state'
-import { addAppKeyListener, removeAppKeyListener } from '@/lib/keyboard/app-keyboard-router'
-import type { AutomationsPageNavigation } from './automations-page-navigation'
+import { addAppKeyListener, removeAppKeyListener } from '@/lib/app-keyboard-router'
 
 export function useAutomationsPageEscape({
   store,
-  local,
-  navigation
+  local
 }: {
   store: AutomationsPageStoreState
   local: AutomationsPageLocalState
-  navigation: AutomationsPageNavigation
 }): void {
-  const { activeModal, closeAutomationsPage } = store
+  const { activeModal, closeAutomationsPage, setPendingAutomationRunNavigation } = store
   const {
     createOpen,
     deleteTarget,
     externalDeleteTarget,
     isDetailOpen,
-    activePaneTab,
+    selectedAutomationRunPageId,
     pageView,
     runPageOrigin,
-    runNotFound
+    setPageView,
+    setActivePaneTab,
+    setIsDetailOpen,
+    setSelectedAutomationRunPageId
   } = local
   useEffect(() => {
     if (createOpen || deleteTarget || externalDeleteTarget || activeModal !== 'none') {
@@ -64,51 +63,53 @@ export function useAutomationsPageEscape({
         }
       }
 
-      event.preventDefault()
-      if (pageView !== 'run' && !isDetailOpen && pageView !== 'runs') {
-        closeAutomationsPage()
-        return
-      }
-      // Why: Escape goes to the parent page; when that is the previous history entry, step
-      // back to it rather than adding a new one, so Forward still returns here.
-      useAppStore.getState().setAutomationsPageNextVisitMode('return')
-      // Escape undoes the last step: a run returns where it was opened from.
       if (pageView === 'run') {
-        if (runNotFound) {
-          if (runNotFound.kind === 'run' && isDetailOpen) {
-            navigation.returnFromRun(runPageOrigin)
-          } else {
-            navigation.showList()
-          }
-          return
-        }
-        navigation.returnFromRun(runPageOrigin)
+        event.preventDefault()
+        setPendingAutomationRunNavigation(null)
+        setSelectedAutomationRunPageId(null)
+        setPageView(runPageOrigin === 'automation' ? 'automations' : 'runs')
+        setIsDetailOpen(runPageOrigin === 'automation')
+        setActivePaneTab(runPageOrigin === 'automation' ? 'runs' : 'overview')
         return
       }
+
       if (isDetailOpen) {
-        if (activePaneTab === 'runs') {
-          navigation.showSelectedAutomation()
+        event.preventDefault()
+        if (selectedAutomationRunPageId) {
+          setSelectedAutomationRunPageId(null)
           return
         }
-        navigation.showList()
+        setIsDetailOpen(false)
+        setActivePaneTab('overview')
         return
       }
-      navigation.showList()
+
+      if (pageView === 'runs') {
+        event.preventDefault()
+        setPageView('automations')
+        return
+      }
+
+      event.preventDefault()
+      closeAutomationsPage()
     }
 
     addAppKeyListener('keydown', onKeyDown)
     return () => removeAppKeyListener('keydown', onKeyDown)
   }, [
     activeModal,
-    activePaneTab,
     closeAutomationsPage,
     createOpen,
     deleteTarget,
     externalDeleteTarget,
     isDetailOpen,
-    navigation,
     pageView,
-    runNotFound,
-    runPageOrigin
+    runPageOrigin,
+    selectedAutomationRunPageId,
+    setActivePaneTab,
+    setIsDetailOpen,
+    setSelectedAutomationRunPageId,
+    setPendingAutomationRunNavigation,
+    setPageView
   ])
 }

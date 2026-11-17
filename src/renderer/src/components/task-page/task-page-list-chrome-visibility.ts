@@ -1,4 +1,4 @@
-import type { TaskProvider } from '../../../../shared/work-items/task-providers'
+import type { TaskProvider } from '../../../../shared/task-providers'
 
 export type TaskPageListChromeVisibilityState = {
   taskSource: TaskProvider

@@ -1,18 +1,23 @@
-import { lazy, Suspense } from 'react'
+import { memo } from 'react'
 import { View, StyleSheet } from 'react-native'
-import { mobilePrSidebarStyles } from '../source-control/review/pull-request/mobile-pr-sidebar-styles'
-import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { MobileSourceControlPanel } from '../source-control/MobileSourceControlPanel'
+import { MobileFileExplorerPanel } from '../files/MobileFileExplorerPanel'
+import { mobilePrSidebarStyles } from '../components/pr-sidebar/mobile-pr-sidebar-styles'
 import { useMobileDockResize } from './use-mobile-dock-resize'
-import type { SessionDockPanelContentProps } from './SessionDockPanelContent'
+import type { ActivePanel } from './session-panel-host'
 
-type Props = SessionDockPanelContentProps & { availableWidth: number }
+type Props = {
+  activePanel: Exclude<ActivePanel, null>
+  hostId: string
+  worktreeId: string
+  name: string
+  availableWidth: number
+  onRequestClose: () => void
+  onFileOpenStart?: () => void
+  onOpenedFileDiff?: (relativePath: string) => void
+}
 
-// Panels load with the first dock open so phone sessions, which never dock, skip Source Control and Files code.
-const SessionDockPanelContent = lazy(() =>
-  import('./SessionDockPanelContent').then((module) => ({
-    default: module.SessionDockPanelContent
-  }))
-)
+type DockPanelContentProps = Omit<Props, 'availableWidth'>
 
 // Keep drag width state in this subtree; terminal refits follow frame onLayout and need no width prop.
 export function SessionDockColumn({
@@ -21,28 +26,65 @@ export function SessionDockColumn({
   worktreeId,
   name,
   availableWidth,
-  onRequestClose
+  onRequestClose,
+  onFileOpenStart,
+  onOpenedFileDiff
 }: Props) {
-  useMobileColorScheme()
   const { dockWidth, panHandlers } = useMobileDockResize(availableWidth)
   return (
     <View style={[mobilePrSidebarStyles.dockColumn, { width: dockWidth }]}>
       {/* Dedicated drag handle over the dock's left border — a leaf overlay so the
           inner ScrollView can't intercept the gesture on Android. */}
       <View style={styles.resizeHandle} {...panHandlers} />
-      {/* The column frame paints at once; its panel fills in from local disk with no spinner. */}
-      <Suspense fallback={null}>
-        <SessionDockPanelContent
-          activePanel={activePanel}
-          hostId={hostId}
-          worktreeId={worktreeId}
-          name={name}
-          onRequestClose={onRequestClose}
-        />
-      </Suspense>
+      <DockPanelContent
+        activePanel={activePanel}
+        hostId={hostId}
+        worktreeId={worktreeId}
+        name={name}
+        onRequestClose={onRequestClose}
+        onFileOpenStart={onFileOpenStart}
+        onOpenedFileDiff={onOpenedFileDiff}
+      />
     </View>
   )
 }
+
+// Width-independent panel props let memo skip content rerenders during resize.
+const DockPanelContent = memo(function DockPanelContent({
+  activePanel,
+  hostId,
+  worktreeId,
+  name,
+  onRequestClose,
+  onFileOpenStart,
+  onOpenedFileDiff
+}: DockPanelContentProps) {
+  // Reuse the source-control hub so dock icon switches retain commit draft, visited tabs and scroll.
+  if (activePanel === 'sourceControl' || activePanel === 'pr') {
+    return (
+      <MobileSourceControlPanel
+        hostId={hostId}
+        worktreeId={worktreeId}
+        name={name}
+        origin="session"
+        embedded
+        initialTab={activePanel === 'pr' ? 'pr' : 'changes'}
+        onRequestClose={onRequestClose}
+        onFileOpenStart={onFileOpenStart}
+        onOpenedFileDiff={onOpenedFileDiff}
+      />
+    )
+  }
+  return (
+    <MobileFileExplorerPanel
+      hostId={hostId}
+      worktreeId={worktreeId}
+      name={name}
+      embedded
+      onRequestClose={onRequestClose}
+    />
+  )
+})
 
 const RESIZE_EDGE_WIDTH = 24
 

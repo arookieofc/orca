@@ -1,15 +1,18 @@
-import type { TerminalTab } from '../../../shared/workspace-layout/terminal-tab-types'
-import type { WorkspaceSessionState } from '../../../shared/workspace-session/workspace-session-state-types'
+import type { TerminalTab } from '../../../shared/terminal-tab-types'
+import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
 import { getRepoIdFromWorktreeId } from '../../../shared/worktree/id'
-import { worktreeWorkspaceKey } from '../../../shared/workspace/identity/workspace-scope'
-import { sessionFieldsRemovedWithWorkspace } from '../../orca-profiles/project-transfer/profile-project-session-field-disposition'
-import { markdownFileIdCandidates } from '../../orca-profiles/project-transfer/profile-session-markdown-transfer'
+import {
+  getWorktreeIdFromHostIdentity,
+  isWorktreeHostIdentity
+} from '../../../shared/worktree/host-qualified-identity'
+import { worktreeWorkspaceKey } from '../../../shared/workspace-scope'
+import { SESSION_FIELDS_PRUNED_BY_OWNER_KEY } from '../../orca-profiles/profile-project-session-field-disposition'
 
-const OWNER_KEYED_FIELDS = sessionFieldsRemovedWithWorkspace('ownerKey')
-const OWNER_TAB_KEYED_FIELDS = sessionFieldsRemovedWithWorkspace('ownerTabKey')
-
-/** IDs a removed workspace's files may use in markdownFrontmatterVisible. */
-export type RemovedOwnerFileIds = Set<string>
+// Repo-keyed topology revisions advance rather than delete; host-qualified recency keys need a scan.
+export const OWNER_KEYED_SESSION_FIELDS_DELETED_WITH_THEIR_OWNER =
+  SESSION_FIELDS_PRUNED_BY_OWNER_KEY.filter(
+    (field) => field !== 'terminalTopologyRevisionByRepoId' && field !== 'lastVisitedAtByWorktreeId'
+  )
 
 export function createMinimalPersistedTerminalTab(args: {
   worktreeId: string
@@ -43,35 +46,17 @@ export function deleteOwnerKeyedSessionFields(
   next: WorkspaceSessionState,
   ownerKey: string,
   removedTabIds: Set<string>,
-  options: { advanceTerminalTopologyRevision?: boolean } = {},
-  removedFileIds: RemovedOwnerFileIds = new Set()
+  options: { advanceTerminalTopologyRevision?: boolean } = {}
 ): void {
-  // Why both: unified terminal tabs can outlive their legacy row, and their layouts key by entityId.
-  const ownerTabIds = new Set((next.tabsByWorktree?.[ownerKey] ?? []).map((tab) => tab.id))
-  for (const tab of next.unifiedTabs?.[ownerKey] ?? []) {
-    if (tab.contentType === 'terminal') {
-      ownerTabIds.add(tab.entityId)
-      ownerTabIds.add(tab.id)
-    }
-  }
+  const removedTerminalTabs = next.tabsByWorktree?.[ownerKey] ?? []
   if (next.tabsByWorktree) {
     delete next.tabsByWorktree[ownerKey]
   }
-  for (const tabId of ownerTabIds) {
-    removedTabIds.add(tabId)
-    for (const field of OWNER_TAB_KEYED_FIELDS) {
-      const record = next[field] as Record<string, unknown> | undefined
-      if (record) {
-        delete record[tabId]
-      }
-    }
-    if (next.activeTabId === tabId) {
+  for (const tab of removedTerminalTabs) {
+    removedTabIds.add(tab.id)
+    delete next.terminalLayoutsByTabId[tab.id]
+    if (next.activeTabId === tab.id) {
       next.activeTabId = null
-    }
-  }
-  for (const file of next.openFilesByWorktree?.[ownerKey] ?? []) {
-    for (const id of markdownFileIdCandidates(file.filePath, ownerKey, file.runtimeEnvironmentId)) {
-      removedFileIds.add(id)
     }
   }
   if (options.advanceTerminalTopologyRevision) {
@@ -92,10 +77,19 @@ export function deleteOwnerKeyedSessionFields(
     }
   }
   // Share the removal census so new fields cannot be pruned on only one path.
-  for (const field of OWNER_KEYED_FIELDS) {
+  for (const field of OWNER_KEYED_SESSION_FIELDS_DELETED_WITH_THEIR_OWNER) {
     const record = next[field] as Record<string, unknown> | undefined
     if (record) {
       delete record[ownerKey]
+    }
+  }
+  // Include host-qualified executionHostId|worktreeId keys.
+  if (next.lastVisitedAtByWorktreeId) {
+    for (const key of Object.keys(next.lastVisitedAtByWorktreeId)) {
+      const rawId = isWorktreeHostIdentity(key) ? getWorktreeIdFromHostIdentity(key) : key
+      if (key === ownerKey || rawId === ownerKey) {
+        delete next.lastVisitedAtByWorktreeId[key]
+      }
     }
   }
   // Worktree owners are raw ids, but the active key stores their canonical worktree: form.

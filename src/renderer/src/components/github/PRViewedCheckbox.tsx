@@ -1,8 +1,8 @@
 import React from 'react'
 import { Check, LoaderCircle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/class-names'
-import { useTranslate } from '@/i18n/use-translate'
+import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
 
 export function PRViewedCheckbox({
   checked,
@@ -15,7 +15,6 @@ export function PRViewedCheckbox({
   filePath: string
   onToggle: () => void
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -23,13 +22,11 @@ export function PRViewedCheckbox({
           type="button"
           role="checkbox"
           aria-checked={checked}
-          aria-label={
-            checked
-              ? t('github.viewed.unmarkFile', 'Unmark {{path}} as viewed', {
-                  path: filePath
-                })
-              : t('github.viewed.markFile', 'Mark {{path}} as viewed', { path: filePath })
-          }
+          aria-label={translate(
+            'auto.components.GitHubItemDialog.2d89a38d9d',
+            '{{value0}} {{value1}} as viewed',
+            { value0: checked ? 'Unmark' : 'Mark', value1: filePath }
+          )}
           disabled={pending}
           onClick={(event) => {
             event.stopPropagation()
@@ -55,13 +52,13 @@ export function PRViewedCheckbox({
               <Check className="size-3" strokeWidth={3} />
             ) : null}
           </span>
-          <span>{t('auto.components.GitHubItemDialog.af924014f8', 'Viewed')}</span>
+          <span>{translate('auto.components.GitHubItemDialog.af924014f8', 'Viewed')}</span>
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={4}>
         {checked
-          ? t('auto.components.GitHubItemDialog.ba8e329d92', 'Unmark viewed')
-          : t('auto.components.GitHubItemDialog.16c1abe76c', 'Mark viewed')}
+          ? translate('auto.components.GitHubItemDialog.ba8e329d92', 'Unmark viewed')
+          : translate('auto.components.GitHubItemDialog.16c1abe76c', 'Mark viewed')}
       </TooltipContent>
     </Tooltip>
   )

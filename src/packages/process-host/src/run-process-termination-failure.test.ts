@@ -1,9 +1,6 @@
-import { ChildProcess } from 'node:child_process'
-import type * as ChildProcessModule from 'node:child_process'
-import { PassThrough } from 'node:stream'
+import { EventEmitter } from 'node:events'
+import type { ChildProcess } from 'node:child_process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-const { groupExists } = vi.hoisted(() => ({ groupExists: vi.fn(() => true) }))
 
 const { forceTerminateProcessTreeMock, signalProcessTreeMock, spawnMock } = vi.hoisted(() => ({
   forceTerminateProcessTreeMock: vi.fn(),
@@ -11,35 +8,26 @@ const { forceTerminateProcessTreeMock, signalProcessTreeMock, spawnMock } = vi.h
   spawnMock: vi.fn()
 }))
 
-vi.mock('node:child_process', async (importOriginal) => ({
-  ...(await importOriginal<typeof ChildProcessModule>()),
-  spawn: spawnMock,
-  spawnSync: vi.fn()
-}))
+vi.mock('node:child_process', () => ({ spawn: spawnMock, spawnSync: vi.fn() }))
 vi.mock('./process-tree-termination', () => ({
-  processGroupExists: groupExists,
   forceTerminateProcessTree: forceTerminateProcessTreeMock,
   signalProcessTree: signalProcessTreeMock
 }))
 
 import { runProcess } from './run-process'
 
-class FakeProcess extends ChildProcess {
-  override pid = 1234
-  override kill = vi.fn(() => true)
-  override unref = vi.fn()
-  override stdin = new PassThrough()
-  override stdout = new PassThrough()
-  override stderr = new PassThrough()
-}
-
-function mockChild(): FakeProcess {
-  return new FakeProcess()
+function mockChild(): ChildProcess {
+  const child = new EventEmitter() as EventEmitter & Record<string, unknown>
+  child.pid = 1234
+  child.kill = vi.fn(() => true)
+  child.stdin = Object.assign(new EventEmitter(), { end: vi.fn() })
+  child.stdout = new EventEmitter()
+  child.stderr = new EventEmitter()
+  return child as unknown as ChildProcess
 }
 
 describe('runProcess termination failure', () => {
   beforeEach(() => {
-    groupExists.mockReturnValue(true)
     vi.useFakeTimers()
     signalProcessTreeMock.mockResolvedValue(false)
     forceTerminateProcessTreeMock.mockResolvedValue(false)
@@ -48,6 +36,19 @@ describe('runProcess termination failure', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.clearAllMocks()
+  })
+
+  it('reports ordinary child close exactly once', async () => {
+    const child = mockChild()
+    const onChildTerminated = vi.fn()
+    spawnMock.mockReturnValue(child)
+    const pending = runProcess({ program: 'git', timeoutMs: null, onChildTerminated })
+
+    child.emit('close', 0, null)
+    child.emit('close', 0, null)
+
+    await expect(pending).resolves.toMatchObject({ code: 0 })
+    expect(onChildTerminated).toHaveBeenCalledOnce()
   })
 
   it('does not report a live-child error before its eventual close', async () => {
@@ -59,43 +60,30 @@ describe('runProcess termination failure', () => {
 
     child.emit('error', new Error('delivery failed'))
     expect(onChildTerminated).not.toHaveBeenCalled()
-    groupExists.mockReturnValue(false)
     child.emit('close', null, 'SIGKILL')
 
     await rejection
     expect(onChildTerminated).toHaveBeenCalledOnce()
   })
 
-  it.skipIf(process.platform === 'win32')(
-    'holds a closed root until the barrier deadline without releasing its unverified group',
-    async () => {
-      const child = mockChild()
-      spawnMock.mockReturnValue(child)
-      const onChildTerminated = vi.fn()
-      const pending = runProcess({
-        program: 'git',
-        timeoutMs: 10,
-        terminationBarrier: true,
-        onChildTerminated
-      })
-      let settled = false
-      void pending.then(() => {
-        settled = true
-      })
+  it('holds the result until the barrier deadline when tree termination cannot be verified', async () => {
+    const child = mockChild()
+    spawnMock.mockReturnValue(child)
+    const pending = runProcess({ program: 'git', timeoutMs: 10, terminationBarrier: true })
+    let settled = false
+    void pending.then(() => {
+      settled = true
+    })
 
-      await vi.advanceTimersByTimeAsync(10)
-      await vi.advanceTimersByTimeAsync(2_000)
-      expect(settled).toBe(false)
-      child.emit('exit', null, 'SIGKILL')
-      child.emit('close', null, 'SIGKILL')
+    await vi.advanceTimersByTimeAsync(10)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(settled).toBe(false)
+    child.emit('exit', null, 'SIGKILL')
 
-      expect(settled).toBe(false)
-      expect(onChildTerminated).not.toHaveBeenCalled()
-      await vi.advanceTimersByTimeAsync(10_000)
-      await expect(pending).resolves.toMatchObject({ timedOut: true })
-      expect(onChildTerminated).not.toHaveBeenCalled()
-    }
-  )
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(10_000)
+    await expect(pending).resolves.toMatchObject({ timedOut: true })
+  })
 
   // Windows takes the taskkill branch, which never consults forceTerminateProcessTree.
   it.skipIf(process.platform === 'win32')(
@@ -140,12 +128,11 @@ describe('runProcess termination failure', () => {
 
     await expect(pending).resolves.toMatchObject({ code: null, timedOut: true })
     expect(onChildTerminated).not.toHaveBeenCalled()
-    groupExists.mockReturnValue(false)
     child.emit('close', null, 'SIGKILL')
     expect(onChildTerminated).toHaveBeenCalledOnce()
   })
 
-  it('retains ownership after root exit until the bounded unverified result', async () => {
+  it('retains a root exit observed before barrier shutdown', async () => {
     const controller = new AbortController()
     const child = mockChild()
     spawnMock.mockReturnValue(child)
@@ -156,17 +143,9 @@ describe('runProcess termination failure', () => {
       terminationBarrier: true
     })
 
-    let settled = false
-    void pending.then(() => {
-      settled = true
-    })
     child.emit('exit', 0, null)
     controller.abort()
     await vi.advanceTimersByTimeAsync(2_000)
-    if (process.platform !== 'win32') {
-      expect(settled).toBe(false)
-    }
-    await vi.advanceTimersByTimeAsync(10_000)
 
     await expect(pending).resolves.toMatchObject({ code: 0, timedOut: false })
   })

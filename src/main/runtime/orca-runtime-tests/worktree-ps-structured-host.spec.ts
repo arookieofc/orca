@@ -1,9 +1,8 @@
-import { makeStructuredAgentStatusSubject } from '../../../shared/agent-status/contracts/agent-status-subject'
+import { makeStructuredAgentStatusSubject } from '../../../shared/agent-status-subject'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import './runtime-test-module-registration.spec'
-import { OrcaRuntimeService } from '../orca-runtime'
-import { TEST_WORKTREE_ID, store } from './orca-runtime-test-fixtures.spec'
-import { AgentHookServer, _internals } from '../../agent-hooks/server/agent-hook-server'
+import { OrcaRuntimeService } from '../orca-runtime-test-mocks.spec'
+import { TEST_WORKTREE_ID, store } from '../orca-runtime-test-fixtures.spec'
+import { AgentHookServer, _internals } from '../../agent-hooks/server'
 
 vi.mock('../../telemetry/client', () => ({ track: vi.fn() }))
 vi.mock('../../telemetry/cohort-classifier', () => ({

@@ -1,32 +1,23 @@
-import {
-  acceptBrowserGuestMetadata,
-  clearBrowserGuestMetadata
-} from '@/components/browser-pane/host-guest/metadata/browser-guest-metadata-cache'
 import { rememberLiveBrowserUrl } from '@/components/browser-pane/describe-page/live-browser-url-registry'
-import { runtimeEnvironmentIdOrLocalUnlessTwin } from '@/lib/workspace/ownership/worktree-runtime-owner'
-import { findVisibleBrowserLinkTarget } from '@/lib/browser/navigation/visible-browser-link-target'
-import { openUrlInTabBesideBrowserPage } from '@/lib/browser/palette/browser-page-tab-opening'
-import {
-  isClientHostedBrowserSourcePage,
-  openClientHostedUrlBesideBrowserPage
-} from '@/lib/browser/palette/open-client-hosted-link-beside-page'
-import { redactKagiSessionToken } from '../../../../shared/browser/navigation/browser-url'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host/execution-host'
-import { useAppStore } from '../../store/index'
-import { findPage } from '../../store/slices/browser/pages/browser-page-records'
+import { runtimeEnvironmentIdOrLocalUnlessTwin } from '@/lib/worktree-runtime-owner'
+import { findVisibleBrowserLinkTarget } from '@/lib/visible-browser-link-target'
+import { openUrlInTabBesideBrowserPage } from '@/lib/browser-page-tab-opening'
+import { redactKagiSessionToken } from '../../../../shared/browser-url'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
+import { useAppStore } from '../../store'
+import { findPage } from '../../store/slices/browser-page-records'
 import {
   acquireBrowserAutomationVisibility,
   releaseBrowserAutomationVisibility
-} from '@/components/browser-pane/host-guest/retention/browser-automation-visibility'
+} from '@/components/browser-pane/host-guest/browser-automation-visibility'
 import { acquireBrowserAutomationBootstrapLease } from './browser-automation-bootstrap-lease'
-import { markBrowserPageOpenedByPage } from '@/components/browser-pane/host-guest/lifecycle/browser-page-window-close'
-import { setBrowserPageAgentViewportSize } from '@/components/browser-pane/host-guest/viewport/browser-page-viewport'
+import { markBrowserPageOpenedByPage } from '@/components/browser-pane/host-guest/browser-page-window-close'
 import {
   beginAgentInputFocusGuard,
   clearAgentInputFocusGuards,
   endAgentInputFocusGuard,
   watchUserComposition
-} from '@/components/browser-pane/host-guest/input/agent-input-focus-guard'
+} from '@/components/browser-pane/host-guest/agent-input-focus-guard'
 import {
   setBrowserAgentPageActive,
   showBrowserAgentCursor
@@ -38,32 +29,6 @@ function isClientHostedBrowserPage(browserPageId: string): boolean {
     useAppStore.getState().remoteBrowserPageHandlesByPageId[browserPageId]?.placement?.kind ===
     'client'
   )
-}
-
-/** One automation-visibility lease per page while main reports it held; repeats are ignored. */
-function createMainOwnedPaintHolds(): {
-  set: (browserPageId: string, held: boolean) => void
-  releaseAll: () => void
-} {
-  const tokens = new Map<string, string>()
-  return {
-    set: (browserPageId, held) => {
-      const token = tokens.get(browserPageId)
-      if (held && !token) {
-        tokens.set(browserPageId, acquireBrowserAutomationVisibility(browserPageId))
-      } else if (!held && token) {
-        tokens.delete(browserPageId)
-        releaseBrowserAutomationVisibility(token)
-      }
-    },
-    // A dead hold cannot release later; clear it now so the page cannot remain drawn indefinitely.
-    releaseAll: () => {
-      for (const token of tokens.values()) {
-        releaseBrowserAutomationVisibility(token)
-      }
-      tokens.clear()
-    }
-  }
 }
 
 export function registerBrowserStateIpcBridge(
@@ -82,17 +47,12 @@ export function registerBrowserStateIpcBridge(
       }
       useAppStore.getState().updateBrowserPageState(browserPageId, {
         loading: false,
-        loadError
+        loadError,
+        canGoBack: false,
+        canGoForward: false
       })
     })
   )
-  const unsubscribeMetadata = window.api.browser.onGuestMetadata?.(acceptBrowserGuestMetadata)
-  if (unsubscribeMetadata) {
-    unsubs.push(() => {
-      unsubscribeMetadata()
-      clearBrowserGuestMetadata()
-    })
-  }
   const unsubscribeCertificateFailure = window.api.browser.onCertificateFailureChanged?.(
     ({ browserPageId, failure }) => {
       if (isRuntimeEnvironmentActive() && !isClientHostedBrowserPage(browserPageId)) {
@@ -139,22 +99,27 @@ export function registerBrowserStateIpcBridge(
     })
   )
   // Why: main owns capture holds and sends each page's first hold and last release; no reply is awaited.
-  const capturePaintHolds = createMainOwnedPaintHolds()
+  const capturePaintHoldTokens = new Map<string, string>()
   const unsubscribeCapturePaintHold = window.api.browser.onCapturePaintHold?.(
-    ({ browserPageId, held }) => capturePaintHolds.set(browserPageId, held)
+    ({ browserPageId, held }) => {
+      const token = capturePaintHoldTokens.get(browserPageId)
+      if (held && !token) {
+        capturePaintHoldTokens.set(browserPageId, acquireBrowserAutomationVisibility(browserPageId))
+      } else if (!held && token) {
+        capturePaintHoldTokens.delete(browserPageId)
+        releaseBrowserAutomationVisibility(token)
+      }
+    }
   )
   if (unsubscribeCapturePaintHold) {
     unsubs.push(() => {
       unsubscribeCapturePaintHold()
-      capturePaintHolds.releaseAll()
+      // A dead hold cannot release later; clear it now so the page cannot remain drawn indefinitely.
+      for (const token of capturePaintHoldTokens.values()) {
+        releaseBrowserAutomationVisibility(token)
+      }
+      capturePaintHoldTokens.clear()
     })
-  }
-  const unsubscribeAgentViewport = window.api.browser.onAgentViewportApplied?.(
-    ({ browserPageId, width, height }) =>
-      setBrowserPageAgentViewportSize(browserPageId, { width, height })
-  )
-  if (unsubscribeAgentViewport) {
-    unsubs.push(unsubscribeAgentViewport)
   }
   const unsubscribeAgentInputFocusGuard = window.api.browser.onAgentInputFocusGuard?.(
     ({ browserPageId, token, active }) => {
@@ -174,25 +139,13 @@ export function registerBrowserStateIpcBridge(
       clearAgentInputFocusGuards()
     })
   }
-  // Why: the bootstrap lease is fixed at creation; an agent's page in a hidden worktree must keep drawing while it drives it.
-  const agentActivityPaintHolds = createMainOwnedPaintHolds()
   const unsubscribeAgentActivity = window.api.browser.onAgentActivity?.(
-    ({ browserPageId, worktreeId, active, controllerHostLabel, agentSessionId }) => {
-      setBrowserAgentPageActive(
-        browserPageId,
-        active,
-        worktreeId,
-        controllerHostLabel,
-        agentSessionId
-      )
-      agentActivityPaintHolds.set(browserPageId, active)
+    ({ browserPageId, worktreeId, active }) => {
+      setBrowserAgentPageActive(browserPageId, active, worktreeId)
     }
   )
   if (unsubscribeAgentActivity) {
-    unsubs.push(() => {
-      unsubscribeAgentActivity()
-      agentActivityPaintHolds.releaseAll()
-    })
+    unsubs.push(unsubscribeAgentActivity)
   }
   const unsubscribeAgentCursor = window.api.browser.onAgentCursor?.((event) => {
     // Main waits for this answer, so a page nobody can see answers at once.
@@ -221,21 +174,7 @@ export function registerBrowserStateIpcBridge(
       const sourcePage = Object.values(store.browserPagesByWorkspace)
         .flat()
         .find((page) => page.id === browserPageId)
-      if (!sourcePage) {
-        return
-      }
-      // Client-hosted guests live on this desktop, so a paired worktree must not drop their popups.
-      if (isClientHostedBrowserSourcePage(browserPageId)) {
-        openClientHostedUrlBesideBrowserPage({
-          sourcePageId: browserPageId,
-          worktreeId: sourcePage.worktreeId,
-          url,
-          activate: activate ?? true,
-          onOpened: markBrowserPageOpenedByPage
-        })
-        return
-      }
-      if (runtimeEnvironmentIdOrLocalUnlessTwin(store, sourcePage.worktreeId)) {
+      if (!sourcePage || runtimeEnvironmentIdOrLocalUnlessTwin(store, sourcePage.worktreeId)) {
         return
       }
       const placement = findVisibleBrowserLinkTarget(store, sourcePage.worktreeId)

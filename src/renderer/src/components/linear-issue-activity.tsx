@@ -4,10 +4,10 @@ import { LoaderCircle, RefreshCw } from 'lucide-react'
 import { LinearIssueCommentFooter, type LinearLocalComment } from '@/components/LinearItemDrawer'
 import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { Button } from '@/components/ui/button'
-import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 import { formatLinearIssueRelativeTime } from '@/components/linear-issue-workspace-text'
 import type { LinearComment, LinearIssue } from '../../../shared/linear/issue-types'
-import type { TaskSourceContext } from '../../../shared/work-items/task-source-context'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
 
 function LinearIssueAvatar({
   avatarUrl,
@@ -49,13 +49,11 @@ export function LinearIssueActivity({
   onCommentAdded: (comment: LinearLocalComment) => void
   sourceContext?: TaskSourceContext | null
 }): React.JSX.Element {
-  const t = useTranslate()
-  const intlLocale = useIntlLocale()
   return (
     <section className="mt-12 border-t border-border/60 pt-9">
       <div className="mb-8 flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-foreground">
-          {t('auto.components.LinearIssueWorkspace.543970c87a', 'Activity')}
+          {translate('auto.components.LinearIssueWorkspace.543970c87a', 'Activity')}
         </h2>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <LinearIssueAvatar
@@ -73,20 +71,10 @@ export function LinearIssueActivity({
           className="size-5"
         />
         <span>
-          {issue.assignee?.displayName
-            ? t(
-                'auto.components.LinearIssueWorkspace.namedUserUpdatedIssue',
-                '{{name}} updated the issue · {{time}}',
-                {
-                  name: issue.assignee.displayName,
-                  time: formatLinearIssueRelativeTime(issue.updatedAt, intlLocale)
-                }
-              )
-            : t(
-                'auto.components.LinearIssueWorkspace.someoneUpdatedIssue',
-                'Someone updated the issue · {{time}}',
-                { time: formatLinearIssueRelativeTime(issue.updatedAt, intlLocale) }
-              )}
+          {issue.assignee?.displayName ??
+            translate('auto.components.LinearIssueWorkspace.8a33c85e9c', 'Someone')}{' '}
+          {translate('auto.components.LinearIssueWorkspace.fabbd3f974', 'updated the issue ·')}{' '}
+          {formatLinearIssueRelativeTime(issue.updatedAt)}
         </span>
       </div>
 
@@ -105,7 +93,7 @@ export function LinearIssueActivity({
             ) : (
               <RefreshCw className="size-3" />
             )}
-            {t('auto.components.LinearIssueWorkspace.b0eac92d85', 'Retry')}
+            {translate('auto.components.LinearIssueWorkspace.b0eac92d85', 'Retry')}
           </Button>
         </div>
       ) : null}
@@ -127,10 +115,10 @@ export function LinearIssueActivity({
                 <div className="mb-1 flex min-w-0 items-center gap-2 text-sm">
                   <span className="truncate font-semibold text-foreground">
                     {comment.user?.displayName ??
-                      t('auto.components.LinearIssueWorkspace.ca8778c124', 'Unknown')}
+                      translate('auto.components.LinearIssueWorkspace.ca8778c124', 'Unknown')}
                   </span>
                   <span className="shrink-0 text-muted-foreground">
-                    {formatLinearIssueRelativeTime(comment.createdAt, intlLocale)}
+                    {formatLinearIssueRelativeTime(comment.createdAt)}
                   </span>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-card px-4 py-3">

@@ -1,28 +1,25 @@
 // Main-owned starts retain a failed pane with its reason, even when failure preceded layout persistence.
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/workspace-layout/layout-owner-switch'
-import { isHibernationDoneRecord } from '../../../../shared/agent-session/lifecycle/resume/hibernation-done-record'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
+import { isHibernationDoneRecord } from '../../../../shared/hibernation-done-record'
 import { isRemoteRuntimePtyId } from '../../../../shared/remote-runtime/remote-runtime-pty-id'
 import type { LayoutApplyReply } from '../../../../shared/workspace-layout/workspace-layout-command-types'
-import type { PaneStartArgsOf } from './runtime-pane-admission'
-import type { TerminalCreateOptions } from './terminal-create-options'
-import type { RuntimeTerminalCreate } from '../../../../shared/terminal/runtime/runtime-terminal-create-contract'
+import type * as dependencies from '../../orca-runtime-create-terminal-dependencies'
 import {
   PaneResumeOutcomes,
   PaneStartStatuses,
   paneStartFailure,
   type PaneFactSources
-} from '../surface/pane-start-statuses'
-import type { LayoutCommandRunOptions, WindowLayoutCommand } from '../layout/runtime-layout-apply'
+} from '../../pane-start-statuses'
+import type { LayoutCommandRunOptions, WindowLayoutCommand } from '../../runtime-layout-apply'
 import {
   runLayoutPaneStarts,
   startsPanes,
   stopReplacedTerminals
 } from '../recovery/layout-command-pane-starts'
-import { allocateTerminalPaneIdentity } from '../identity/runtime-terminal-pane-identity'
+import { allocateTerminalPaneIdentity } from '../../runtime-terminal-pane-identity'
 import { OrcaRuntimeWithCreateTerminal } from './terminal-create'
 import { mainOwnsTabLayout } from './main-owned-tab-layout'
 import { PaneOwnerContentionError } from '../../../ipc/pty/pane/pane-spawn-operation'
-import type { TerminalWorkspaceCreationEvidence } from './terminal-workspace-scope'
 
 export type FailedStartPane = { tabId: string; leafId: string }
 
@@ -118,7 +115,7 @@ export abstract class OrcaRuntimeWithFailedStartPanes extends OrcaRuntimeWithCre
     )
   }
 
-  protected paneStartStatusArgs: PaneStartArgsOf = (opts) => {
+  protected paneStartStatusArgs: dependencies.PaneStartArgsOf = (opts) => {
     const sink = this.paneStartStatuses
     return sink
       ? {
@@ -135,9 +132,9 @@ export abstract class OrcaRuntimeWithFailedStartPanes extends OrcaRuntimeWithCre
   // Not async: with the switch off this adds no await to every create.
   override createTerminal(
     worktreeSelector?: string,
-    opts: TerminalCreateOptions = {},
-    ...evidence: TerminalWorkspaceCreationEvidence
-  ): Promise<RuntimeTerminalCreate> {
+    opts: dependencies.TerminalCreateOptions = {},
+    created?: dependencies.Worktree
+  ): Promise<dependencies.RuntimeTerminalCreate> {
     // Keep main-owned failed panes visible regardless of which start step failed.
     if (
       ORCA_LAYOUT_OWNER_IS_MAIN &&
@@ -149,19 +146,19 @@ export abstract class OrcaRuntimeWithFailedStartPanes extends OrcaRuntimeWithCre
         (pane) =>
           opts.startFailure
             ? Promise.reject(opts.startFailure)
-            : super.createTerminal(worktreeSelector, { ...opts, ...pane }, ...evidence),
-        (pane, error) => this.keepFailedStartPane(worktreeSelector, pane, opts, error, ...evidence)
+            : super.createTerminal(worktreeSelector, { ...opts, ...pane }, created),
+        (pane, error) => this.keepFailedStartPane(worktreeSelector, created, pane, opts, error)
       )
     }
-    return super.createTerminal(worktreeSelector, opts, ...evidence)
+    return super.createTerminal(worktreeSelector, opts, created)
   }
 
   /** Start the window's saved first pane under its ids; host_not_owned preserves window starts when the switch is off or main does not own the tab. */
   startWindowTabTerminal(
     worktreeId: string,
     pane: { tabId: string; leafId: string },
-    opts: Omit<TerminalCreateOptions, 'tabId' | 'leafId' | 'presentation'>
-  ): Promise<RuntimeTerminalCreate> {
+    opts: Omit<dependencies.TerminalCreateOptions, 'tabId' | 'leafId' | 'presentation'>
+  ): Promise<dependencies.RuntimeTerminalCreate> {
     if (
       !ORCA_LAYOUT_OWNER_IS_MAIN ||
       !mainOwnsTabLayout(this.getWorkspaceSessionHostIdsForTab(worktreeId, pane.tabId))
@@ -173,9 +170,7 @@ export abstract class OrcaRuntimeWithFailedStartPanes extends OrcaRuntimeWithCre
       ...opts,
       ...pane,
       presentation: 'background',
-      keepPaneOnStartFailure: true,
-      // The window's own new tab: a user act, as New Terminal is for a window spawn.
-      wslUserAct: true
+      keepPaneOnStartFailure: true
     })
   }
 
@@ -188,23 +183,16 @@ export abstract class OrcaRuntimeWithFailedStartPanes extends OrcaRuntimeWithCre
   /** Through main's create rules, so a pane the user closed meanwhile is refused, not restored. */
   private async keepFailedStartPane(
     worktreeSelector: string,
+    created: dependencies.Worktree | undefined,
     pane: FailedStartPane,
-    { title, wslUserAct }: TerminalCreateOptions,
-    error: unknown,
-    ...evidence: TerminalWorkspaceCreationEvidence
+    { title }: dependencies.TerminalCreateOptions,
+    error: unknown
   ): Promise<void> {
     if (error instanceof PaneOwnerContentionError) {
       // Another owner's terminal runs in the pane; the window attaches to it.
       return
     }
-    // The failed start retains both its captured owner and the same user's act.
-    const workspace = await this.resolveTerminalWorkspaceLaunchScope(
-      worktreeSelector,
-      evidence[0],
-      { wslUserAct: wslUserAct === true },
-      evidence[1],
-      evidence[2]
-    )
+    const workspace = await this.resolveTerminalWorkspaceLaunchScope(worktreeSelector, created)
     const create = { type: 'createTerminalTab' as const, workspace: workspace.id, ...pane }
     const reply = await this.applyLayoutCommand(title ? { ...create, title } : create)
     // `tab_exists`: the start wrote this pane before failing and kept it.

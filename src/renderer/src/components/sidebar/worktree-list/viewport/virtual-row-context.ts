@@ -1,10 +1,9 @@
 import type React from 'react'
 import type { AppState } from '@/store/types'
-import type { ProjectGroup } from '../../../../../../shared/project/groups/project-group-types'
+import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
-import type { LineageRowProjection } from '../listing/lineage-row-projection'
 import type { RenderRow } from '../listing/render-row'
-import type { LineageToggleHandler } from '../../workspace-card/identity/worktree-lineage-toggle-handler-cache'
+import type { LineageToggleHandler } from '../../worktree-lineage-toggle-handler-cache'
 import type { SidebarRevealHighlight } from '../navigation/use-reveal-highlight'
 import type { WorktreeDragRuntime } from '../drag/use-runtime'
 import type { WorktreeDragSession } from '../drag/use-session'
@@ -16,24 +15,23 @@ import type { WorktreeSidebarHeaderDrag } from '../drag/use-header-drag'
 import type { WorktreeListVirtualizer } from './use-virtualizer'
 import type { VirtualizedWorktreeViewportProps } from './viewport-props'
 import type { WorktreeVirtualRowContext } from '../rows/virtual-row-dispatch'
-import type { RepoHeaderProjectActions } from '../rows/repo-header-project-actions'
+import { getRepoOwnerWorktreeVisibilityDefaults } from '../../../../store/worktree-visibility-defaults-by-host'
 
 import type { ProjectHeaderHostContext } from '../rows/project-header-host-context'
+import type { RepoSshGateResolver } from '@/hooks/use-repo-ssh-gate-resolver'
 
 type BuildArgs = {
   props: VirtualizedWorktreeViewportProps
   projectGroups: readonly ProjectGroup[]
-  dragUnitsByRow: ReadonlyMap<number, { identity: string }>
-  hiddenDragRanges: readonly { start: number; end: number }[]
-  projection: LineageRowProjection
-  activeFamilyRoots: ReadonlySet<number>
   renderRows: RenderRow[]
   firstHeaderIndex: number
   virtualization: WorktreeListVirtualizer
   measureVirtualRowElement: (element: HTMLDivElement | null) => void
   settings: AppState['settings']
-  projectActions: RepoHeaderProjectActions
+  worktreeVisibilityDefaultsByHost: AppState['worktreeVisibilityDefaultsByHost']
+  getRepoSshGate: RepoSshGateResolver
   newCardStyle: boolean
+  folderBackedProjectGroupIds: ReadonlySet<string>
   session: WorktreeDragSession
   runtime: WorktreeDragRuntime
   primaryActive: ReturnType<typeof usePrimaryActiveWorktreeRow>
@@ -56,10 +54,6 @@ type BuildArgs = {
 export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtualRowContext {
   const { props, runtime, session, statusDrag, headerDrag, primaryActive, reveal } = args
   return {
-    dragUnitsByRow: args.dragUnitsByRow,
-    hiddenDragRanges: args.hiddenDragRanges,
-    projection: args.projection,
-    activeFamilyRoots: args.activeFamilyRoots,
     renderRows: args.renderRows,
     firstHeaderIndex: args.firstHeaderIndex,
     activeStickyHeaderIndexRef: args.virtualization.activeStickyHeaderIndexRef,
@@ -86,6 +80,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       collapsedGroups: props.collapsedGroups,
       workspaceStatuses: props.workspaceStatuses,
       projectGroups: args.projectGroups,
+      getRepoSshGate: args.getRepoSshGate,
       highlightedRevealRowKey: reveal.highlightedRevealRowKey,
       dragOverStatus: runtime.dragOverStatus,
       pinDragOver: runtime.pinDragOver,
@@ -93,11 +88,23 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       projectHeaderHostContexts: args.projectHeaderHostContexts,
       getCachedFolderWorkspacePathStatus: args.getCachedFolderWorkspacePathStatus,
       toggleGroupWithScrollAnchor: args.toggleGroupWithScrollAnchor,
-      toggleAllProjects: props.onToggleAllProjects,
-      projectActions: args.projectActions,
+      projectActions: {
+        getWorktreeVisibilityDefaults: (repo) =>
+          getRepoOwnerWorktreeVisibilityDefaults(
+            repo,
+            args.settings,
+            args.worktreeVisibilityDefaultsByHost
+          ),
+        onOpenRepoSettings: props.handleOpenRepoSettings,
+        onOpenWorktreeVisibility: props.handleOpenWorktreeVisibility,
+        onCreateGroupFromRepo: props.handleCreateGroupFromRepo,
+        onMoveProjectToGroup: props.handleMoveProjectToGroup,
+        onRemoveProjectFromGroup: props.handleRemoveProjectFromGroup,
+        onRemoveProject: props.handleRemoveProject,
+        onCreateForRepo: props.handleCreateForRepo
+      },
       onRenameProjectGroup: props.handleRenameProjectGroup,
       onDeleteProjectGroup: props.handleDeleteProjectGroup,
-      onRefreshProjectGroup: props.handleRefreshProjectGroup,
       onCreateFolderWorkspace: props.handleCreateFolderWorkspace,
       onWorkspaceStatusDragOver: statusDrag.handleWorkspaceStatusDragOver,
       onWorkspaceStatusDragLeave: statusDrag.handleWorkspaceStatusDragLeave,
@@ -108,11 +115,12 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
     item: {
       settings: args.settings,
       groupBy: props.groupBy,
+      folderBackedProjectGroupIds: args.folderBackedProjectGroupIds,
       groupKeyByRowKey: session.groupKeyByRowKey,
       groupIndexByRowKey: session.groupIndexByRowKey,
       agentSendTargetWorktreeId: props.agentSendTargetWorktreeId,
       worktreeDragState: runtime.worktreeDragState,
-      nativeLineageDropTargetIdentity: runtime.nativeLineageDropTargetIdentity,
+      nativeLineageDropTargetId: runtime.nativeLineageDropTargetId,
       activeWorktreeId: props.activeWorktreeId,
       activeWorkspaceExecutionHostId: props.activeWorkspaceExecutionHostId,
       currentWorktreeId: props.currentWorktreeId,
@@ -142,7 +150,6 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       worktreeMap: props.worktreeMap,
       worktreeLineageById: props.worktreeLineageById,
       workspaceLineageByChildKey: props.workspaceLineageByChildKey,
-      crossStoreChildrenByFolderId: props.crossStoreChildrenByFolderId,
       prCache: props.prCache,
       hostedReviewCache: props.hostedReviewCache,
       getCachedFolderWorkspacePathStatus: args.getCachedFolderWorkspacePathStatus,
@@ -150,9 +157,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       onContextMenuSelect: props.onContextMenuSelect,
       onImmediateActivate: primaryActive.handleImmediateWorktreeRowActivate,
       onRowClickCapture: args.onRowClickCapture,
-      onRowPointerDown: args.onRowPointerDown,
-      worktreeDragState: runtime.worktreeDragState,
-      nativeLineageDropTargetIdentity: runtime.nativeLineageDropTargetIdentity
+      onRowPointerDown: args.onRowPointerDown
     }
   }
 }

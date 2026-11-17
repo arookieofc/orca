@@ -1,9 +1,9 @@
-import type { Store } from '../../persistence/loading-store/store'
+import type { Store } from '../../persistence'
 import type {
   RemovedSshTargetTombstone,
   SshRepoReadoption,
   SshTarget
-} from '../../../shared/remote-runtime/ssh/ssh-types'
+} from '../../../shared/ssh-types'
 import { meaningfulSshAlias, sshEndpointKey, type SshIdentityFields } from './ssh-target-identity'
 
 /** Re-add mints a new target id; tombstone identity matches reattach orphaned workspace/automation/filter state. Match aliases strictly, then endpoint tuples only when an alias is absent; uncertain ghosts remain for Forget. */

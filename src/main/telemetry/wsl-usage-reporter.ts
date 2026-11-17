@@ -1,30 +1,22 @@
 // Windows-only daily usage; gather registry/WSL state only while transmission is enabled. Reuse confirmed running distros, otherwise share one probe when user distros exist.
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Store } from '../persistence/loading-store/store'
-import type { GlobalSettings } from '../../shared/settings/global-settings-types'
-import {
-  getRepoExecutionHostId,
-  parseExecutionHostId
-} from '../../shared/execution-host/execution-host'
-import { listEnvironments } from '../../shared/remote-runtime/host-store/runtime-environment-store'
-import { isWslHostRuntimeEnvironment } from '../../shared/remote-runtime/host-catalog/runtime-environments'
-import { resolveLocalWorkspaceRuntime } from '../workspaces/execution-host/local-project-runtime-resolution'
-import { getCachedWslAvailability } from '../wsl/discovery/wsl-availability'
-import { getCachedWslDistros } from '../wsl/discovery/distro-catalog'
-import { listConfirmedRunningWslDistros } from '../wsl/discovery/wsl-background-distro-gate'
-import { filterUserWslDistros } from '../wsl/discovery/wsl-distro-list-output'
-import { peekConfirmedRunningWslDistros } from '../wsl/discovery/wsl-running-distro-cache'
-import { loadWindowsNativeRegistry, WINDOWS_REG_SZ } from '../windows/windows-native-registry'
-import { readWslDistroRegistrations } from '../wsl/discovery/wsl-distro-registry-id'
-import { listWslHostDistros } from '../wsl/host-lifecycle/wsl-host-distro-list'
-import {
-  wslHostsAppliedMovedProjects,
-  wslHostsAppliedPolicyState,
-  wslHostsGateOpen,
-  wslHostsGateState
-} from '../wsl/host-lifecycle/wsl-host-gate'
-import { isForeignLink, readWorktreeLinks } from '../git/worktrees/removal/worktree-prune-guard'
+import type { Store } from '../persistence'
+import type { GlobalSettings } from '../../shared/global-settings-types'
+import { getRepoExecutionHostId, parseExecutionHostId } from '../../shared/execution-host'
+import { listEnvironments } from '../../shared/runtime-environment-store'
+import { isWslHostRuntimeEnvironment } from '../../shared/runtime-environments'
+import { resolveLocalWorkspaceRuntime } from '../local-project-runtime-resolution'
+import { getCachedWslAvailability } from '../wsl-availability'
+import { getCachedWslDistros } from '../wsl'
+import { listConfirmedRunningWslDistros } from '../wsl-background-distro-gate'
+import { filterUserWslDistros } from '../wsl-distro-list-output'
+import { peekConfirmedRunningWslDistros } from '../wsl-running-distro-cache'
+import { loadWindowsNativeRegistry, WINDOWS_REG_SZ } from '../windows-native-registry'
+import { readWslDistroRegistrations } from '../wsl/wsl-distro-registry-id'
+import { listWslHostDistros } from '../wsl/wsl-host-distro-list'
+import { wslHostsGateOpen } from '../wsl/wsl-host-gate'
+import { isForeignLink, readWorktreeLinks } from '../git/worktree-prune-guard'
 import { isTelemetryEnabled, track } from './client'
 import {
   buildWslUsageSnapshot,
@@ -121,10 +113,10 @@ export async function countWindowsDriveReposWithWslWorktrees(
   return total
 }
 
-async function readWslHostDistros(userDataPath: string): Promise<Map<string, string>> {
+function readWslHostDistros(userDataPath: string): Map<string, string> {
   try {
     return new Map(
-      (await listEnvironments(userDataPath))
+      listEnvironments(userDataPath)
         .filter(isWslHostRuntimeEnvironment)
         .map((environment) => [environment.id, environment.orcadDeployment.distro])
     )
@@ -133,25 +125,18 @@ async function readWslHostDistros(userDataPath: string): Promise<Map<string, str
   }
 }
 
-/**
- * Reuse a confirmed running list; otherwise one shared probe, and none when no user distro exists
- * or no Orca project uses WSL: telemetry alone shouldn't run `wsl.exe` (#28167). Null: not probed.
- */
+/** Reuse a confirmed running list; otherwise one shared probe, and none when no user distro exists. */
 export async function listRunningDistrosForSnapshot(
   registrations: readonly { distro: string }[] | null,
-  hasWslProjects: boolean,
   peek: () => readonly string[] | null = peekConfirmedRunningWslDistros,
   probe: () => Promise<string[]> = listConfirmedRunningWslDistros
-): Promise<string[] | null> {
+): Promise<string[]> {
   const cached = peek()
   if (cached) {
     return [...cached]
   }
   const userNames = filterUserWslDistros((registrations ?? []).map(({ distro }) => distro))
-  if (userNames.length === 0) {
-    return []
-  }
-  return hasWslProjects ? probe() : null
+  return userNames.length > 0 ? probe() : []
 }
 
 export async function gatherWslUsageSnapshotInput(
@@ -160,38 +145,23 @@ export async function gatherWslUsageSnapshotInput(
 ): Promise<WslUsageSnapshotInput> {
   const gateOpen = wslHostsGateOpen()
   const registrations = await readWslDistroRegistrations()
-  const hostDistros = gateOpen ? await readWslHostDistros(userDataPath) : new Map<string, string>()
-  const projects = collectWslProjects(
-    store,
-    gateOpen,
-    () => hostDistros,
-    getCachedWslDistros()?.[0] ?? null
-  )
-  let distrosRunningKnown = true
   const userDistros = await listWslHostDistros({
     readRegistrations: async () => registrations,
-    readRunning: async () => {
-      const running = await listRunningDistrosForSnapshot(registrations, projects.length > 0)
-      distrosRunningKnown = running !== null
-      return { status: 'confirmed', distros: running ?? [] }
-    }
+    listRunning: () => listRunningDistrosForSnapshot(registrations)
   })
   return {
     registeredDistroCount: registrations?.length ?? null,
-    distrosRunningKnown,
-    // A confirmed read never yields 'unverifiable'; the snapshot's schema keeps its two states.
-    userDistros: userDistros.map(({ version, state }) => ({
-      version,
-      state: state === 'running' ? 'running' : 'stopped'
-    })),
+    userDistros,
     wslPackageVersion: readWslPackageVersion(),
     wslAvailableCached: getCachedWslAvailability(),
-    projects,
+    projects: collectWslProjects(
+      store,
+      gateOpen,
+      () => readWslHostDistros(userDataPath),
+      getCachedWslDistros()?.[0] ?? null
+    ),
     windowsDriveReposWithWslWorktrees: await countWindowsDriveReposWithWslWorktrees(store),
-    wslHostsGateOpen: gateOpen,
-    wslHostsGateState: wslHostsGateState(),
-    wslHostsPolicy: wslHostsAppliedPolicyState(),
-    wslHostsMovedProjects: wslHostsAppliedMovedProjects()
+    wslHostsGateOpen: gateOpen
   }
 }
 

@@ -1,19 +1,12 @@
 import type { OrcaRuntimeWithTransitionGraphReloadToTerminalState as TransitionGraphReloadToTerminalStateMethods } from './session-graph-authority'
 import type { OrcaRuntimeWithBindPtyIncarnationHandle as BindPtyIncarnationHandleMethods } from '../terminal/identity/terminal-handle-bindings'
-import { OrcaRuntimeWithSessionTitleAuthority } from '../session-tabs/publication/session-title-publisher'
-import type { RuntimeRendererReloadFence } from './renderer-reload-fence'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/workspace-layout/layout-owner-switch'
-import { HEADLESS_RUNTIME_WINDOW_ID } from '../../../shared/remote-runtime/session-graph/runtime-session-contracts'
-import { rendererStatusReplica } from './renderer-status-replica'
+import type { OrcaRuntimeWithResolveWaiter as ResolveWaiterMethods } from '../orca-runtime-resolve-waiter'
+import { OrcaRuntimeWithStopTerminalsForProject } from '../terminal/stop/project-terminal-stop'
+import type { RuntimeRendererReloadFence } from '../orca-runtime-core'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/layout-owner-switch'
+import { HEADLESS_RUNTIME_WINDOW_ID } from '../../../shared/runtime-types'
 
-export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntimeWithSessionTitleAuthority {
-  /** Phone frames held for an unseeded renderer's snapshot are owed once it loses authority. */
-  protected releaseUnseededPhoneFrames(): void {
-    for (const worktreeId of rendererStatusReplica(this).unseededWorktrees()) {
-      this.scheduleMobileSessionTabsChanged(worktreeId)
-    }
-  }
-
+export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntimeWithStopTerminalsForProject {
   protected abstract assertStableReadyGraph(
     ...args: Parameters<TransitionGraphReloadToTerminalStateMethods['assertStableReadyGraph']>
   ): ReturnType<TransitionGraphReloadToTerminalStateMethods['assertStableReadyGraph']>
@@ -33,6 +26,14 @@ export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntime
   protected abstract refreshWritableFlags(
     ...args: Parameters<BindPtyIncarnationHandleMethods['refreshWritableFlags']>
   ): ReturnType<BindPtyIncarnationHandleMethods['refreshWritableFlags']>
+
+  protected abstract rejectAllWaiters(
+    ...args: Parameters<ResolveWaiterMethods['rejectAllWaiters']>
+  ): ReturnType<ResolveWaiterMethods['rejectAllWaiters']>
+
+  protected abstract rejectWaitersForHandle(
+    ...args: Parameters<ResolveWaiterMethods['rejectWaitersForHandle']>
+  ): ReturnType<ResolveWaiterMethods['rejectWaitersForHandle']>
 
   protected abstract rememberDetachedPreAllocatedLeaves(
     ...args: Parameters<BindPtyIncarnationHandleMethods['rememberDetachedPreAllocatedLeaves']>
@@ -56,7 +57,7 @@ export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntime
 
   async hasTerminalsForWorktree(worktreeSelector: string): Promise<boolean> {
     const graphEpoch = this.captureReadyGraphEpoch()
-    const worktree = await this.resolveWorkspaceSelector(worktreeSelector)
+    const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     this.assertStableReadyGraph(graphEpoch)
     for (const leaf of this.leaves.values()) {
       if (leaf.worktreeId === worktree.id && leaf.ptyId) {
@@ -99,9 +100,8 @@ export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntime
   }
 
   protected beginGraphReload(windowId: number): number {
-    const titleAuthority = this.captureSessionTitleAuthority()
     // Compare incarnations against the rebuilt graph before staling proven process identities.
-    this.terminalIdentity.advanceRendererEpoch()
+    this.rendererGraphEpoch += 1
     this.graphStatus = 'reloading'
     const revision = this.graphReloadLifecycle.begin(windowId)
     this.setTerminalSideEffectConsumerAvailable(false)
@@ -112,11 +112,19 @@ export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntime
         this.invalidatePtyIncarnationHandle(ptyId)
       }
     }
-    this.terminalIdentity.clearHandles()
-    this.terminalIdentity.clearLeafBindings()
+    const retainedHandles = new Set([
+      ...this.handleByPtyId.values(),
+      ...[...this.handleByPtyIncarnation.values()].map((record) => record.handle)
+    ])
+    for (const handle of this.terminalWaiters.handles()) {
+      if (!retainedHandles.has(handle)) {
+        this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
+      }
+    }
+    this.handles.clear()
+    this.handleByLeafKey.clear()
     // Preserve CLI handles and incarnation waiters across reload; graph adoption may rejoin the same PTY.
     this.refreshWritableFlags()
-    this.republishSessionTitleAuthorityChanges(titleAuthority)
     return revision
   }
 
@@ -133,7 +141,6 @@ export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntime
       return false
     }
     if (fence.recovery === 'renderer') {
-      const titleAuthority = this.captureSessionTitleAuthority()
       const restoresPublishedInventory =
         this.sessionTabsInventoryPublicationEpoch === this.rendererGraphEpoch - 1
       this.graphStatus = 'ready'
@@ -146,7 +153,6 @@ export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntime
       if (restoresPublishedInventory) {
         this.markSessionTabsInventoryPublished()
       }
-      this.republishSessionTitleAuthorityChanges(titleAuthority)
       return true
     }
     this.graphReloadLifecycle.begin(windowId)
@@ -182,7 +188,6 @@ export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntime
   }
 
   markGraphUnavailable(windowId: number): void {
-    const titleAuthority = this.captureSessionTitleAuthority()
     if (
       this.authoritativeWindowId === HEADLESS_RUNTIME_WINDOW_ID &&
       windowId === this.pendingHeadlessPromotionWindowId
@@ -201,12 +206,11 @@ export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntime
     if (this.shouldRestoreHeadlessGraph(windowId)) {
       this.pendingHeadlessPromotionWindowId = null
       this.restoreHeadlessGraphAuthority()
-      this.republishSessionTitleAuthorityChanges(titleAuthority, this.republishBrowserSessionTabs())
       return
     }
     // Without an authoritative graph, live-terminal operations must fail closed.
     if (this.graphStatus !== 'unavailable') {
-      this.terminalIdentity.advanceRendererEpoch()
+      this.rendererGraphEpoch += 1
     }
     this.graphStatus = 'unavailable'
     this.setTerminalSideEffectConsumerAvailable(false)
@@ -214,32 +218,17 @@ export abstract class OrcaRuntimeWithHasTerminalsForWorktree extends OrcaRuntime
     this.rememberDetachedPreAllocatedLeaves()
     for (const [ptyId, handle] of this.handleByPtyId) {
       if (this.handleByPtyIncarnation.get(ptyId)?.handle === handle) {
-        this.terminalIdentity.unbindPty(ptyId)
+        this.handleByPtyId.delete(ptyId)
       }
     }
-    this.terminalIdentity.clearTabs()
-    this.terminalIdentity.clearLeaves()
+    this.tabs.clear()
+    this.leaves.clear()
     this.leavesByPtyId.clear()
-    this.terminalIdentity.clearHandles()
-    this.terminalIdentity.clearLeafBindings()
+    this.handles.clear()
+    this.handleByLeafKey.clear()
     this.clearPtyIncarnationHandles()
     // Keep pre-allocated CLI handles for reconnect adoption.
-    this.terminalWaiters.rejectAll('terminal_handle_stale')
-    this.releaseUnseededPhoneFrames()
-    this.republishSessionTitleAuthorityChanges(titleAuthority, this.republishBrowserSessionTabs())
-    this.releaseAgentSenderHistoryIfUnobserved()
-  }
-
-  // Renderer browser rows are listed only while their window exists; a version bump lets every client apply the drop.
-  private republishBrowserSessionTabs(): Set<string> {
-    const republished = new Set<string>()
-    for (const [worktreeId, snapshot] of this.mobileSessionTabsByWorktree) {
-      if (snapshot.tabs.some((tab) => tab.type === 'browser')) {
-        this.republishMobileSessionTabsSnapshot(worktreeId)
-        republished.add(worktreeId)
-      }
-    }
-    return republished
+    this.rejectAllWaiters('terminal_handle_stale')
   }
 
   protected handleGraphReloadTimeout(windowId: number): void {

@@ -3,19 +3,36 @@ import {
   openCookieDebuggerSession,
   type CookieClearDebugger
 } from './browser-cookie-debugger-session'
-import { normalizeCookieDomain } from './policy/cookie-domain'
+import { normalizeCookieDomain } from './browser-cookie-import-policy'
 import type {
   CookieClearIdentity,
   CookieClearPartitionKey,
   CookieClearStore,
-  CookieImportWriteStore,
-  CookieJarCdpReadStore
-} from './storage/cookie-store-contracts'
+  CookieImportWriteStore
+} from './browser-cookie-import-clear'
 import { restoreEveryCookieIdentity } from './browser-cookie-identity-restore'
 import { normalizeCookiePartitionSite } from './sources/browser-cookie-source-partition'
-import { cdpCookiesFromCommand, type CdpCookie } from './browser-cdp-cookie'
 
-export function cdpSameSite(sameSite: Cookie['sameSite']): 'Strict' | 'Lax' | 'None' | undefined {
+type CdpCookiePartitionKey = {
+  topLevelSite?: string
+  hasCrossSiteAncestor?: boolean
+}
+
+type CdpCookie = {
+  name: string
+  value: string
+  domain?: string
+  path?: string
+  secure?: boolean
+  httpOnly?: boolean
+  session?: boolean
+  expires?: number
+  sameSite?: string
+  partitionKey?: CdpCookiePartitionKey | null
+  partitionKeyOpaque?: boolean
+}
+
+function cdpSameSite(sameSite: Cookie['sameSite']): 'Strict' | 'Lax' | 'None' | undefined {
   if (sameSite === 'strict') {
     return 'Strict'
   }
@@ -51,7 +68,7 @@ function partitionKeyFromCdp(cookie: CdpCookie): CookieClearPartitionKey | undef
   }
 }
 
-export function cookieScopeKey(
+function cookieScopeKey(
   name: string,
   domain: string | undefined,
   path: string | undefined,
@@ -61,7 +78,7 @@ export function cookieScopeKey(
   return normalizedDomain ? JSON.stringify([name, normalizedDomain, path || '/', hostOnly]) : null
 }
 
-export function cdpCookieScopeKey(cookie: CdpCookie): string | null {
+function cdpCookieScopeKey(cookie: CdpCookie): string | null {
   return cookieScopeKey(cookie.name, cookie.domain, cookie.path, !cookie.domain?.startsWith('.'))
 }
 
@@ -79,7 +96,7 @@ function indexCdpCookies(cookies: readonly CdpCookie[]): Map<string, CdpCookie[]
   return index
 }
 
-export function identityFromCdpCookie(url: string, cdpCookie: CdpCookie): CookieClearIdentity {
+function identityFromCdpCookie(url: string, cdpCookie: CdpCookie): CookieClearIdentity {
   const partitionKey = partitionKeyFromCdp(cdpCookie)
   return {
     url,
@@ -152,6 +169,14 @@ export function cdpSetCookieParamsFromIdentity(
   }
 }
 
+function cdpCookiesFromCommand(value: unknown): CdpCookie[] {
+  if (typeof value !== 'object' || value === null || !('cookies' in value)) {
+    return []
+  }
+  const cookies = value.cookies
+  return Array.isArray(cookies) ? cookies : []
+}
+
 function cdpSetCookieSucceeded(value: unknown): boolean {
   if (typeof value !== 'object' || value === null || !('success' in value)) {
     return true
@@ -184,7 +209,7 @@ async function writeIdentityWithCdp(
 
 export function openCookieClearStore(
   targetSession: Session
-): CookieClearStore & CookieImportWriteStore & CookieJarCdpReadStore & { dispose: () => void } {
+): CookieClearStore & CookieImportWriteStore & { dispose: () => void } {
   const { attach, dispose } = openCookieDebuggerSession(targetSession)
   return {
     get: (filter) => targetSession.cookies.get(filter),
@@ -199,8 +224,6 @@ export function openCookieClearStore(
     },
     writeCookieIdentity: async (identity) =>
       writeIdentityWithCdp((await attach()).debugger, identity, 'import'),
-    readAllCdpCookies: async () =>
-      cdpCookiesFromCommand(await (await attach()).debugger.sendCommand('Network.getAllCookies')),
     dispose
   }
 }

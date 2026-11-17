@@ -6,6 +6,7 @@ type EventSubscription = {
 
 type ExpoTwoWayAudioWebModule = {
   initialize: () => Promise<boolean>
+  playPCMData: (audioData: Uint8Array) => void
   bypassVoiceProcessing: (bypass: boolean) => void
   toggleRecording: (val: boolean) => boolean
   isRecording: () => boolean
@@ -15,6 +16,10 @@ type ExpoTwoWayAudioWebModule = {
   requestMicrophonePermissionsAsync: () => Promise<PermissionResponse>
   getMicrophoneModeIOS: () => null
   setMicrophoneModeIOS: () => void
+  isPlaying: () => boolean
+  stopPlayback: () => void
+  pausePlayback: () => void
+  resumePlayback: () => void
   addListener: (eventName: string, handler: (ev: unknown) => void) => EventSubscription
 }
 
@@ -30,6 +35,7 @@ const noop = () => undefined
 const ExpoTwoWayAudioModule: ExpoTwoWayAudioWebModule = {
   // QA browser has no shell microphone; page dictation uses platform/dictation-capture.web.ts native.audio.start|read|stop instead.
   initialize: async () => false,
+  playPCMData: noop,
   bypassVoiceProcessing: noop,
   toggleRecording: () => false,
   isRecording: () => false,
@@ -39,6 +45,10 @@ const ExpoTwoWayAudioModule: ExpoTwoWayAudioWebModule = {
   requestMicrophonePermissionsAsync: async () => deniedMicrophonePermission,
   getMicrophoneModeIOS: () => null,
   setMicrophoneModeIOS: noop,
+  isPlaying: () => false,
+  stopPlayback: noop,
+  pausePlayback: noop,
+  resumePlayback: noop,
   addListener: () => ({ remove: noop })
 }
 

@@ -67,24 +67,19 @@ test('CSV links navigate from small and paged previews without replacing the ren
   electronApp
 }, testInfo) => {
   test.setTimeout(90_000)
+  const url = 'https://example.com/?from=csv#demo'
   const smallName = 'csv-links.csv'
   const largeName = 'csv-links-large.csv'
-  // Distinct URLs: a link whose page is already open reuses that tab instead of adding one.
-  const urls = {
-    [smallName]: 'https://example.com/?from=small-csv#demo',
-    [largeName]: 'https://example.com/?from=large-csv#demo'
-  }
-  const content = (url: string): string => `name,url,notes\nExample,${url},javascript:alert(1)\n`
-  writeFileSync(path.join(seededRepoPath, smallName), content(urls[smallName]))
+  const content = `name,url,notes\nExample,${url},javascript:alert(1)\n`
+  writeFileSync(path.join(seededRepoPath, smallName), content)
   writeFileSync(
     path.join(seededRepoPath, largeName),
-    content(urls[largeName]) + `Record,${urls[largeName]},${'x'.repeat(200)}\n`.repeat(6000)
+    content + `Record,${url},${'x'.repeat(200)}\n`.repeat(6000)
   )
   await orcaPage.evaluate(async () => {
     await window.__store?.getState().updateSettings({ openLinksInApp: true })
   })
   for (const name of [smallName, largeName]) {
-    const url = urls[name]
     await orcaPage.evaluate(
       ({ name, filePath }) => {
         const state = window.__store?.getState()

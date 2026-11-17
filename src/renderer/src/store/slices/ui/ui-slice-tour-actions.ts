@@ -1,63 +1,12 @@
 import type { UISlice, UISliceGet, UISliceSet } from './ui-slice-contract'
-import {
-  hasContextualTourActionStep,
-  isContextualTourStepDone
-} from '../../../../../shared/feature-education/contextual-tours/contextual-tour-action-steps'
-import {
-  getContextualTour,
-  type ContextualTourId,
-  getContextualTourStepIndex
-} from '../../../../../shared/feature-education/contextual-tours/contextual-tours'
+import { getContextualTour } from '../../../../../shared/contextual-tours'
 import {
   getContextualTourRequestDecision,
   hasContextualTourTarget,
   getNextVisibleContextualTourStepIndex,
   getPreviousVisibleContextualTourStepIndex
 } from '../../../components/contextual-tours/contextual-tour-gate'
-import { hasFeatureInteraction } from '../../../../../shared/feature-education/interactions/feature-interactions'
-
-// An unfinished action tour waits for the user to act, so it sits outside the one-tour-per-session
-// limit: it neither blocks other tours nor is blocked by them until it is seen (final tip shown or closed).
-export function isPausedActionTour(
-  state: Pick<UISlice, 'contextualToursSeenIds'>,
-  tourId: ContextualTourId | null
-): tourId is ContextualTourId {
-  return (
-    tourId !== null &&
-    !state.contextualToursSeenIds.includes(tourId) &&
-    hasContextualTourActionStep(getContextualTour(tourId))
-  )
-}
-
-function isInformationalTour(tourId: ContextualTourId): boolean {
-  return !hasContextualTourActionStep(getContextualTour(tourId))
-}
-
-export function isContextualTourSessionConsumed(
-  state: Pick<UISlice, 'contextualToursSeenIds' | 'contextualToursStartedThisSession'>,
-  tourId: ContextualTourId
-): boolean {
-  return (
-    !isPausedActionTour(state, tourId) &&
-    state.contextualToursStartedThisSession.some(
-      (started) => started !== tourId && isInformationalTour(started)
-    )
-  )
-}
-
-// A step added ahead of actions the user already did must not reopen the tour for them; only a
-// run already started this session (or a forced replay) continues past those actions.
-export function isContextualTourStartBlockedByProgress(
-  state: Pick<UISlice, 'featureInteractions' | 'contextualToursStartedThisSession'>,
-  tourId: ContextualTourId
-): boolean {
-  return (
-    !state.contextualToursStartedThisSession.includes(tourId) &&
-    getContextualTour(tourId).steps.some((step) =>
-      isContextualTourStepDone(step, state.featureInteractions)
-    )
-  )
-}
+import { hasFeatureInteraction } from '../../../../../shared/feature-interactions'
 
 export function createUiTourActions(set: UISliceSet, get: UISliceGet): Partial<UISlice> {
   return {
@@ -70,7 +19,7 @@ export function createUiTourActions(set: UISliceSet, get: UISliceGet): Partial<U
     activeContextualTourWasFeaturePreviouslyInteracted: false,
     contextualTourNavigationInteractionSnapshot: {},
     activeContextualTourSuppressed: false,
-    contextualToursStartedThisSession: [],
+    contextualTourShownThisSession: false,
     contextualToursOnboardingVisible: false,
     contextualToursBlockingSurfaceVisible: false,
     lastCompletedContextualTourId: null,
@@ -105,13 +54,11 @@ export function createUiTourActions(set: UISliceSet, get: UISliceGet): Partial<U
           autoEligible: options?.force === true || s.contextualToursAutoEligible === true,
           onboardingVisible: s.contextualToursOnboardingVisible,
           seenIds: options?.force === true ? [] : s.contextualToursSeenIds,
-          progressBlocked: options?.force !== true && isContextualTourStartBlockedByProgress(s, id),
-          sessionConsumed: options?.force !== true && isContextualTourSessionConsumed(s, id),
+          sessionConsumed: options?.force === true ? false : s.contextualTourShownThisSession,
           activeTourId: s.activeContextualTourId,
           activeModal: s.activeModal,
           blockingSurfaceVisible: s.contextualToursBlockingSurfaceVisible,
-          targetExists: hasContextualTourTarget,
-          isStepDone: (step) => isContextualTourStepDone(step, s.featureInteractions)
+          targetExists: hasContextualTourTarget
         })
         if (decision.kind !== 'start') {
           if (s.contextualTourNavigationInteractionSnapshot[id] === undefined) {
@@ -137,9 +84,7 @@ export function createUiTourActions(set: UISliceSet, get: UISliceGet): Partial<U
             hasFeatureInteraction(s.featureInteractions, id),
           contextualTourNavigationInteractionSnapshot: remainingNavigationSnapshot,
           activeContextualTourSuppressed: false,
-          contextualToursStartedThisSession: s.contextualToursStartedThisSession.includes(id)
-            ? s.contextualToursStartedThisSession
-            : [...s.contextualToursStartedThisSession, id],
+          contextualTourShownThisSession: true,
           lastCompletedContextualTourId: null
         }
       }),
@@ -169,19 +114,6 @@ export function createUiTourActions(set: UISliceSet, get: UISliceGet): Partial<U
           return s
         }
         const tour = getContextualTour(s.activeContextualTourId)
-        if (
-          tour.id === 'workspace-agent-sessions' &&
-          tour.steps[s.activeContextualTourStepIndex]?.id === 'agent-sessions-new-tab'
-        ) {
-          return {
-            activeContextualTourStepIndex: getContextualTourStepIndex(
-              tour.id,
-              s.activeTabType === 'agent-session'
-                ? 'agent-sessions-split-chat'
-                : 'agent-sessions-split'
-            )
-          }
-        }
         const nextStepIndex = getNextVisibleContextualTourStepIndex({
           tour,
           currentStepIndex: s.activeContextualTourStepIndex,
@@ -190,7 +122,7 @@ export function createUiTourActions(set: UISliceSet, get: UISliceGet): Partial<U
         if (nextStepIndex !== null) {
           return { activeContextualTourStepIndex: nextStepIndex }
         }
-        // Why: the browser tour's last target lives in a closed menu until that step is active.
+        // Why: browser step 3's target lives in a closed menu until that step is active.
         if (
           s.activeContextualTourId === 'browser' &&
           s.activeContextualTourStepIndex + 1 < tour.steps.length
@@ -269,9 +201,7 @@ export function createUiTourActions(set: UISliceSet, get: UISliceGet): Partial<U
         if (!tourId || (id && activeTourId !== id)) {
           return s
         }
-        // An unshown informational attempt frees the session for a retry; an action tour stays paused.
-        const freesSession =
-          !s.contextualToursSeenIds.includes(tourId) && isInformationalTour(tourId)
+        const alreadyShown = s.contextualToursSeenIds.includes(tourId)
         return {
           activeContextualTourId: null,
           activeContextualTourStepIndex: 0,
@@ -280,9 +210,7 @@ export function createUiTourActions(set: UISliceSet, get: UISliceGet): Partial<U
           activeContextualTourWasFeaturePreviouslyInteracted: false,
           activeContextualTourSuppressed: false,
           lastCompletedContextualTourId: null,
-          contextualToursStartedThisSession: freesSession
-            ? s.contextualToursStartedThisSession.filter((started) => started !== tourId)
-            : s.contextualToursStartedThisSession
+          contextualTourShownThisSession: alreadyShown ? s.contextualTourShownThisSession : false
         }
       }),
     markContextualToursSeen: (ids) =>

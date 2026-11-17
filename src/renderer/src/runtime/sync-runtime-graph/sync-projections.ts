@@ -1,10 +1,7 @@
 import type { AppState } from '@/store/types'
-import { resolveTerminalTabTitle } from '../../../../shared/workspace-layout/tab-groups/tab-title-resolution'
-import { remoteTabFaviconUrl } from '../../../../shared/browser/browser-favicon-url'
+import { resolveTerminalTabTitle } from '../../../../shared/tab-title-resolution'
 import { stableHashString } from './editor-draft-hash'
-import type { TerminalTab } from '../../../../shared/workspace-layout/terminal-tab-types'
-import { getOpenFileIndexes } from './mobile-session-inputs'
-import { getMobileMarkdownSourceFile, isMobilePublishableOpenFile } from './mobile-session-surfaces'
+import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import {
   EMPTY_BROWSER_PAGES_BY_WORKSPACE,
   EMPTY_BROWSER_TABS_BY_WORKTREE,
@@ -111,7 +108,6 @@ export function buildRuntimeMobileOpenFilesProjection(openFiles: AppState['openF
               language: file.language,
               mode: file.mode,
               diffSource: file.diffSource,
-              branchOldPath: file.branchOldPath,
               isDirty: file.isDirty,
               mirroredFromRuntimeSession: file.mirroredFromRuntimeSession,
               isUntitled: file.isUntitled,
@@ -199,9 +195,7 @@ function buildBrowserPagesProjection(
                 url: page.url,
                 loading: page.loading,
                 canGoBack: page.canGoBack,
-                canGoForward: page.canGoForward,
-                // An icon arriving resyncs; later swaps (animated icons) ride the next sync.
-                hasRemoteFavicon: remoteTabFaviconUrl(page.faviconUrl) !== null
+                canGoForward: page.canGoForward
               }))
             )
           }
@@ -224,91 +218,52 @@ export function buildRuntimeMobileBrowserProjection(state: AppState): string {
   )},"pagesByWorkspace":${buildBrowserPagesProjection(getBrowserPagesByWorkspace(state))}}`
 }
 
-let cachedDraftSourceFileIds: {
-  source: AppState['openFiles']
-  ids: ReadonlySet<string>
-} | null = null
-
-function getEditorDraftSourceFileIds(openFiles: AppState['openFiles']): ReadonlySet<string> {
-  if (cachedDraftSourceFileIds?.source === openFiles) {
-    return cachedDraftSourceFileIds.ids
-  }
-  const indexes = getOpenFileIndexes(openFiles)
-  const ids = new Set<string>()
-  for (const file of openFiles) {
-    if (!isMobilePublishableOpenFile(file)) {
-      continue
-    }
-    const source = getMobileMarkdownSourceFile(file, indexes.byWorktreeAndId.get(file.worktreeId))
-    if (source) {
-      ids.add(source.id)
-    }
-  }
-  cachedDraftSourceFileIds = { source: openFiles, ids }
-  return ids
-}
-
-// Reuse unchanged file hashes between coalesced snapshot captures.
-function getEditorDraftHashCache(
-  editorDrafts: AppState['editorDrafts'],
-  openFiles: AppState['openFiles']
-): EditorDraftHashCache {
+// Monaco re-spreads drafts per keystroke; memoize each file’s unchanged string so typing does not rehash all dirty files.
+function getEditorDraftHashCache(editorDrafts: AppState['editorDrafts']): EditorDraftHashCache {
   const cached = graphState.cachedEditorDraftHashes
-  if (cached?.source === editorDrafts && cached.openFiles === openFiles) {
+  if (cached?.source === editorDrafts) {
     return cached
   }
-
-  const sourceFileIds = getEditorDraftSourceFileIds(openFiles)
 
   const previousEntries = cached?.entries
   const entries = new Map<string, EditorDraftHashCacheEntry>()
   const hashByFileId = new Map<string, string>()
-  for (const fileId of sourceFileIds) {
-    const content = editorDrafts[fileId]
-    if (content === undefined) {
-      continue
-    }
+  const parts: string[] = []
+  for (const [fileId, content] of Object.entries(editorDrafts)) {
     const previous = previousEntries?.get(fileId)
     let entry: EditorDraftHashCacheEntry
     if (previous?.content === content) {
       entry = previous
     } else {
+      const fileIdJson = previous?.fileIdJson ?? JSON.stringify(fileId)
       const hash = stableHashString(content)
-      entry = { content, hash }
+      entry = { content, hash, fileIdJson, projection: `${fileIdJson}:${JSON.stringify(hash)}` }
     }
     entries.set(fileId, entry)
     hashByFileId.set(fileId, entry.hash)
+    parts.push(entry.projection)
   }
   const next: EditorDraftHashCache = {
     source: editorDrafts,
-    openFiles,
     entries,
-    hashByFileId
+    hashByFileId,
+    projection: `{${parts.join(',')}}`
   }
   graphState.cachedEditorDraftHashes = next
   return next
 }
 
 export function buildRuntimeMobileEditorDraftsProjection(
-  editorDrafts: AppState['editorDrafts'],
-  openFiles: AppState['openFiles']
-): ReadonlyMap<string, string> {
-  const drafts = new Map<string, string>()
-  for (const fileId of getEditorDraftSourceFileIds(openFiles)) {
-    const content = editorDrafts[fileId]
-    if (content !== undefined) {
-      drafts.set(fileId, content)
-    }
-  }
-  return drafts
+  editorDrafts: AppState['editorDrafts']
+): string {
+  return getEditorDraftHashCache(editorDrafts).projection
 }
 
-/** Per-file version stamps are hashed only when a mobile snapshot is built. */
+/** Per-file draft version stamps for the mobile session snapshot; shares the keystroke memo. */
 export function getEditorDraftVersionByFileId(
-  editorDrafts: AppState['editorDrafts'],
-  openFiles: AppState['openFiles']
+  editorDrafts: AppState['editorDrafts']
 ): ReadonlyMap<string, string> {
-  return getEditorDraftHashCache(editorDrafts, openFiles).hashByFileId
+  return getEditorDraftHashCache(editorDrafts).hashByFileId
 }
 
 export function resetRuntimeMobileSyncProjectionCachesForTests(): void {
@@ -317,5 +272,4 @@ export function resetRuntimeMobileSyncProjectionCachesForTests(): void {
   graphState.cachedBrowserWorkspacesProjection = null
   graphState.cachedBrowserPagesProjection = null
   graphState.cachedEditorDraftHashes = null
-  cachedDraftSourceFileIds = null
 }

@@ -4,8 +4,8 @@ import { ExternalLink, Layers3 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
+import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 import type { LinearCustomViewSummary } from '../../../shared/linear/project-types'
 import {
   linearProjectDateLabel,
@@ -44,21 +44,23 @@ function LinearCustomViewTableSkeleton(): React.JSX.Element {
 }
 
 function LinearCustomViewTableEmpty({ hasError }: { hasError?: boolean }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div className="px-4 py-10 text-center">
       <p className="text-sm font-medium text-foreground">
         {hasError
-          ? t('auto.components.linear.project.view.surfaces.c0a50f96a4', 'Unable to load views')
-          : t('auto.components.linear.project.view.surfaces.ef90b21366', 'No views found')}
+          ? translate(
+              'auto.components.linear.project.view.surfaces.c0a50f96a4',
+              'Unable to load views'
+            )
+          : translate('auto.components.linear.project.view.surfaces.ef90b21366', 'No views found')}
       </p>
       <p className="mt-2 text-sm text-muted-foreground">
         {hasError
-          ? t(
+          ? translate(
               'auto.components.linear.project.view.surfaces.f4c79cff5f',
               'Review the workspace error below, then refresh.'
             )
-          : t(
+          : translate(
               'auto.components.linear.project.view.surfaces.9f0f51fd9e',
               'Create or save views in Linear, then refresh.'
             )}
@@ -76,8 +78,6 @@ export function LinearCustomViewTableContent({
   onSelectView,
   onOpenView
 }: LinearCustomViewTableContentProps): React.JSX.Element {
-  const t = useTranslate()
-  const intlLocale = useIntlLocale()
   if (loading && views.length === 0) {
     return <LinearCustomViewTableSkeleton />
   }
@@ -131,17 +131,17 @@ export function LinearCustomViewTableContent({
             </Badge>
             <span className="truncate text-[12px] text-muted-foreground">
               {view.shared
-                ? t('auto.components.linear.project.view.surfaces.27d91cb1a6', 'Shared')
-                : t('auto.components.linear.project.view.surfaces.f059181bd9', 'Private')}
+                ? translate('auto.components.linear.project.view.surfaces.27d91cb1a6', 'Shared')
+                : translate('auto.components.linear.project.view.surfaces.f059181bd9', 'Private')}
             </span>
             <span className="truncate text-[12px] text-muted-foreground">
               {linearProjectUnknownText(view.owner ?? view.creator) ??
-                t('auto.components.linear.project.view.surfaces.20b9d09b7d', 'Unknown')}
+                translate('auto.components.linear.project.view.surfaces.20b9d09b7d', 'Unknown')}
             </span>
             <span className="truncate text-[12px] text-muted-foreground">
               {view.updatedAt
-                ? linearProjectDateLabel(view.updatedAt, t, intlLocale)
-                : t('auto.components.linear.project.view.surfaces.20b9d09b7d', 'Unknown')}
+                ? linearProjectDateLabel(view.updatedAt)
+                : translate('auto.components.linear.project.view.surfaces.20b9d09b7d', 'Unknown')}
             </span>
             <div className="flex justify-end md:can-hover:opacity-0 md:transition-opacity md:group-hover/row:opacity-100 md:group-focus-within/row:opacity-100">
               <Tooltip>
@@ -153,8 +153,8 @@ export function LinearCustomViewTableContent({
                       event.stopPropagation()
                       onOpenView(view)
                     }}
-                    aria-label={t(
-                      'auto.components.linear.project.view.surfaces.openInLinear',
+                    aria-label={translate(
+                      'auto.components.linear.project.view.surfaces.7616c986c6',
                       'Open {{value0}} in Linear',
                       { value0: view.name }
                     )}
@@ -163,7 +163,10 @@ export function LinearCustomViewTableContent({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" sideOffset={6}>
-                  {t('auto.components.linear.project.view.surfaces.aac9a4afc6', 'Open in Linear')}
+                  {translate(
+                    'auto.components.linear.project.view.surfaces.aac9a4afc6',
+                    'Open in Linear'
+                  )}
                 </TooltipContent>
               </Tooltip>
             </div>

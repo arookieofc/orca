@@ -1,7 +1,7 @@
 import {
   decodeTerminalStreamText,
   type TerminalStreamFrame
-} from '../../../../../shared/terminal/stream/terminal-stream-protocol'
+} from '../../../../../shared/terminal-stream-protocol'
 import { isTerminalInputLockedForClient, sendTerminalStreamInput } from './terminal-input-delivery'
 import type {
   TerminalInputSequenceLedger,
@@ -39,10 +39,10 @@ export function handleMultiplexInputFrame(
       // Ack only after provider handoff because clients delete their replay copy.
       requireWriteSettlement: sequenced
     })
-    if (!sequenced && outcome !== 'paused') {
+    if (!sequenced) {
       state.notifyStreamWriteUnavailable(stream, outcome)
     }
-    return outcome === 'delivered' || outcome === 'paused'
+    return outcome === 'delivered'
       ? 'applied'
       : outcome === 'rejected'
         ? 'refused'

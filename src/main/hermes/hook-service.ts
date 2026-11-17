@@ -1,18 +1,14 @@
 import { rmSync } from 'node:fs'
 import type { SFTPWrapper } from 'ssh2'
 
-import type {
-  AgentHookInstallState,
-  AgentHookInstallStatus
-} from '../../shared/agent-hook-listener/configuration/agent-hook-types'
+import type { AgentHookInstallState, AgentHookInstallStatus } from '../../shared/agent-hook-types'
 import {
   listRemoteDirectory,
   readTextFileRemote,
   writeTextFileRemoteAtomic
-} from '../agent-hooks/installation/remote/hook-text-files-remote'
-
+} from '../agent-hooks/installer-utils-remote'
+import type { HermesConfig } from './hermes-config-yaml'
 import {
-  type HermesConfig,
   disablePlugin,
   enablePlugin,
   getConfigEnablement,

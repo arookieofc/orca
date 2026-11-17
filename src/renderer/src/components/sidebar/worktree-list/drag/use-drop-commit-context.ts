@@ -39,7 +39,6 @@ export function useWorktreeDropCommitContext(args: {
       refreshWorktreeDragSession: session.refreshWorktreeDragSession,
       getEligibleLineageDropTarget: lineageDrop.getEligibleLineageDropTarget,
       commitWorktreeLineageParentDrop: lineageDrop.commitWorktreeLineageParentDrop,
-      captureFolderRetention: lineageDrop.captureFolderRetention,
       clearReorderedWorktreeParents: lineageDrop.clearReorderedWorktreeParents,
       clearWorktreeDrag: runtime.clearWorktreeDrag,
       onMoveWorktreesToStatus: (worktreeIds, status) =>
@@ -60,7 +59,6 @@ export function useWorktreeDropCommitContext(args: {
     onReorderWorktrees,
     runtime.clearWorktreeDrag,
     scrollRef,
-    lineageDrop.captureFolderRetention,
     session.computeWorktreeDrop,
     session.computeWorktreeStatusDrop,
     session.refreshWorktreeDragSession,

@@ -21,7 +21,6 @@ export type PhoneMirrorTopology<TDesktop> = {
 }
 
 type PhoneMirrorTopologyOptions = {
-  withoutBrowser?: boolean
   /** Lets `host.restartServeProcess` reclaim the same port. */
   pinnedServePort?: boolean
 }
@@ -54,8 +53,7 @@ export async function launchPhoneMirrorTopology(
   try {
     const host = await launchHeadlessPairedRuntimeHost({
       pairingScope: options.phoneTo === 'host' ? 'mobile' : 'runtime',
-      pinnedServePort: options.pinnedServePort,
-      withoutBrowser: options.withoutBrowser
+      pinnedServePort: options.pinnedServePort
     })
     cleanups.push(host.dispose)
     let desktop: PairedElectronClient | null = null

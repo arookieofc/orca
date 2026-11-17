@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { createTestUsageStoreHost } from '../usage/usage-store-host-test-fixture'
-import { scanCodexUsageFilesViaWorker } from '../usage/scan-worker/usage-scan-worker-spawn'
-import { CodexUsageStore } from './store'
+import type { Mock } from 'vitest'
+import { scanCodexUsageFilesViaWorker } from '../usage/usage-scan-worker-spawn'
+import { CodexUsageStore, initCodexUsagePath } from './store'
 import type { CodexUsagePersistedState } from './types'
 
 export function createEmptyScanResult() {
@@ -66,33 +66,37 @@ export function createWorktreeUsageSession(worktreeId: string) {
 }
 
 export function createStoreWithState(state: Partial<CodexUsagePersistedState>): CodexUsageStore {
-  writeFileSync(
-    join(activeUserData, 'orca-codex-usage.json'),
-    JSON.stringify({
-      schemaVersion: 7,
-      worktreeFingerprint: null,
-      processedFiles: [],
-      sessions: [],
-      dailyAggregates: [],
-      scanState: {
-        enabled: false,
-        lastScanStartedAt: null,
-        lastScanCompletedAt: null,
-        lastScanError: null
-      },
-      ...state
-    })
-  )
-  return new CodexUsageStore(createTestUsageStoreHost({ userDataPath: activeUserData }))
+  const store = new CodexUsageStore({
+    getRepos: () => [],
+    getAllWorktreeMeta: () => ({})
+  })
+
+  ;(store as unknown as { state: CodexUsagePersistedState }).state = {
+    schemaVersion: 1,
+    worktreeFingerprint: null,
+    processedFiles: [],
+    sessions: [],
+    dailyAggregates: [],
+    scanState: {
+      enabled: false,
+      lastScanStartedAt: null,
+      lastScanCompletedAt: null,
+      lastScanError: null
+    },
+    ...state
+  }
+
+  return store
 }
 
-let activeUserData: string
-export function setupCodexUsageStoreEnv(): { tempUserData: string } {
+/** The caller owns the hoisted Electron mock. */
+export function setupCodexUsageStoreEnv(getPathMock: Mock): { tempUserData: string } {
   const env = { tempUserData: '' }
 
   beforeEach(() => {
     env.tempUserData = mkdtempSync(join(tmpdir(), 'orca-codex-usage-store-'))
-    activeUserData = env.tempUserData
+    getPathMock.mockReturnValue(env.tempUserData)
+    initCodexUsagePath()
     vi.mocked(scanCodexUsageFilesViaWorker).mockReset()
     vi.mocked(scanCodexUsageFilesViaWorker).mockResolvedValue(createEmptyScanResult())
     vi.useFakeTimers()

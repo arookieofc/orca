@@ -25,7 +25,7 @@ export function closeSharedControlSocket(args: {
   lastClose: { code: number; reason: string } | null
   error?: Error
   preserveReadyWaitersAndPendingRequests?: boolean
-  clearReadinessTimer: () => void
+  clearReadyStableTimer: () => void
 }): void {
   if (args.ws || args.socketCleanup) {
     args.reportClose()
@@ -38,7 +38,7 @@ export function closeSharedControlSocket(args: {
       error: args.error
     })
   }
-  args.clearReadinessTimer()
+  args.clearReadyStableTimer()
   finishCloseAfterReadySubscriptions(args.subscriptions)
   closeSharedControlSocketState({
     readyWaiters: args.readyWaiters,

@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react'
+import { LoaderCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { Button } from '../ui/button'
@@ -10,9 +11,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '../ui/dialog'
-import { DialogCancel, DialogError } from '../ui/dialog-parts'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
 import {
   runKillAllTerminalSurfaces,
   snapshotKillAllTerminalSurfaceIds,
@@ -36,8 +35,6 @@ export type DaemonActionsApi = {
   setPending: (kind: PendingConfirm) => void
   busyKind: DaemonActionKind | null
   isBusy: boolean
-  /** The confirmed action failed outright; the dialog stays open to offer Try again. */
-  error: string | null
   runRestart: () => Promise<void>
   runKillAll: () => Promise<void>
   runConfirmed: () => void
@@ -73,29 +70,14 @@ function showKillAllTerminalSurfacesResult(summary: KillAllTerminalSurfacesSumma
             value2: summary.daemon.remainingCount
           }
         )
-  const inventoryWarning =
-    summary.daemon.status === 'fulfilled' && summary.daemon.listingIncomplete
-      ? translate(
-          'components.shared.useDaemonActions.someSessionsUnchecked',
-          'Some sessions couldn’t be checked.'
-        )
-      : null
-  const description = [
-    [surfaceDescription, daemonDescription].filter(Boolean).join(' '),
-    inventoryWarning
-  ]
-    .filter(Boolean)
-    .join('\n')
-  const noticeOptions = inventoryWarning
-    ? { description, classNames: { description: 'whitespace-pre-line' } }
-    : { description }
+  const description = [surfaceDescription, daemonDescription].filter(Boolean).join(' ')
   if (summary.daemon.status === 'rejected') {
     toast.error(
       translate(
         'auto.components.shared.useDaemonActions.1f0d8ac762',
         'Terminal cleanup finished with errors.'
       ),
-      noticeOptions
+      { description }
     )
     return
   }
@@ -105,17 +87,17 @@ function showKillAllTerminalSurfacesResult(summary: KillAllTerminalSurfacesSumma
         'auto.components.shared.useDaemonActions.1f0d8ac762',
         'Terminal cleanup finished with errors.'
       ),
-      noticeOptions
+      { description }
     )
     return
   }
-  if (summary.daemon.remainingCount > 0 || summary.daemon.listingIncomplete) {
+  if (summary.daemon.remainingCount > 0) {
     toast.warning(
       translate(
         'auto.components.shared.useDaemonActions.80b6ea14cf',
         'Terminal cleanup finished with warnings.'
       ),
-      noticeOptions
+      { description }
     )
     return
   }
@@ -138,69 +120,59 @@ function showKillAllTerminalSurfacesResult(summary: KillAllTerminalSurfacesSumma
           'auto.components.shared.useDaemonActions.d9657ac204',
           'Terminal session shutdown requested.'
         ),
-    noticeOptions
+    { description }
   )
 }
 
 export function useDaemonActions(callbacks?: DaemonActionCallbacks): DaemonActionsApi {
   const [pending, setPending] = useState<PendingConfirm>(null)
   const [busyKind, setBusyKind] = useState<DaemonActionKind | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const mountedRef = useMountedRef()
 
-  const changePending = useCallback((kind: PendingConfirm): void => {
-    setError(null)
-    setPending(kind)
-  }, [])
-
-  // Why keep it open on failure: nothing ran, so the same confirmation can retry in place.
-  const settlePendingAction = useCallback(
-    (failure: string | null): void => {
-      if (!mountedRef.current) {
-        return
-      }
-      setBusyKind(null)
-      setError(failure)
-      if (failure === null) {
-        setPending(null)
-      }
-    },
-    [mountedRef]
-  )
+  const clearPendingAction = useCallback((): void => {
+    if (!mountedRef.current) {
+      return
+    }
+    setBusyKind(null)
+    setPending(null)
+  }, [mountedRef])
 
   const runRestart = useCallback(async () => {
     setBusyKind('restart')
-    setError(null)
-    const failure = translate(
-      'components.shared.useDaemonActions.restartFailed',
-      'Couldn’t restart the terminal service.'
-    )
-    let outcome: string | null = failure
     try {
       const { success } = await window.api.pty.management.restart()
       if (success) {
-        outcome = null
         toast.success(
           translate('auto.components.shared.useDaemonActions.0e9da1b98e', 'Daemon restarted.')
         )
+      } else {
+        toast.error(
+          translate(
+            'auto.components.shared.useDaemonActions.b5954e12d3',
+            'Restart failed — check logs.'
+          )
+        )
       }
     } catch (err) {
-      console.error('[terminal-service] restart failed:', err)
+      toast.error(
+        translate('auto.components.shared.useDaemonActions.d762b41f41', 'Restart failed.'),
+        {
+          description: err instanceof Error ? err.message : undefined
+        }
+      )
     } finally {
-      settlePendingAction(outcome)
+      clearPendingAction()
       if (mountedRef.current) {
         callbacks?.onRestartSettled?.()
       }
     }
-  }, [callbacks, settlePendingAction, mountedRef])
+  }, [callbacks, clearPendingAction, mountedRef])
 
   const runKillAll = useCallback(async () => {
     // Snapshot confirmed surfaces before callbacks/awaits so newly created tabs stay outside the destructive scope.
     const targetSurfaceIds = snapshotKillAllTerminalSurfaceIds()
     setBusyKind('killAll')
-    setError(null)
     callbacks?.onKillAllStart?.()
-    let outcome: string | null = null
     try {
       const summary = await runKillAllTerminalSurfaces(targetSurfaceIds)
       if (summary.daemon.status === 'rejected' && mountedRef.current) {
@@ -211,18 +183,22 @@ export function useDaemonActions(callbacks?: DaemonActionCallbacks): DaemonActio
       if (mountedRef.current) {
         callbacks?.onKillAllError?.()
       }
-      console.error('[terminal-service] kill all sessions failed:', err)
-      outcome = translate(
-        'auto.components.shared.useDaemonActions.e8f25bd903',
-        'Couldn’t finish terminal cleanup.'
+      toast.error(
+        translate(
+          'auto.components.shared.useDaemonActions.e8f25bd903',
+          'Couldn’t finish terminal cleanup.'
+        ),
+        {
+          description: err instanceof Error ? err.message : undefined
+        }
       )
     } finally {
-      settlePendingAction(outcome)
+      clearPendingAction()
       if (mountedRef.current) {
         callbacks?.onKillAllSettled?.()
       }
     }
-  }, [callbacks, settlePendingAction, mountedRef])
+  }, [callbacks, clearPendingAction, mountedRef])
 
   const runConfirmed = useCallback(() => {
     if (pending === 'restart') {
@@ -234,10 +210,9 @@ export function useDaemonActions(callbacks?: DaemonActionCallbacks): DaemonActio
 
   return {
     pending,
-    setPending: changePending,
+    setPending,
     busyKind,
     isBusy: busyKind !== null,
-    error,
     runRestart,
     runKillAll,
     runConfirmed
@@ -246,69 +221,101 @@ export function useDaemonActions(callbacks?: DaemonActionCallbacks): DaemonActio
 
 type DaemonActionCopy = {
   title: string
-  description: string
+  description: React.ReactNode
   confirmLabel: string
   busyLabel: string
 }
 
-function getCopy(kind: DaemonActionKind, t: Translate = translate): DaemonActionCopy {
+function getCopy(kind: DaemonActionKind): DaemonActionCopy {
   if (kind === 'restart') {
     return {
-      title: t(
+      title: translate(
         'auto.components.shared.useDaemonActions.922548bc66',
         'Restart the terminal service?'
       ),
-      description: t(
-        'auto.components.shared.useDaemonActions.01d6b7c64e',
-        'Open terminals and agents will restart. Terminals on remote hosts are not affected.'
+      description: (
+        <>
+          {translate(
+            'auto.components.shared.useDaemonActions.01d6b7c64e',
+            'Open terminals and agents will restart. Terminals on remote hosts are not affected.'
+          )}
+        </>
       ),
-      confirmLabel: t('auto.components.shared.useDaemonActions.confirmRestart', 'Restart'),
-      busyLabel: t('auto.components.shared.useDaemonActions.busyRestarting', 'Restarting…')
+      confirmLabel: 'Restart',
+      busyLabel: 'Restarting…'
     }
   }
   return {
-    title: t('auto.components.shared.useDaemonActions.1bbea41a77', 'Kill all terminal sessions?'),
-    description: t(
-      'components.shared.useDaemonActions.killAllSessionsDescription',
-      'Ends every terminal session and its agents, including ones with no open tab. Unsaved work is lost.'
+    title: translate(
+      'auto.components.shared.useDaemonActions.1bbea41a77',
+      'Kill all terminal sessions?'
     ),
-    confirmLabel: t('auto.components.shared.useDaemonActions.confirmKillAll', 'Kill all sessions'),
-    busyLabel: t('auto.components.shared.useDaemonActions.busyKilling', 'Killing…')
+    description: (
+      <>
+        {translate(
+          'auto.components.shared.useDaemonActions.a702d4196e',
+          "This closes every terminal tab across all workspaces and requests shutdown for its current terminal sessions. Any unsaved terminal work is lost. The daemon itself keeps running, and new terminals can be opened immediately. This can't be undone."
+        )}
+      </>
+    ),
+    confirmLabel: 'Kill all sessions',
+    busyLabel: 'Killing…'
   }
 }
 
-export function DaemonActionDialog({ api }: { api: DaemonActionsApi }): React.JSX.Element {
-  const t = useTranslate()
-  const { pending, setPending, busyKind, isBusy, error, runConfirmed } = api
-  const copy = pending ? getCopy(pending, t) : null
+export function DaemonActionDialog({
+  api,
+  // Popover callers gate dismissal so confirmation remains mounted during mutation.
+  extraDescription
+}: {
+  api: DaemonActionsApi
+  extraDescription?: React.ReactNode
+}): React.JSX.Element {
+  const { pending, setPending, busyKind, isBusy, runConfirmed } = api
+  const copy = pending ? getCopy(pending) : null
   return (
     <Dialog
       open={pending !== null}
       onOpenChange={(open) => {
-        if (!open && !isBusy) {
-          setPending(null)
+        if (open) {
+          return
         }
+        if (isBusy) {
+          return
+        }
+        setPending(null)
       }}
     >
       <DialogContent
-        size="confirm"
-        busy={isBusy}
-        initialFocus="cancel"
-        className="z-[80]"
+        className="z-[80] max-w-md"
         overlayClassName="z-[80]"
+        showCloseButton={!isBusy}
+        onPointerDownOutside={(e) => {
+          if (isBusy) {
+            e.preventDefault()
+          }
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isBusy) {
+            e.preventDefault()
+          }
+        }}
       >
         {copy ? (
           <>
             <DialogHeader>
-              <DialogTitle>{copy.title}</DialogTitle>
-              <DialogDescription>{copy.description}</DialogDescription>
+              <DialogTitle className="text-sm">{copy.title}</DialogTitle>
+              <DialogDescription className="text-xs">
+                {copy.description}
+                {extraDescription ? <div className="mt-2">{extraDescription}</div> : null}
+              </DialogDescription>
             </DialogHeader>
-            {error ? <DialogError>{error}</DialogError> : null}
             <DialogFooter>
-              <DialogCancel>
-                {t('auto.components.shared.useDaemonActions.01af244097', 'Cancel')}
-              </DialogCancel>
-              <Button size="sm" variant="destructive" onClick={runConfirmed} disabled={isBusy}>
+              <Button variant="outline" onClick={() => setPending(null)} disabled={isBusy}>
+                {translate('auto.components.shared.useDaemonActions.01af244097', 'Cancel')}
+              </Button>
+              <Button variant="destructive" onClick={runConfirmed} disabled={isBusy}>
+                {isBusy ? <LoaderCircle className="size-4 animate-spin" /> : null}
                 {isBusy && busyKind === pending ? copy.busyLabel : copy.confirmLabel}
               </Button>
             </DialogFooter>

@@ -1,12 +1,13 @@
 import { Check } from 'lucide-react'
 import { useCallback, useState } from 'react'
-import type { BuiltInWindowsTerminalShell } from '../../../../shared/shell/launch/windows-terminal-shell'
-import { WINDOWS_GIT_BASH_SHELL } from '../../../../shared/shell/launch/windows-terminal-shell'
-import type { GlobalSettings } from '../../../../shared/settings/global-settings-types'
-import { cn } from '@/lib/class-names'
-import { useWindowsTerminalCapabilities } from '@/runtime/hosts/capabilities/windows-terminal-capabilities'
-import { SettingsSegmentedControl } from '../settings/form-controls/SettingsFormControls'
-import { ShellIcon } from '../terminal/shells/ShellIcon'
+import type { BuiltInWindowsTerminalShell } from '../../../../shared/windows-terminal-shell'
+import { WINDOWS_GIT_BASH_SHELL } from '../../../../shared/windows-terminal-shell'
+import { WINDOWS_NIUBASH_SHELL } from '../../../../shared/niubash-shell'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import { cn } from '@/lib/utils'
+import { useWindowsTerminalCapabilities } from '@/lib/windows-terminal-capabilities'
+import { SettingsSegmentedControl } from '../settings/SettingsFormControls'
+import { ShellIcon } from '../tab-bar/shell-icons'
 import {
   Select,
   SelectContent,
@@ -14,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { useTranslate } from '@/i18n/use-translate'
+import { translate } from '@/i18n/i18n'
 
 type WindowsTerminalStepProps = {
   settings: GlobalSettings | null
@@ -41,7 +42,8 @@ function normalizeWindowsShell(value: string | null | undefined): BuiltInWindows
     value === 'powershell.exe' ||
     value === 'cmd.exe' ||
     value === 'wsl.exe' ||
-    value === WINDOWS_GIT_BASH_SHELL
+    value === WINDOWS_GIT_BASH_SHELL ||
+    value === WINDOWS_NIUBASH_SHELL
   ) {
     return value
   }
@@ -52,7 +54,6 @@ export function WindowsTerminalStep({
   settings,
   updateSettings
 }: WindowsTerminalStepProps): React.JSX.Element {
-  const t = useTranslate()
   const capabilities = useWindowsTerminalCapabilities(Boolean(settings), true)
   const [selectPortalRoot, setSelectPortalRoot] = useState<HTMLElement | null>(null)
   const windowsShell = normalizeWindowsShell(settings?.terminalWindowsShell)
@@ -64,6 +65,7 @@ export function WindowsTerminalStep({
       : capabilities.wslDistros
   const showGitBashOption = capabilities.gitBashAvailable || windowsShell === WINDOWS_GIT_BASH_SHELL
   const showWslOption = capabilities.wslAvailable || windowsShell === 'wsl.exe'
+  const showNiubashOption = capabilities.niubashAvailable || windowsShell === WINDOWS_NIUBASH_SHELL
 
   const setSelectPortalHost = useCallback((node: HTMLDivElement | null) => {
     // Portal inside onboarding so its overlay cannot block the distro menu.
@@ -73,21 +75,24 @@ export function WindowsTerminalStep({
   const shellOptions: ShellOption[] = [
     {
       value: 'powershell.exe',
-      label: t('auto.components.onboarding.WindowsTerminalStep.powerShell', 'PowerShell'),
+      label: translate('auto.components.onboarding.WindowsTerminalStep.powerShell', 'PowerShell'),
       description: capabilities.pwshAvailable
-        ? t(
+        ? translate(
             'auto.components.onboarding.WindowsTerminalStep.powerShellPwsh',
             'Uses PowerShell 7+ when available, with Windows PowerShell as fallback.'
           )
-        : t(
+        : translate(
             'auto.components.onboarding.WindowsTerminalStep.powerShellInbox',
             'Uses the Windows PowerShell available on every supported Windows install.'
           )
     },
     {
       value: 'cmd.exe',
-      label: t('auto.components.onboarding.WindowsTerminalStep.commandPrompt', 'Command Prompt'),
-      description: t(
+      label: translate(
+        'auto.components.onboarding.WindowsTerminalStep.commandPrompt',
+        'Command Prompt'
+      ),
+      description: translate(
         'auto.components.onboarding.WindowsTerminalStep.commandPromptDescription',
         'Opens new terminal panes with classic cmd.exe behavior.'
       )
@@ -96,13 +101,13 @@ export function WindowsTerminalStep({
       ? [
           {
             value: WINDOWS_GIT_BASH_SHELL,
-            label: t('auto.components.onboarding.WindowsTerminalStep.gitBash', 'Git Bash'),
+            label: translate('auto.components.onboarding.WindowsTerminalStep.gitBash', 'Git Bash'),
             description: capabilities.gitBashAvailable
-              ? t(
+              ? translate(
                   'auto.components.onboarding.WindowsTerminalStep.gitBashDescription',
                   'Uses Git for Windows bash.exe for Unix-style shell workflows.'
                 )
-              : t(
+              : translate(
                   'auto.components.onboarding.WindowsTerminalStep.gitBashUnavailable',
                   'Selected, but Git Bash was not detected on this machine.'
                 ),
@@ -110,17 +115,35 @@ export function WindowsTerminalStep({
           } satisfies ShellOption
         ]
       : []),
+    ...(showNiubashOption
+      ? [
+          {
+            value: WINDOWS_NIUBASH_SHELL,
+            label: 'Niubash',
+            description: capabilities.niubashAvailable
+              ? translate(
+                  'auto.components.onboarding.WindowsTerminalStep.niubashDescription',
+                  'Uses native Bash-compatible niu.exe without WSL or MSYS.'
+                )
+              : translate(
+                  'auto.components.onboarding.WindowsTerminalStep.niubashUnavailable',
+                  'Selected, but Niubash was not detected on this machine.'
+                ),
+            disabled: !capabilities.niubashAvailable
+          } satisfies ShellOption
+        ]
+      : []),
     ...(showWslOption
       ? [
           {
             value: 'wsl.exe',
-            label: t('auto.components.onboarding.WindowsTerminalStep.wsl', 'WSL'),
+            label: translate('auto.components.onboarding.WindowsTerminalStep.wsl', 'WSL'),
             description: capabilities.wslAvailable
-              ? t(
+              ? translate(
                   'auto.components.onboarding.WindowsTerminalStep.wslDescription',
                   'Starts new terminal panes inside your Windows Subsystem for Linux default.'
                 )
-              : t(
+              : translate(
                   'auto.components.onboarding.WindowsTerminalStep.wslUnavailable',
                   'Selected, but WSL was not detected on this machine.'
                 ),
@@ -133,22 +156,22 @@ export function WindowsTerminalStep({
   const rightClickOptions: RightClickOption[] = [
     {
       value: 'paste',
-      label: t(
+      label: translate(
         'auto.components.onboarding.WindowsTerminalStep.rightClickPaste',
         'Paste on right-click'
       ),
-      description: t(
+      description: translate(
         'auto.components.onboarding.WindowsTerminalStep.rightClickPasteDescription',
         'Right-click pastes the clipboard. Ctrl+right-click opens the context menu.'
       )
     },
     {
       value: 'menu',
-      label: t(
+      label: translate(
         'auto.components.onboarding.WindowsTerminalStep.rightClickMenu',
         'Open context menu'
       ),
-      description: t(
+      description: translate(
         'auto.components.onboarding.WindowsTerminalStep.rightClickMenuDescription',
         'Right-click opens the terminal menu. Paste from the menu or keyboard.'
       )
@@ -158,7 +181,7 @@ export function WindowsTerminalStep({
   if (!settings) {
     return (
       <div className="rounded-xl border border-border bg-muted/20 px-5 py-4 text-sm text-muted-foreground">
-        {t(
+        {translate(
           'auto.components.onboarding.WindowsTerminalStep.loading',
           'Loading terminal settings...'
         )}
@@ -176,10 +199,13 @@ export function WindowsTerminalStep({
       <section className="space-y-3">
         <div className="space-y-1">
           <h2 className="text-sm font-semibold text-foreground">
-            {t('auto.components.onboarding.WindowsTerminalStep.defaultShell', 'Default Shell')}
+            {translate(
+              'auto.components.onboarding.WindowsTerminalStep.defaultShell',
+              'Default Shell'
+            )}
           </h2>
           <p className="text-[13px] leading-relaxed text-muted-foreground">
-            {t(
+            {translate(
               'auto.components.onboarding.WindowsTerminalStep.defaultShellDescription',
               'Choose the shell Orca opens for new Windows terminal panes.'
             )}
@@ -205,13 +231,13 @@ export function WindowsTerminalStep({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
                 <div className="text-sm font-medium text-foreground">
-                  {t(
+                  {translate(
                     'auto.components.onboarding.WindowsTerminalStep.wslDistribution',
                     'WSL Distribution'
                   )}
                 </div>
                 <p className="text-[13px] leading-relaxed text-muted-foreground">
-                  {t(
+                  {translate(
                     'auto.components.onboarding.WindowsTerminalStep.wslDistributionDescription',
                     'Use the Windows default distribution or choose a specific installed distro.'
                   )}
@@ -228,7 +254,7 @@ export function WindowsTerminalStep({
               >
                 <SelectTrigger
                   size="sm"
-                  aria-label={t(
+                  aria-label={translate(
                     'auto.components.onboarding.WindowsTerminalStep.wslDistribution',
                     'WSL Distribution'
                   )}
@@ -237,11 +263,11 @@ export function WindowsTerminalStep({
                   <SelectValue
                     placeholder={
                       capabilities.isLoading
-                        ? t(
+                        ? translate(
                             'auto.components.onboarding.WindowsTerminalStep.loadingDistros',
                             'Loading distributions'
                           )
-                        : t(
+                        : translate(
                             'auto.components.onboarding.WindowsTerminalStep.windowsDefault',
                             'Windows default'
                           )
@@ -254,7 +280,7 @@ export function WindowsTerminalStep({
                   className="z-[120] w-[--radix-select-trigger-width]"
                 >
                   <SelectItem value={DEFAULT_WSL_DISTRO_VALUE}>
-                    {t(
+                    {translate(
                       'auto.components.onboarding.WindowsTerminalStep.windowsDefault',
                       'Windows default'
                     )}
@@ -274,13 +300,13 @@ export function WindowsTerminalStep({
       <section className="space-y-3">
         <div className="space-y-1">
           <h2 className="text-sm font-semibold text-foreground">
-            {t(
+            {translate(
               'auto.components.onboarding.WindowsTerminalStep.rightClickBehavior',
               'Right-click behavior'
             )}
           </h2>
           <p className="text-[13px] leading-relaxed text-muted-foreground">
-            {t(
+            {translate(
               'auto.components.onboarding.WindowsTerminalStep.rightClickBehaviorDescription',
               'Pick the terminal mouse behavior that matches your Windows muscle memory.'
             )}
@@ -294,7 +320,7 @@ export function WindowsTerminalStep({
               void updateSettings({ terminalRightClickToPaste: value === 'paste' })
             }
             options={rightClickOptions}
-            ariaLabel={t(
+            ariaLabel={translate(
               'auto.components.onboarding.WindowsTerminalStep.rightClickBehavior',
               'Right-click behavior'
             )}

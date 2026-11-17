@@ -1,13 +1,12 @@
 import { existsSync } from 'node:fs'
-import type { Worker } from 'node:worker_threads'
-import { spawnWorkerThread } from '../worker-threads/worker-thread-spawn'
-import type { WorkerThreadFactory } from '../worker-threads/worker-thread-transport'
+import { Worker } from 'node:worker_threads'
+import type { WorkerThreadFactory } from '../lazy-worker-thread-host'
 import {
   currentWorkerEntryLayout,
   resolveWorkerThreadEntryPath,
   type WorkerEntryLayout
-} from '../worker-threads/worker-thread-entry-path'
-import { WorkerThreadRequestQueue } from '../worker-threads/worker-thread-request-queue'
+} from '../worker-thread-entry-path'
+import { WorkerThreadRequestQueue } from '../worker-thread-request-queue'
 import {
   PORT_SCAN_COMMAND_TIMEOUT_MS,
   PortScanCommandTimeoutError,
@@ -101,7 +100,7 @@ function defaultWorkerFactory(): Worker {
   if (!existsSync(workerPath)) {
     throw new Error(`Port scan command worker entry not found: ${workerPath}`)
   }
-  return spawnWorkerThread(workerPath, { name: 'orca-port-scan' })
+  return new Worker(workerPath)
 }
 
 let sharedClient: PortScanCommandClient | null = null

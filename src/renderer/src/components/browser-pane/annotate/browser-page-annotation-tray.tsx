@@ -1,15 +1,6 @@
-import { ImeTextarea } from '@/lib/text-input/ime/ime-text-field'
-import { useState } from 'react'
-import {
-  ChevronDown,
-  ChevronRight,
-  CircleCheck,
-  Copy,
-  Image as ImageIcon,
-  Pencil,
-  Send,
-  Trash2
-} from 'lucide-react'
+import { ImeTextarea } from '@/lib/ime-text-field'
+import { useEffect, useState } from 'react'
+import { ChevronDown, ChevronRight, CircleCheck, Copy, Pencil, Send, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
@@ -19,23 +10,17 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { isScreenSubmitShortcut } from '@/lib/keyboard/screen-submit-shortcut'
-import { useTranslate } from '@/i18n/use-translate'
+import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
+import { translate } from '@/i18n/i18n'
 import {
   GRAB_BUDGET,
   type BrowserAnnotationIntent,
   type BrowserPageAnnotation
-} from '../../../../../shared/browser/element-grab/browser-grab-types'
+} from '../../../../../shared/browser-grab-types'
 import { BROWSER_ANNOTATION_INTENT_OPTIONS } from '../describe-page/browser-annotation-geometry'
-import {
-  BrowserAnnotationSendMenuContent,
-  browserAnnotationCopyTooltip
-} from './delivery/BrowserAnnotationSendMenuContent'
-import { preventAgentSendTargetOutsideDismiss } from './delivery/prevent-agent-send-target-outside-dismiss'
-import { browserAnnotationMatchesPageUrl } from './viewport/browser-annotation-page-url'
-import { useBrowserAnnotationImages } from './delivery/use-browser-annotation-images'
-import { BrowserAnnotationImageStrip } from './delivery/browser-annotation-image-strip'
-import type { BrowserPageAnnotationTrayProps } from '../describe-page/browser-page-types'
+import { BrowserAnnotationSendMenuContent } from './BrowserAnnotationSendMenuContent'
+import { preventAgentSendTargetOutsideDismiss } from './prevent-agent-send-target-outside-dismiss'
+import { browserAnnotationMatchesPageUrl } from './browser-annotation-page-url'
 
 export function BrowserPageAnnotationTray({
   browserAnnotations,
@@ -45,8 +30,6 @@ export function BrowserPageAnnotationTray({
   worktreeId,
   activeGroupId,
   browserAnnotationsPrompt,
-  includePageDetails,
-  handleIncludePageDetailsChange,
   handleBrowserAnnotationsSentToAgent,
   handleBrowserAnnotationsHandedOff,
   handleCopyBrowserAnnotations,
@@ -54,48 +37,59 @@ export function BrowserPageAnnotationTray({
   handleClearBrowserAnnotations,
   handleDeleteBrowserAnnotation,
   handleUpdateBrowserAnnotation
-}: BrowserPageAnnotationTrayProps): React.JSX.Element {
-  const t = useTranslate()
+}: {
+  browserAnnotations: BrowserPageAnnotation[]
+  currentUrl?: string
+  annotationTraySendOpen: boolean
+  handleAnnotationTraySendOpenChange: (open: boolean) => void
+  worktreeId: string
+  activeGroupId: string | undefined
+  browserAnnotationsPrompt: string
+  handleBrowserAnnotationsSentToAgent: () => void
+  handleBrowserAnnotationsHandedOff: (delivered: Promise<unknown>) => void
+  handleCopyBrowserAnnotations: () => void
+  browserAnnotationsCopied: boolean
+  handleClearBrowserAnnotations: () => void
+  handleDeleteBrowserAnnotation: (annotationId: string) => void
+  handleUpdateBrowserAnnotation: (
+    annotationId: string,
+    comment: string,
+    intent: BrowserAnnotationIntent
+  ) => void
+}): React.JSX.Element {
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null)
   const [editComment, setEditComment] = useState('')
   const [editIntent, setEditIntent] = useState<BrowserAnnotationIntent>('change')
-  const editImages = useBrowserAnnotationImages(worktreeId)
   const [expanded, setExpanded] = useState(true)
   const ToggleChevron = expanded ? ChevronDown : ChevronRight
 
   // Why: a delete or clear while a row is mid-edit must not leave edit state pointing at nothing.
-  if (
-    editingAnnotationId &&
-    !browserAnnotations.some((annotation) => annotation.id === editingAnnotationId)
-  ) {
-    setEditingAnnotationId(null)
-    editImages.resetImages()
-  }
+  useEffect(() => {
+    if (
+      editingAnnotationId &&
+      !browserAnnotations.some((annotation) => annotation.id === editingAnnotationId)
+    ) {
+      setEditingAnnotationId(null)
+    }
+  }, [browserAnnotations, editingAnnotationId])
 
   const handleStartEdit = (annotation: BrowserPageAnnotation): void => {
     setEditingAnnotationId(annotation.id)
     setEditComment(annotation.comment)
     setEditIntent(annotation.intent)
-    editImages.resetImages(annotation.imagePaths)
   }
 
   const handleCancelEdit = (): void => {
     setEditingAnnotationId(null)
-    editImages.resetImages()
   }
 
-  const canSaveEdit = Boolean(editComment.trim()) && !editImages.saving
   const handleSaveEdit = (): void => {
-    if (!canSaveEdit || !editingAnnotationId) {
+    const trimmed = editComment.trim()
+    if (!trimmed || !editingAnnotationId) {
       return
     }
-    handleUpdateBrowserAnnotation(
-      editingAnnotationId,
-      editComment.trim(),
-      editIntent,
-      editImages.imagePaths
-    )
-    handleCancelEdit()
+    handleUpdateBrowserAnnotation(editingAnnotationId, trimmed, editIntent)
+    setEditingAnnotationId(null)
   }
 
   return (
@@ -111,12 +105,12 @@ export function BrowserPageAnnotationTray({
                 >
                   <ToggleChevron className="size-4 shrink-0 text-muted-foreground" />
                   {browserAnnotations.length === 1
-                    ? t(
+                    ? translate(
                         'auto.components.browser.pane.BrowserPane.ea6af700da',
                         '{{value0}} annotation',
                         { value0: browserAnnotations.length }
                       )
-                    : t(
+                    : translate(
                         'auto.components.browser.pane.BrowserPane.c13693fe27',
                         '{{value0}} annotations',
                         { value0: browserAnnotations.length }
@@ -126,11 +120,11 @@ export function BrowserPageAnnotationTray({
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
               {expanded
-                ? t(
+                ? translate(
                     'auto.components.browser.pane.annotate.browser.page.annotation.tray.38d320108c',
                     'Collapse annotations'
                   )
-                : t(
+                : translate(
                     'auto.components.browser.pane.annotate.browser.page.annotation.tray.9f209891a7',
                     'Expand annotations'
                   )}
@@ -151,12 +145,12 @@ export function BrowserPageAnnotationTray({
                     disabled={!browserAnnotationsPrompt}
                   >
                     <Send className="size-3" />
-                    {t('auto.components.browser.pane.BrowserPane.ac39b9366b', 'Send')}
+                    {translate('auto.components.browser.pane.BrowserPane.ac39b9366b', 'Send')}
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
-                {t(
+                {translate(
                   'auto.components.browser.pane.BrowserPane.95af781091',
                   'Send feedback to an agent'
                 )}
@@ -172,35 +166,26 @@ export function BrowserPageAnnotationTray({
                 worktreeId={worktreeId}
                 groupId={activeGroupId ?? worktreeId}
                 prompt={browserAnnotationsPrompt}
-                includePageDetails={includePageDetails}
-                onIncludePageDetailsChange={handleIncludePageDetailsChange}
                 onPromptDelivered={handleBrowserAnnotationsSentToAgent}
                 onPromptHandedOff={handleBrowserAnnotationsHandedOff}
               />
             </DropdownMenuContent>
           </DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="xs"
-                variant="outline"
-                className="gap-1.5"
-                onClick={handleCopyBrowserAnnotations}
-              >
-                {browserAnnotationsCopied ? (
-                  <CircleCheck className="size-3" />
-                ) : (
-                  <Copy className="size-3" />
-                )}
-                {browserAnnotationsCopied
-                  ? t('auto.components.browser.pane.BrowserPane.6f4ab3592b', 'Copied')
-                  : t('auto.components.browser.pane.BrowserPane.d51ef37351', 'Copy')}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              {browserAnnotationCopyTooltip(includePageDetails, t)}
-            </TooltipContent>
-          </Tooltip>
+          <Button
+            size="xs"
+            variant="outline"
+            className="gap-1.5"
+            onClick={handleCopyBrowserAnnotations}
+          >
+            {browserAnnotationsCopied ? (
+              <CircleCheck className="size-3" />
+            ) : (
+              <Copy className="size-3" />
+            )}
+            {browserAnnotationsCopied
+              ? translate('auto.components.browser.pane.BrowserPane.6f4ab3592b', 'Copied')
+              : translate('auto.components.browser.pane.BrowserPane.d51ef37351', 'Copy')}
+          </Button>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -208,7 +193,7 @@ export function BrowserPageAnnotationTray({
                 variant="ghost"
                 className="text-muted-foreground hover:text-foreground"
                 onClick={handleClearBrowserAnnotations}
-                aria-label={t(
+                aria-label={translate(
                   'auto.components.browser.pane.BrowserPane.734e4343ec',
                   'Clear browser annotations'
                 )}
@@ -217,7 +202,10 @@ export function BrowserPageAnnotationTray({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              {t('auto.components.browser.pane.BrowserPane.11c5084aa2', 'Clear annotations')}
+              {translate(
+                'auto.components.browser.pane.BrowserPane.11c5084aa2',
+                'Clear annotations'
+              )}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -242,12 +230,8 @@ export function BrowserPageAnnotationTray({
                       className="min-w-0 flex-1"
                       data-slot="annotation-edit"
                       onKeyDown={(event) => {
-                        // Why: useGrabMode's bail-out lets this reach any focused child; an image preview's portal only closes itself.
-                        if (
-                          event.key === 'Escape' &&
-                          event.target instanceof Node &&
-                          event.currentTarget.contains(event.target)
-                        ) {
+                        // Why: bail-out selector in useGrabMode lets this reach any focused child, not just the textarea.
+                        if (event.key === 'Escape') {
                           event.preventDefault()
                           event.stopPropagation()
                           handleCancelEdit()
@@ -257,11 +241,10 @@ export function BrowserPageAnnotationTray({
                       <ImeTextarea
                         value={editComment}
                         onChange={(event) => setEditComment(event.target.value)}
-                        onPaste={editImages.handlePaste}
                         maxLength={GRAB_BUDGET.annotationCommentMaxLength}
                         className="h-16 w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-xs outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
                         autoFocus
-                        aria-label={t(
+                        aria-label={translate(
                           'auto.components.browser.pane.BrowserPane.d2a7092e6e',
                           'Annotation comment'
                         )}
@@ -272,10 +255,6 @@ export function BrowserPageAnnotationTray({
                             handleSaveEdit()
                           }
                         }}
-                      />
-                      <BrowserAnnotationImageStrip
-                        images={editImages.images}
-                        onRemove={editImages.removeImage}
                       />
                       <ToggleGroup
                         type="single"
@@ -288,7 +267,7 @@ export function BrowserPageAnnotationTray({
                           }
                         }}
                         className="mt-1.5 h-7 w-full [&_[data-slot=toggle-group-item]]:h-7 [&_[data-slot=toggle-group-item]]:flex-1 [&_[data-slot=toggle-group-item]]:px-1.5"
-                        aria-label={t(
+                        aria-label={translate(
                           'auto.components.browser.pane.annotate.browser.page.annotation.tray.449d2c2629',
                           'Annotation intent'
                         )}
@@ -310,13 +289,13 @@ export function BrowserPageAnnotationTray({
                       </ToggleGroup>
                       <div className="mt-1.5 flex justify-end gap-1.5">
                         <Button size="xs" variant="ghost" onClick={handleCancelEdit}>
-                          {t(
+                          {translate(
                             'auto.components.browser.pane.annotate.browser.page.annotation.tray.024467ceac',
                             'Cancel'
                           )}
                         </Button>
-                        <Button size="xs" disabled={!canSaveEdit} onClick={handleSaveEdit}>
-                          {t(
+                        <Button size="xs" disabled={!editComment.trim()} onClick={handleSaveEdit}>
+                          {translate(
                             'auto.components.browser.pane.annotate.browser.page.annotation.tray.c16f932cb3',
                             'Save'
                           )}
@@ -336,12 +315,6 @@ export function BrowserPageAnnotationTray({
                         </div>
                         <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                           <span>{annotation.intent}</span>
-                          {annotation.imagePaths?.length ? (
-                            <span className="flex items-center gap-0.5">
-                              <ImageIcon className="size-3" />
-                              {annotation.imagePaths.length}
-                            </span>
-                          ) : null}
                           {currentUrl !== undefined &&
                           !browserAnnotationMatchesPageUrl(
                             annotation.payload.page.sanitizedUrl,
@@ -359,7 +332,7 @@ export function BrowserPageAnnotationTray({
                           variant="ghost"
                           className="can-hover:opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
                           onClick={() => handleStartEdit(annotation)}
-                          aria-label={t(
+                          aria-label={translate(
                             'auto.components.browser.pane.annotate.browser.page.annotation.tray.09a7c1df70',
                             'Edit annotation {{value0}}',
                             { value0: index + 1 }
@@ -372,7 +345,7 @@ export function BrowserPageAnnotationTray({
                           variant="ghost"
                           className="can-hover:opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
                           onClick={() => handleDeleteBrowserAnnotation(annotation.id)}
-                          aria-label={t(
+                          aria-label={translate(
                             'auto.components.browser.pane.BrowserPane.f2d0c22d67',
                             'Delete annotation {{value0}}',
                             { value0: index + 1 }

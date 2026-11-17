@@ -19,12 +19,7 @@ export async function checkPaneMarkers(
   const mounted = new Set(
     await page.evaluate(() =>
       Array.from(document.querySelectorAll<HTMLElement>('.pane[data-leaf-id][data-pty-id]'))
-        // Why opacity: a hidden tab with a queued startup is laid out at opacity 0 so it spawns at real geometry; it has a size but is not shown.
-        .filter(
-          (pane) =>
-            pane.getBoundingClientRect().width > 0 &&
-            pane.checkVisibility({ opacityProperty: true, visibilityProperty: true })
-        )
+        .filter((pane) => pane.getBoundingClientRect().width > 0)
         .map((pane) => pane.dataset.leafId ?? '')
     )
   )

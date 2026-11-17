@@ -1,25 +1,22 @@
-import { terminalPendingLabel, terminalPendingReason } from './launch-menu/new-tab-agent-menu-model'
 import React, { useState } from 'react'
 import { CommandItem, CommandSeparator } from '@/components/ui/command'
-import { getAgentCatalog, type AgentCatalogEntry } from '@/lib/agent-catalog/agent-catalog'
-import { AgentIcon } from '@/components/agent/icons/AgentIcon'
-import { searchAgentPickerEntries } from '@/lib/agent-catalog/agent-picker-search'
-import type { AgentLaunchSurface } from '@/lib/agent-session/launch/routing/agent-session-launch-plan'
-import type { NewTabAgentMenuRow } from '../../../../shared/agent-launch/picker/agent-launch-picker-rows'
-import type { NewTabAgentMenuModel } from '@/components/agent/launch-menu/new-tab-agent-menu-model'
+import { AgentIcon, getAgentCatalog, type AgentCatalogEntry } from '@/lib/agent-catalog'
+import { searchAgentPickerEntries } from '@/lib/agent-picker-search'
+import type { AgentLaunchSurface } from '@/lib/agent-session-launch-plan'
+import type { NewTabAgentMenuRow } from '@/lib/new-tab-agent-menu-rows'
+import type { NewTabAgentMenuModel } from '@/components/tab-bar/use-new-tab-agent-menu-rows'
 import {
   chatUnavailableLabel,
   rowId,
   rowLabel,
   rowTitle
-} from '@/components/agent/launch-menu/agent-menu-row-presentation'
-import { cn } from '@/lib/class-names'
+} from '@/components/tab-bar/tab-agent-row-presentation'
+import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
-import type { TuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent'
-import type { resolveAgentMenuSelection } from '@/lib/agent-session/launch/routing/agent-menu-selection'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { resolveAgentMenuSelection } from '@/lib/agent-menu-selection'
 import { renderAgentComboboxItem } from './agent-combobox-items'
-import { AgentSurfaceLaunchButton } from './AgentSurfaceLaunchButton'
+import { AgentTerminalLaunchButton } from './AgentTerminalLaunchButton'
 
 /** The "+" menu's rows in the picker: a chat row picks the chat, its terminal button the CLI. */
 export type AgentComboboxSurfaceRows = {
@@ -31,15 +28,9 @@ export type AgentComboboxSurfaceRows = {
   onPick: (agent: TuiAgent, surface: AgentLaunchSurface) => void
 }
 
-/** The host has not answered what the choices are; a terminal only waiting on its host does not
- *  stop the user choosing another surface, it only blocks submitting. */
-export function surfaceAnswerPending(rows: AgentComboboxSurfaceRows | undefined): boolean {
-  return rows?.selection.ready === false && !rows.selection.terminalWaiting
-}
-
 // Nothing launches until the form is submitted, so the picker says "start", not "launch".
-function terminalPickTitle(label: string, t: Translate = translate): string {
-  return t('components.agentCombobox.startInTerminal', 'Start {{value0}} in a terminal', {
+function terminalPickTitle(label: string): string {
+  return translate('components.agentCombobox.startInTerminal', 'Start {{value0}} in a terminal', {
     value0: label
   })
 }
@@ -68,17 +59,13 @@ export function surfaceCommandValues(
     value: TuiAgent | null
     blankValue: string
     blankMatchesQuery: boolean
-  },
-  t?: Translate
+  }
 ): { rows: NewTabAgentMenuRow[]; selected: string | null; highlighted: string } {
   // Disabled rows are listed with their reason, so every agent is searched, not only pickable ones.
   const rows = visibleSurfaceRows(model, getAgentCatalog(), picker.query)
   const selected =
     surfaceRowValue(visibleSurfaceRows(model, getAgentCatalog(), ''), picker.value) ?? null
-  const pending = model.state === 'settled' && model.terminalPending
-  const first = rows.find(
-    (row) => row.kind !== 'chat-unavailable' && !terminalPendingReason(pending, row, t)
-  )
+  const first = rows.find((row) => row.kind !== 'chat-unavailable')
   const highlighted = !picker.query.trim()
     ? (selected ?? picker.blankValue)
     : picker.blankMatchesQuery
@@ -124,21 +111,13 @@ export function useSurfaceRowArming(
     const row = rows.find((candidate) => rowId(candidate) === commandValue)
     const input = event.target instanceof HTMLInputElement ? event.target : null
     const caretAtEnd = !input || input.selectionStart === input.value.length
-    const terminalReady =
-      rowOffersTerminal(interaction.model, row) &&
-      !(interaction.model?.state === 'settled' && interaction.model.terminalPending)
-    if (event.key === 'ArrowRight' && terminalReady && caretAtEnd) {
+    if (event.key === 'ArrowRight' && rowOffersTerminal(interaction.model, row) && caretAtEnd) {
       event.preventDefault()
       setArmed(commandValue)
     } else if (event.key === 'Enter' && armedValue !== null && row) {
       // Stopped so cmdk does not also select the row and start a chat.
       event.preventDefault()
-      // A host that started connecting after the arm leaves the current choice as it was.
-      if (terminalReady) {
-        pick(row.agent, 'terminal')
-      } else {
-        setArmed(null)
-      }
+      pick(row.agent, 'terminal')
     } else if (armedValue !== null && !['Shift', 'Meta', 'Control', 'Alt'].includes(event.key)) {
       if (event.key === 'ArrowLeft') {
         event.preventDefault()
@@ -164,7 +143,6 @@ export function SurfaceAgentItems({
   defaultAgent?: TuiAgent | 'blank' | null
   onSetDefault?: (agent: TuiAgent) => void
 }): React.ReactNode {
-  const t = useTranslate()
   const { model, onPick } = surfaceRows
   if (model.state === 'loading') {
     // Why: rows fill in once every answer is known, instead of reshuffling under the pointer.
@@ -173,7 +151,10 @@ export function SurfaceAgentItems({
         key={width}
         value={`loading:${width}`}
         disabled
-        aria-label={t('auto.components.tab.bar.QuickLaunchButton.agentsLoading', 'Loading agents')}
+        aria-label={translate(
+          'auto.components.tab.bar.QuickLaunchButton.agentsLoading',
+          'Loading agents'
+        )}
       >
         <span aria-hidden="true" className="flex h-[1lh] flex-1 items-center">
           <span className={cn('h-2 rounded-full bg-muted', width)} />
@@ -185,12 +166,11 @@ export function SurfaceAgentItems({
   const terminalPicked = surfaceRows.selection.cli
   return rows.map((row, index) => {
     const id = rowId(row)
-    const label = rowLabel(row, t)
+    const label = rowLabel(row)
     const startsCliGroup = row.kind === 'cli' && index > 0 && rows[index - 1]?.kind !== 'cli'
-    const pendingReason = terminalPendingReason(model.terminalPending, row, t)
-    const unavailable = row.kind === 'chat-unavailable' || !!pendingReason
+    const unavailable = row.kind === 'chat-unavailable'
     const pressed = row.kind === 'chat' && id === pickedValue && terminalPicked
-    const agentLabel = rowLabel({ ...row, kind: 'chat' }, t)
+    const agentLabel = rowLabel({ ...row, kind: 'chat' })
     return (
       <React.Fragment key={id}>
         {startsCliGroup ? <CommandSeparator /> : null}
@@ -207,19 +187,15 @@ export function SurfaceAgentItems({
           title: unavailable
             ? undefined
             : row.kind === 'chat'
-              ? rowTitle(row, agentLabel, t)
-              : terminalPickTitle(agentLabel, t),
+              ? rowTitle(row, agentLabel)
+              : terminalPickTitle(agentLabel),
           trailing: unavailable ? (
             <span className="shrink-0 text-muted-foreground">
-              {row.kind === 'chat-unavailable'
-                ? chatUnavailableLabel(row.reason, t)
-                : pendingReason}
+              {chatUnavailableLabel(row.reason)}
             </span>
           ) : rowOffersTerminal(model, row) ? (
-            <AgentSurfaceLaunchButton
-              surface="terminal"
-              reason={model.terminalPending ? terminalPendingLabel(t) : undefined}
-              title={terminalPickTitle(agentLabel, t)}
+            <AgentTerminalLaunchButton
+              title={terminalPickTitle(agentLabel)}
               aria-pressed={pressed}
               className={cn(
                 'hover:bg-background [[data-selected=true]_&]:opacity-100',

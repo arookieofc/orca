@@ -1,11 +1,7 @@
 import { join, posix as pathPosix } from 'node:path'
-import { resolveKiroHomeDir } from '../../shared/agent-launch/environment/kiro-home'
-import { isPlainObject } from '../agent-hooks/installation/configuration/hooks-json-read'
-import {
-  buildKiroListHook,
-  getKiroManagedCommandMatcher,
-  kiroListHookRunsManagedCommand
-} from './hook-settings'
+import { resolveKiroHomeDir } from '../../shared/kiro-home'
+import { isPlainObject, MANAGED_HOOK_TIMEOUT_SECONDS } from '../agent-hooks/installer-utils'
+import { getKiroManagedCommandMatcher } from './hook-settings'
 
 const KIRO_STANDALONE_HOOKS_FILE_NAME = 'orca-agent-status.json'
 
@@ -35,7 +31,12 @@ export function getKiroRemoteStandaloneHooksFilePath(
 export function buildKiroStandaloneHooksFile(command: string): Record<string, unknown> {
   return {
     version: 'v1',
-    hooks: KIRO_STANDALONE_HOOK_TRIGGERS.map((trigger) => buildKiroListHook(trigger, command))
+    hooks: KIRO_STANDALONE_HOOK_TRIGGERS.map((trigger) => ({
+      name: `orca-agent-status-${trigger}`,
+      trigger,
+      action: { type: 'command', command },
+      timeout: MANAGED_HOOK_TIMEOUT_SECONDS
+    }))
   }
 }
 
@@ -44,7 +45,12 @@ function hookEntries(file: Record<string, unknown>): unknown[] {
 }
 
 function runsManagedKiroScript(entry: unknown): boolean {
-  return kiroListHookRunsManagedCommand(entry, getKiroManagedCommandMatcher())
+  const action = isPlainObject(entry) ? entry.action : undefined
+  return (
+    isPlainObject(action) &&
+    typeof action.command === 'string' &&
+    getKiroManagedCommandMatcher()(action.command)
+  )
 }
 
 /** `activeOnly` drops `enabled: false` entries, which Kiro skips. */

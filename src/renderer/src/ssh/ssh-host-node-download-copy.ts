@@ -1,11 +1,9 @@
-// @protected-copy: Node download mirror trust copy.
 import type {
   SshManagedServerNodeDownloadBlocked,
   SshManagedServerStatus
-} from '../../../shared/remote-runtime/ssh/ssh-types'
-import type { NodeDistMirrorRefusal } from '../../../shared/node-runtime/node-dist-mirror'
+} from '../../../shared/ssh-types'
+import type { NodeDistMirrorRefusal } from '../../../shared/node-dist-mirror'
 import { translate } from '@/i18n/i18n'
-import type { Translate } from '@/i18n/use-translate'
 
 /** `offer`: set a mirror now. `settings`: a mirror was tried, so only its setting is left. */
 export type NodeMirrorRecovery = 'offer' | 'settings'
@@ -38,36 +36,30 @@ export function blockedNodeDownload(
   return status.nodeDownloadBlocked
 }
 
-export function nodeDownloadBlockedText(
-  blocked: SshManagedServerNodeDownloadBlocked,
-  t: Translate = translate
-): string {
+export function nodeDownloadBlockedText(blocked: SshManagedServerNodeDownloadBlocked): string {
   switch (blocked.mirror) {
     case 'unset':
-      return t(
+      return translate(
         'auto.components.settings.sshHostServer.nodeDownloadBlocked',
         'Neither this computer nor this host could download Node.js, which Orca’s server needs. Use a Node.js mirror, or check the network on both machines.'
       )
     case 'unsupported':
-      return t(
+      return translate(
         'auto.components.settings.sshHostServer.nodeDownloadBlockedNoMirror',
         'Neither this computer nor this host could download Node.js, which Orca’s server needs. Check the network or proxy on both machines, then connect again.'
       )
     case 'tried':
-      return t(
+      return translate(
         'auto.components.settings.sshHostServer.nodeDownloadBlockedMirrorTried',
         'Neither this computer nor this host could download Node.js, including from the Node.js download mirror. Check the mirror setting, then connect again.'
       )
   }
 }
 
-export function nodeMirrorRecoveryLabel(
-  recovery: NodeMirrorRecovery,
-  t: Translate = translate
-): string {
+export function nodeMirrorRecoveryLabel(recovery: NodeMirrorRecovery): string {
   return recovery === 'offer'
-    ? t('auto.components.settings.nodeDistMirrorDialog.action', 'Use a Node.js mirror…')
-    : t('auto.components.settings.nodeDistMirrorDialog.openSetting', 'Open mirror setting')
+    ? translate('auto.components.settings.nodeDistMirrorDialog.action', 'Use a Node.js mirror…')
+    : translate('auto.components.settings.nodeDistMirrorDialog.openSetting', 'Open mirror setting')
 }
 
 export function nodeDistMirrorRefusalText(reason: NodeDistMirrorRefusal): string {

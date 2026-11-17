@@ -1,19 +1,12 @@
+import type { Worker } from 'node:worker_threads'
 import type { SttEventSink } from './stt-service'
-import type { SttWorkerEvent } from './stt-worker-startup'
-import {
-  STT_WORKER_EXITED_ERROR,
-  STT_WORKER_HUNG_ERROR,
-  type SttWorkerProcess
-} from './stt-worker-process'
 
 export type SttWorkerStopOutcome = 'stopped' | 'error' | 'exit' | 'timeout'
 
 export function waitForSttWorkerStop(args: {
-  worker: SttWorkerProcess
-  streamId: string
-  sink: SttEventSink
+  worker: Worker
+  capturedSink: SttEventSink | null
   timeoutMs: number
-  discard: boolean
   finish: (outcome: SttWorkerStopOutcome) => void
 }): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -30,35 +23,25 @@ export function waitForSttWorkerStop(args: {
       args.worker.off('error', onError)
       args.worker.off('exit', onExit)
     }
-    const finish = (outcome: SttWorkerStopOutcome, processError?: Error): void => {
+    const finish = (outcome: SttWorkerStopOutcome): void => {
       if (settled) {
         return
       }
       settled = true
       cleanup()
       if (outcome !== 'stopped' && !receivedStopped) {
-        // A canceled dictation wants no text; a finishing one lost its tail and must say so.
-        if (!args.discard) {
-          args.sink({ type: 'error', error: stopErrorMessage(outcome, processError) })
-        }
-        args.sink({ type: 'stopped' })
+        args.capturedSink?.({ type: 'stopped' })
       }
       args.finish(outcome)
       resolve()
     }
-    const onStopped = (message: SttWorkerEvent): void => {
-      if (message.type === 'stopped' && message.streamId === args.streamId) {
+    const onStopped = (message: { type: string }): void => {
+      if (message.type === 'stopped') {
         receivedStopped = true
         finish('stopped')
-        return
-      }
-      // Sessions share one queue, so any answer means the engine is still working toward this stream, not hung.
-      // A cancel keeps its short deadline.
-      if (!args.discard) {
-        timeout?.refresh()
       }
     }
-    const onError = (error: Error): void => finish('error', error)
+    const onError = (): void => finish('error')
     const onExit = (): void => finish('exit')
 
     timeout = setTimeout(() => finish('timeout'), args.timeoutMs)
@@ -67,11 +50,4 @@ export function waitForSttWorkerStop(args: {
     args.worker.on('error', onError)
     args.worker.on('exit', onExit)
   })
-}
-
-function stopErrorMessage(outcome: SttWorkerStopOutcome, processError: Error | undefined): string {
-  if (outcome === 'timeout') {
-    return STT_WORKER_HUNG_ERROR
-  }
-  return processError ? String(processError) : STT_WORKER_EXITED_ERROR
 }

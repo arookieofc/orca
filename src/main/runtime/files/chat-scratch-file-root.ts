@@ -1,14 +1,13 @@
 import { lstat } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
-import type { RuntimeStore } from '../construction/runtime-store-contract'
+import type { RuntimeStore } from '../runtime-store-contract'
 import {
   resolveAuthorizedPath,
   type ResolveAuthorizedPathOptions
-} from '../../ipc/filesystem/access/filesystem-auth'
-import { isENOENT } from '../../filesystem/local-file-io/filesystem-path-containment'
-import { nativeChatScratchRootFor } from '../../native-chat/conversation-files/native-chat-scratch-folder'
+} from '../../ipc/filesystem/filesystem-auth'
+import { isENOENT } from '../../ipc/filesystem/filesystem-path-containment'
+import { nativeChatScratchRootFor } from '../../native-chat/native-chat-scratch-folder'
 import { getProfileUserDataPath } from '../../orca-profiles/profile-storage-paths'
-import { getFloatingWorkspaceFileRoots } from '../../ipc/worktrees/floating-workspace-directory'
 
 const PATH_SELECTOR_PREFIX = 'path:'
 const SCRATCH_FOLDER_NAME = /^[0-9a-f]{32}$/
@@ -22,12 +21,7 @@ export function resolveRuntimeAuthorizedPath(
   store: RuntimeStore,
   options: ResolveAuthorizedPathOptions = {}
 ): Promise<string> {
-  const floating = getFloatingWorkspaceFileRoots(store)
-  return resolveAuthorizedPath(targetPath, store, {
-    ...options,
-    extraRoots: [chatScratchRoot(), ...floating.extraRoots],
-    exactRoots: floating.exactRoots
-  })
+  return resolveAuthorizedPath(targetPath, store, { ...options, extraRoots: [chatScratchRoot()] })
 }
 
 export function isChatScratchWorktreeId(worktreeId: string): boolean {

@@ -23,8 +23,8 @@ import {
   Wrench,
   type LucideIcon
 } from 'lucide-react'
-import type { RepoIcon } from '../../../../shared/repository/appearance/repo-icon'
-import { cn } from '@/lib/class-names'
+import type { RepoIcon } from '../../../../shared/repo-icon'
+import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 
@@ -152,8 +152,7 @@ export function RepoIconGlyph({
         <img
           src={imageSrc}
           alt=""
-          // Keep in step with MobileRepoIcon's radii.mark.
-          className={cn('size-full rounded-[4px] object-contain', iconClassName)}
+          className={cn('size-full object-contain', iconClassName)}
           draggable={false}
           onError={() => setFailedImageSrc(imageSrc)}
         />

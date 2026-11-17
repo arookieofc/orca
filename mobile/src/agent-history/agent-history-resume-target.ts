@@ -1,25 +1,24 @@
-import type { AiVaultSession } from '../../../src/shared/ai-vault/contracts/ai-vault-types'
+import type { AiVaultSession } from '../../../src/shared/ai-vault-types'
 import {
   canResumeAiVaultSessionOnTarget,
   getAiVaultResumeWorkspaceExecutionHostId,
   getAiVaultResumeWorkspaceTargetStatus,
   type AiVaultResumeTargetStatus
-} from '../../../src/shared/ai-vault/resume/ai-vault-resume-target'
+} from '../../../src/shared/ai-vault-resume-target'
 import type {
   FolderHostCatalog,
   FolderHostRepo
-} from '../../../src/shared/folder-workspaces/folder-workspace-execution-host'
-import { parseWslUncPath } from '../../../src/shared/file-access/wsl-paths'
-import { normalizeExecutionHostId } from '../../../src/shared/execution-host/execution-host'
-import { getFolderWorkspaceWorktreeHostId } from '../../../src/shared/folder-workspaces/folder-workspace-worktree'
-import { parseWorkspaceKey } from '../../../src/shared/workspace/identity/workspace-scope'
-import type { Worktree } from '../worktree/workspace-list/workspace-list-types'
-import { translate } from '../i18n/mobile-i18n'
+} from '../../../src/shared/folder-workspace-execution-host'
+import { parseWslUncPath } from '../../../src/shared/wsl-paths'
+import { normalizeExecutionHostId } from '../../../src/shared/execution-host'
+import { getFolderWorkspaceWorktreeHostId } from '../../../src/shared/folder-workspace-worktree'
+import { parseWorkspaceKey } from '../../../src/shared/workspace-scope'
+import type { Worktree } from '../worktree/workspace-list-types'
 import {
   canJumpToAiVaultSessionWorktree,
   resolveAiVaultSessionWorktreeInfo,
   type AiVaultSessionOwnerWorkspace
-} from '../../../src/shared/ai-vault/session-display/ai-vault-session-worktree'
+} from '../../../src/shared/ai-vault-session-worktree'
 
 /** The host catalog a resume target is resolved against: the same lists desktop reads from its store. */
 export type MobileAiVaultResumeCatalog = FolderHostCatalog<FolderHostRepo & { id: string }>
@@ -36,21 +35,12 @@ export type MobileAiVaultSessionResumeTarget =
 
 function mobileAiVaultResumeTargetBlockMessage(status: AiVaultResumeTargetStatus): string {
   if (status === 'runtime') {
-    return translate(
-      'agentHistory.resumeTarget.runtimeUnavailable',
-      'Resume from history is not available in runtime-hosted workspaces.'
-    )
+    return 'Resume from history is not available in runtime-hosted workspaces.'
   }
   if (status === 'ssh' || status === 'local') {
-    return translate(
-      'agentHistory.resumeTarget.differentHost',
-      'This session belongs to a different host. Open a workspace on the same host to resume it.'
-    )
+    return 'This session belongs to a different host. Open a workspace on the same host to resume it.'
   }
-  return translate(
-    'agentHistory.resumeTarget.openWorkspace',
-    'Open a workspace before resuming a session.'
-  )
+  return 'Open a workspace before resuming a session.'
 }
 
 /** Desktop's namespace rule from what the phone sees: the host's terminal platform already reflects the project runtime. */

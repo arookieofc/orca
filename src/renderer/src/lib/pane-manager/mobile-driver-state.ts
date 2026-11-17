@@ -1,12 +1,14 @@
 // Mirror runtime PTY driver presence from IPC: mobile ownership locks xterm input/resize and shows Take back (mobile-presence-lock.md).
 
-import type { RuntimeTerminalDriverState } from '../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
+import type { RuntimeTerminalDriverState } from '../../../../shared/runtime-types'
 
-const driverByPtyId = new Map<string, RuntimeTerminalDriverState>()
+export type DriverState = RuntimeTerminalDriverState
+
+const driverByPtyId = new Map<string, DriverState>()
 
 type DriverChangeEvent = {
   ptyId: string
-  driver: RuntimeTerminalDriverState
+  driver: DriverState
 }
 type DriverChangeListener = (event: DriverChangeEvent) => void
 const changeListeners = new Set<DriverChangeListener>()
@@ -22,7 +24,7 @@ function notifyChange(event: DriverChangeEvent): void {
   }
 }
 
-export function setDriverForPty(ptyId: string, driver: RuntimeTerminalDriverState): void {
+export function setDriverForPty(ptyId: string, driver: DriverState): void {
   if (driver.kind === 'idle') {
     driverByPtyId.delete(ptyId)
   } else {
@@ -43,11 +45,11 @@ export function replaceDriverPtyId(replacedPtyId: string, ptyId: string): void {
   setDriverForPty(replacedPtyId, { kind: 'idle' })
 }
 
-export function getDriverForPty(ptyId: string): RuntimeTerminalDriverState {
+export function getDriverForPty(ptyId: string): DriverState {
   return driverByPtyId.get(ptyId) ?? { kind: 'idle' }
 }
 
-export function getAllDrivers(): Map<string, RuntimeTerminalDriverState> {
+export function getAllDrivers(): Map<string, DriverState> {
   return new Map(driverByPtyId)
 }
 
@@ -55,9 +57,7 @@ export function isPtyLocked(ptyId: string): boolean {
   return driverByPtyId.get(ptyId)?.kind === 'mobile'
 }
 
-export function hydrateDrivers(
-  drivers: { ptyId: string; driver: RuntimeTerminalDriverState }[]
-): void {
+export function hydrateDrivers(drivers: { ptyId: string; driver: DriverState }[]): void {
   const affectedPtyIds = new Set(driverByPtyId.keys())
   driverByPtyId.clear()
 

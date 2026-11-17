@@ -5,14 +5,12 @@ import {
   SingleSelectList,
   type PickerOption
 } from '@/components/github/PRFilterPickers'
-import { cn } from '@/lib/class-names'
-import { filterAuthorsValue, filterLabelsValue } from '@/components/github/pr-filter-value-summary'
-import type { ParsedTaskQuery } from '../../../../shared/work-items/task-query'
+import { cn } from '@/lib/utils'
+import type { ParsedTaskQuery } from '../../../../shared/task-query'
 import { translate } from '@/i18n/i18n'
-import { useTranslate, type Translate } from '@/i18n/use-translate'
 
 export type PRFilterChange = {
-  authors?: string[]
+  author?: string | null
   assignee?: string | null
   reviewer?: { kind: 'requested' | 'reviewed-by'; login: string } | null
   labels?: string[]
@@ -22,32 +20,19 @@ export type PRFilterChange = {
 
 export type SectionKey = 'status' | 'author' | 'label' | 'reviewer' | 'assignee'
 
-export function filterStateLabel(
-  state: 'open' | 'closed' | 'merged',
-  t: Translate = translate
-): string {
-  if (state === 'open') {
-    return t('auto.components.github.PRFilterSections.d78b60b5c2', 'Open')
-  }
-  if (state === 'closed') {
-    return t('auto.components.github.PRFilterSections.0fd3249e2e', 'Closed')
-  }
-  return t('auto.components.github.PRFilterSections.bd162b7d5a', 'Merged')
-}
-
-export function filterDraftLabel(t: Translate = translate): string {
-  return t('auto.components.github.PRFilterSections.draft', 'Draft')
-}
-
-function statusLabel(parsed: ParsedTaskQuery, t: Translate = translate): string {
+function statusLabel(parsed: ParsedTaskQuery): string {
   const parts: string[] = []
-  if (parsed.state === 'all') {
-    parts.push(t('auto.components.github.PRFilterSections.allStates', 'All'))
-  } else if (parsed.state) {
-    parts.push(filterStateLabel(parsed.state, t))
+  if (parsed.state === 'open') {
+    parts.push('Open')
+  } else if (parsed.state === 'closed') {
+    parts.push('Closed')
+  } else if (parsed.state === 'merged') {
+    parts.push('Merged')
+  } else if (parsed.state === 'all') {
+    parts.push('All')
   }
   if (parsed.draft) {
-    parts.push(filterDraftLabel(t))
+    parts.push('Draft')
   }
   return parts.join(' · ')
 }
@@ -61,39 +46,38 @@ function StatusSection({
   kind: 'prs' | 'issues'
   onSelect: (change: PRFilterChange) => void
 }): React.JSX.Element {
-  const t = useTranslate()
   const states: { key: 'open' | 'closed' | 'merged' | 'all'; label: string }[] =
     kind === 'prs'
       ? [
           {
             key: 'open',
-            label: filterStateLabel('open', t)
+            label: translate('auto.components.github.PRFilterSections.d78b60b5c2', 'Open')
           },
           {
             key: 'closed',
-            label: filterStateLabel('closed', t)
+            label: translate('auto.components.github.PRFilterSections.0fd3249e2e', 'Closed')
           },
           {
             key: 'merged',
-            label: filterStateLabel('merged', t)
+            label: translate('auto.components.github.PRFilterSections.bd162b7d5a', 'Merged')
           },
           {
             key: 'all',
-            label: t('auto.components.github.PRFilterSections.2b2f019091', 'Any state')
+            label: translate('auto.components.github.PRFilterSections.2b2f019091', 'Any state')
           }
         ]
       : [
           {
             key: 'open',
-            label: filterStateLabel('open', t)
+            label: translate('auto.components.github.PRFilterSections.d78b60b5c2', 'Open')
           },
           {
             key: 'closed',
-            label: filterStateLabel('closed', t)
+            label: translate('auto.components.github.PRFilterSections.0fd3249e2e', 'Closed')
           },
           {
             key: 'all',
-            label: t('auto.components.github.PRFilterSections.2b2f019091', 'Any state')
+            label: translate('auto.components.github.PRFilterSections.2b2f019091', 'Any state')
           }
         ]
   return (
@@ -113,7 +97,7 @@ function StatusSection({
             <span>{s.label}</span>
             {active ? (
               <span className="text-[10px] text-muted-foreground">
-                {t('auto.components.github.PRFilterSections.e0002f1eba', 'selected')}
+                {translate('auto.components.github.PRFilterSections.e0002f1eba', 'selected')}
               </span>
             ) : null}
           </button>
@@ -131,7 +115,6 @@ function DraftToggle({
   parsed: ParsedTaskQuery
   onSelect: (change: PRFilterChange) => void
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <>
       <div className="my-1 h-px bg-border" />
@@ -143,14 +126,14 @@ function DraftToggle({
           parsed.draft && 'bg-muted/40 font-medium'
         )}
       >
-        <span>{t('auto.components.github.PRFilterSections.b930de7194', 'Draft only')}</span>
+        <span>{translate('auto.components.github.PRFilterSections.b930de7194', 'Draft only')}</span>
         {parsed.draft ? (
           <span className="text-[10px] text-muted-foreground">
-            {t('auto.components.github.PRFilterSections.1e9b5244f2', 'on')}
+            {translate('auto.components.github.PRFilterSections.1e9b5244f2', 'on')}
           </span>
         ) : (
           <span className="text-[10px] text-muted-foreground">
-            {t('auto.components.github.PRFilterSections.f0cf6dd591', 'off')}
+            {translate('auto.components.github.PRFilterSections.f0cf6dd591', 'off')}
           </span>
         )}
       </button>
@@ -184,48 +167,49 @@ export function SectionMenu({
   onPick: (s: SectionKey) => void
   onClearAll: (() => void) | null
 }): React.JSX.Element {
-  const t = useTranslate()
-  const status = statusLabel(parsed, t)
+  const status = statusLabel(parsed)
   const rows: { key: SectionKey; label: string; value: string | null }[] = [
     {
       key: 'status',
-      label: t('auto.components.github.PRFilterSections.764a0b4ce1', 'Status'),
+      label: translate('auto.components.github.PRFilterSections.764a0b4ce1', 'Status'),
       value: status || null
     },
     {
       key: 'author',
-      label: t('auto.components.github.PRFilterSections.24754c44ad', 'Author'),
-      value: filterAuthorsValue(parsed.authors, t)
+      label: translate('auto.components.github.PRFilterSections.24754c44ad', 'Author'),
+      value: parsed.author
     },
     {
       key: 'label',
-      label: t('auto.components.github.PRFilterSections.b1d9fdea08', 'Label'),
-      value: filterLabelsValue(parsed.labels, t)
+      label: translate('auto.components.github.PRFilterSections.b1d9fdea08', 'Label'),
+      value:
+        parsed.labels.length === 0
+          ? null
+          : parsed.labels.length === 1
+            ? parsed.labels[0]
+            : `${parsed.labels.length} labels`
     },
     ...(kind === 'prs'
       ? [
           {
             key: 'reviewer' as SectionKey,
-            label:
-              reviewerKind === 'reviewed-by'
-                ? t('auto.components.github.PRFilterDropdowns.7f1ba66c3e', 'Reviewed by')
-                : t('auto.components.github.PRFilterDropdowns.b27b7e526c', 'Review from'),
+            label: reviewerKind === 'reviewed-by' ? 'Reviewed by' : 'Review from',
             value: reviewerActive
           }
         ]
       : []),
     {
       key: 'assignee',
-      label: t('auto.components.github.PRFilterSections.ea3416d646', 'Assignee'),
+      label: translate('auto.components.github.PRFilterSections.ea3416d646', 'Assignee'),
       value: parsed.assignee
     }
   ]
+  const subject = kind === 'prs' ? 'pull requests' : 'issues'
   return (
     <div className="py-1 text-xs">
       <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        {kind === 'prs'
-          ? t('auto.components.github.PRFilterSections.filterPullRequests', 'Filter pull requests')
-          : t('auto.components.github.PRFilterSections.filterIssues', 'Filter issues')}
+        {translate('auto.components.github.PRFilterSections.8177eda37e', 'Filter')}{' '}
+        <span>{subject}</span>
       </div>
       {rows.map((row) => (
         <button
@@ -249,7 +233,7 @@ export function SectionMenu({
             onClick={onClearAll}
             className="w-full px-3 py-1.5 text-left text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
           >
-            {t('auto.components.github.PRFilterSections.30ebb6ca44', 'Clear all filters')}
+            {translate('auto.components.github.PRFilterSections.30ebb6ca44', 'Clear all filters')}
           </button>
         </>
       ) : null}
@@ -288,7 +272,6 @@ export function SectionDetail({
   onBack: () => void
   onSelect: (change: PRFilterChange) => void
 }): React.JSX.Element {
-  const t = useTranslate()
   return (
     <div>
       <button
@@ -297,25 +280,22 @@ export function SectionDetail({
         className="flex w-full items-center gap-1 border-b border-border px-3 py-1.5 text-[11px] text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
       >
         <ChevronRight className="size-3 rotate-180" />
-        {t('auto.components.github.PRFilterSections.b69fa4fa20', 'Back')}
+        {translate('auto.components.github.PRFilterSections.b69fa4fa20', 'Back')}
       </button>
       {section === 'status' ? (
         <StatusSection parsed={parsed} kind={kind} onSelect={onSelect} />
       ) : null}
       {section === 'author' ? (
-        <MultiSelectList
+        <SingleSelectList
           options={authorOpts}
-          selected={parsed.authors}
+          activeValue={parsed.author}
           loading={false}
           error={null}
-          searchPlaceholder={t(
-            'auto.components.github.PRFilterSections.filterOrTypeLogin',
-            'Filter or type a login...'
-          )}
-          emptyText={t('auto.components.github.PRFilterSections.458ea3602b', 'No authors')}
+          searchPlaceholder="Filter or type a login..."
+          emptyText={translate('auto.components.github.PRFilterSections.458ea3602b', 'No authors')}
           allowCustomValue
           renderOption={(opt) => <UserOptionRow option={opt} />}
-          onChange={(next) => onSelect({ authors: next })}
+          onSelect={(value) => onSelect({ author: value })}
         />
       ) : null}
       {section === 'assignee' ? (
@@ -324,11 +304,8 @@ export function SectionDetail({
           activeValue={parsed.assignee}
           loading={usersLoading}
           error={usersError}
-          searchPlaceholder={t(
-            'auto.components.github.PRFilterSections.filterOrTypeLogin',
-            'Filter or type a login...'
-          )}
-          emptyText={t('auto.components.github.PRFilterSections.a00830d3f7', 'No users')}
+          searchPlaceholder="Filter or type a login..."
+          emptyText={translate('auto.components.github.PRFilterSections.a00830d3f7', 'No users')}
           allowCustomValue
           renderOption={(opt) => <UserOptionRow option={opt} />}
           onSelect={(value) => onSelect({ assignee: value })}
@@ -340,11 +317,8 @@ export function SectionDetail({
           selected={parsed.labels}
           loading={labelsLoading}
           error={labelsError}
-          searchPlaceholder={t(
-            'auto.components.github.PRFilterSections.filterLabels',
-            'Filter labels...'
-          )}
-          emptyText={t('auto.components.github.PRFilterSections.de26e2eb06', 'No labels')}
+          searchPlaceholder="Filter labels..."
+          emptyText={translate('auto.components.github.PRFilterSections.de26e2eb06', 'No labels')}
           onChange={(next) => onSelect({ labels: next })}
         />
       ) : null}
@@ -361,7 +335,7 @@ export function SectionDetail({
                   : 'text-muted-foreground hover:bg-muted/50'
               )}
             >
-              {t('auto.components.github.PRFilterSections.94b42b0edf', 'Review requested')}
+              {translate('auto.components.github.PRFilterSections.94b42b0edf', 'Review requested')}
             </button>
             <button
               type="button"
@@ -373,7 +347,7 @@ export function SectionDetail({
                   : 'text-muted-foreground hover:bg-muted/50'
               )}
             >
-              {t('auto.components.github.PRFilterSections.0103e1cb18', 'Reviewed by')}
+              {translate('auto.components.github.PRFilterSections.0103e1cb18', 'Reviewed by')}
             </button>
           </div>
           <SingleSelectList
@@ -381,11 +355,8 @@ export function SectionDetail({
             activeValue={reviewerMode === 'requested' ? parsed.reviewRequested : parsed.reviewedBy}
             loading={usersLoading}
             error={usersError}
-            searchPlaceholder={t(
-              'auto.components.github.PRFilterSections.filterOrTypeLogin',
-              'Filter or type a login...'
-            )}
-            emptyText={t('auto.components.github.PRFilterSections.a00830d3f7', 'No users')}
+            searchPlaceholder="Filter or type a login..."
+            emptyText={translate('auto.components.github.PRFilterSections.a00830d3f7', 'No users')}
             allowCustomValue
             renderOption={(opt) => <UserOptionRow option={opt} />}
             onSelect={(login) =>

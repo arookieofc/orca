@@ -6,11 +6,8 @@ import {
   ARTIFACT_MAX_REQUEST_BYTES,
   artifactContentByteLength,
   artifactWriteRequestByteLength
-} from '../../shared/artifacts/artifacts'
-import {
-  bestEffortFsyncDirectorySync,
-  writeSecureFile
-} from '../../shared/secure-storage/secure-file'
+} from '../../shared/artifacts'
+import { bestEffortFsyncDirectorySync, writeSecureFile } from '../../shared/secure-file'
 import { getOrcaProfileDirectory } from '../orca-profiles/profile-storage-paths'
 import type { ArtifactWriteBody } from './artifact-cloud-request'
 import type { ArtifactShareScope } from './artifact-share-record-store'

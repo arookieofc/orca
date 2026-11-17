@@ -2,18 +2,19 @@ import {
   planManagedOrcadAutoUpdate,
   type ManagedOrcadAutoUpdateSkip
 } from './orcad-managed-update-decision'
-import { OrcadCrashLoopError } from './orcad-managed-crash-loop'
-import { materializeOrcadArtifact } from '../../orcad/artifact-slots/orcad-artifact-materializer'
+import { materializeOrcadArtifact } from '../../orcad/orcad-artifact-materializer'
 import {
   OrcadArtifactsUnavailableError,
   OrcadHostUnsupportedError
-} from '../../orcad/diagnostics/orcad-host-unavailable'
+} from '../../orcad/orcad-host-unavailable'
 import { findIncompleteManagedOrcadMigration } from './orcad-managed-migration-status'
 import { ORCAD_ACTIVATION_FENCE_BUSY_CODE } from '../activation/orcad-activation-fence-hold'
 import { resolveLinkedOrcadContext } from './orcad-managed-runtime-context'
-import { runManagedOrcadUpdate } from './orcad-runtime-maintenance'
-import { withManagedOrcadLifecycle } from './orcad-managed-lifecycle'
-import type { OrcadUpdateDeferCode } from '../activation/orcad-update-plan'
+import {
+  runManagedOrcadUpdate,
+  withManagedOrcadLifecycle
+} from '../../ssh/orcad-runtime-maintenance'
+import type { OrcadUpdateDeferCode } from '../../ssh/orcad-update-plan'
 import { readLocalFullVersion } from '../install/remote-versioned-install'
 
 export type ManagedOrcadAutoUpdateOutcome =
@@ -39,7 +40,7 @@ export function isWaitingOrcadUpdateDeferral(code: string): boolean {
   return WAITING_CODES.has(code)
 }
 
-export async function autoUpdateManagedOrcadEnvironment(
+export function autoUpdateManagedOrcadEnvironment(
   userDataPath: string,
   args: {
     environmentId: string
@@ -49,7 +50,7 @@ export async function autoUpdateManagedOrcadEnvironment(
     onUpdating: () => void
   }
 ): Promise<ManagedOrcadAutoUpdateOutcome> {
-  return await withManagedOrcadLifecycle(userDataPath, args.environmentId, async (managed) => {
+  return withManagedOrcadLifecycle(userDataPath, args.environmentId, async (managed) => {
     // Restarting during migration would race cutover staging.
     if (findIncompleteManagedOrcadMigration(userDataPath, managed.environment.id)) {
       return { outcome: 'skipped', reason: 'migrating' }
@@ -94,10 +95,6 @@ export async function autoUpdateManagedOrcadEnvironment(
         ? { outcome: 'deferred', code: result.code, reason: result.reason }
         : { outcome: 'failed', reason: result.reason }
     } catch (error) {
-      // The host already runs this build; the brake's reason shows on its server status instead.
-      if (error instanceof OrcadCrashLoopError) {
-        return { outcome: 'skipped', reason: 'current' }
-      }
       return { outcome: 'failed', reason: error instanceof Error ? error.message : String(error) }
     }
   })

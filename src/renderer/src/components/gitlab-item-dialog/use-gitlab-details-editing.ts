@@ -1,9 +1,9 @@
-import { gitLabApiFor } from '@/runtime/repository-gitlab/gitlab-owner-api'
+import { gitLabApiFor } from '@/runtime/gitlab-owner-api'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
-import type { GitLabMRUpdate, GitLabWorkItem } from '../../../../shared/gitlab/gitlab-types'
+import type { GitLabMRUpdate, GitLabWorkItem } from '../../../../shared/gitlab-types'
 import {
   formatGitLabLabelDraft,
   normalizeGitLabLabels,
@@ -12,17 +12,14 @@ import {
 } from '../gitlab-item-dialog-parts'
 import type { GitLabDialogRepoSelector } from './gitlab-item-dialog-types'
 import type { GitLabItemDialogState } from './use-gitlab-item-dialog-state'
-import { codeHostErrorText } from '@/lib/source-control/remote/code-host-error-copy'
 
 export function useGitLabDetailsEditing(
   item: GitLabWorkItem | null,
   repoSelector: GitLabDialogRepoSelector | null,
-  state: GitLabItemDialogState,
-  handleRefresh: () => void
+  state: GitLabItemDialogState
 ) {
   const {
     bodyDraft,
-    claimDetailsOwner,
     details,
     labelDraft,
     labelOptions,
@@ -43,14 +40,13 @@ export function useGitLabDetailsEditing(
       return
     }
     setLabelOptionsLoading(true)
-    const ownsResult = claimDetailsOwner()
     try {
       const labels = await gitLabApiFor(repoSelector).listLabels(repoSelector)
-      if (ownsResult()) {
+      if (mountedRef.current) {
         setLabelOptions(normalizeGitLabLabels(labels))
       }
     } catch {
-      if (ownsResult()) {
+      if (mountedRef.current) {
         setLabelOptions([])
       }
     } finally {
@@ -59,7 +55,6 @@ export function useGitLabDetailsEditing(
       }
     }
   }, [
-    claimDetailsOwner,
     labelOptions,
     labelOptionsLoading,
     mountedRef,
@@ -132,7 +127,6 @@ export function useGitLabDetailsEditing(
     }
 
     setDetailsSaving(true)
-    const ownsResult = claimDetailsOwner()
     try {
       const res = await gitLabApiFor(repoSelector).updateMR({
         ...repoSelector,
@@ -140,7 +134,7 @@ export function useGitLabDetailsEditing(
         updates
       })
       if (res.ok) {
-        if (ownsResult()) {
+        if (mountedRef.current) {
           setDetails((current) =>
             current
               ? {
@@ -160,26 +154,21 @@ export function useGitLabDetailsEditing(
           useAppStore.getState().recordFeatureInteraction('gitlab-tasks')
         }
       } else if (mountedRef.current) {
-        toast.error(codeHostErrorText(res))
+        toast.error(res.error)
       }
     } catch (error) {
       if (mountedRef.current) {
         showGitLabMutationError(error)
       }
     } finally {
-      // Only while this item is still shown: a switched-to item keeps its own read and busy state.
-      if (ownsResult()) {
+      if (mountedRef.current) {
         setDetailsSaving(false)
-        // Why: a failed response doesn't prove the host kept the old details; reread (drafts stay) on every attempted write.
-        handleRefresh()
       }
     }
   }, [
     bodyDraft,
-    claimDetailsOwner,
     details,
     handleCancelDetailsEdit,
-    handleRefresh,
     item,
     labelDraft,
     mountedRef,

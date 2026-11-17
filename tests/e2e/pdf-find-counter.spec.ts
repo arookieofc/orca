@@ -141,7 +141,7 @@ test.describe('PDF in a folder workspace', () => {
         if (!folder) {
           throw new Error('Missing fixture folder')
         }
-        const worktreeId = `folder:${folder.folderWorkspace.id}`
+        const worktreeId = `folder:${folder.id}`
         state.setActiveWorktree(worktreeId)
         state.openFile({
           filePath,

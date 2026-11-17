@@ -28,3 +28,8 @@ export function subscribeWorktreeBaseFallbackNotice(listener: () => void): () =>
   listeners.add(listener)
   return () => listeners.delete(listener)
 }
+
+export function resetWorktreeBaseFallbackNoticesForTests(): void {
+  notices.length = 0
+  notifyListeners()
+}

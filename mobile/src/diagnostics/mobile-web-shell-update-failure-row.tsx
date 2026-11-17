@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Text, View } from 'react-native'
-import type { MobileWebShellUpdateFailure } from '../mobile-web-shell/update-recovery/mobile-web-shell-update-failure'
-import { processGenerationStore } from '../mobile-web-shell/generations/process-generation-store'
-import { loadHosts } from '../host-catalog/host-store'
+import type { MobileWebShellUpdateFailure } from '../mobile-web-shell/mobile-web-shell-update-failure'
+import { processGenerationStore } from '../mobile-web-shell/process-generation-store'
+import { loadHosts } from '../transport/host-store'
 import { formatUpdateFailure } from './mobile-web-shell-update-failure-copy'
-import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { troubleshootScreenStyles as styles } from './troubleshoot-screen-styles'
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
-import { ListGroup, SectionHeader } from '../components/list/ListGroup'
 
 type Line = { readonly hostId: string; readonly text: string }
 
@@ -27,8 +24,6 @@ export function updateFailureLines(
 
 // Release console output never reaches logcat; this row is the only update-failure evidence visible there. Mount only in shell-capable builds.
 export function MobileWebShellUpdateFailureRow() {
-  useMobileColorScheme()
-  const t = useMobileTranslation()
   const [lines, setLines] = useState<readonly Line[]>([])
 
   useEffect(() => {
@@ -44,19 +39,16 @@ export function MobileWebShellUpdateFailureRow() {
     return () => {
       stale = true
     }
-  }, [t])
+  }, [])
 
   if (lines.length === 0) {
     return null
   }
   return (
     <View testID="mobile-web-shell-update-failures">
-      <SectionHeader
-        title={t('diagnostics.mobileWebShellUpdateFailureRow.title', 'Workspace updates')}
-        first
-      />
-      <ListGroup style={styles.group}>
-        <View key="lines" style={styles.noteBody}>
+      <Text style={styles.sectionHeading}>Workspace updates</Text>
+      <View style={styles.section}>
+        <View style={styles.accordionBody}>
           {lines.map((line) => (
             <Text
               key={line.hostId}
@@ -67,7 +59,7 @@ export function MobileWebShellUpdateFailureRow() {
             </Text>
           ))}
         </View>
-      </ListGroup>
+      </View>
     </View>
   )
 }

@@ -26,6 +26,8 @@ function runInteractiveBash(
   const rcfile = join(tempHome, 'rcfile')
   writeFileSync(join(tempHome, '.bash_profile'), profile)
   writeFileSync(rcfile, rcfileContent)
+  // Why interactive bash startups stall past 5s on a loaded gate; the composition is what's asserted, not the speed.
+  const spawnTimeoutMs = 30_000
   const result = spawnSync(
     bash,
     ['-lc', '"$BASH" --noprofile --rcfile "$1" -i 2>&1', 'bash', rcfile],
@@ -33,7 +35,7 @@ function runInteractiveBash(
       input,
       encoding: 'utf8',
       env: { ...process.env, HOME: tempHome, ORCA_SHELL_FEATURES: 'ready', TERM: 'xterm' },
-      timeout: 5000
+      timeout: spawnTimeoutMs
     }
   )
   expect(result.error).toBeUndefined()

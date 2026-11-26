@@ -54,6 +54,7 @@ export type AccountRecord = {
   cookieSessionOnly: boolean
   cooldownUntilMs: number | null
   lastUsedAtMs: number | null
+  sshHost?: string | null
 }
 
 export type ExternalAgentKind = 'openai_api' | 'local_cli'
@@ -73,7 +74,29 @@ export type ExternalAgentRecord = {
 
 export type GroupWorkflowMode = 'parallel' | 'review' | 'a2a_relay'
 
-export type GroupReplyStatus = 'queued' | 'sending' | 'streaming' | 'done' | 'needs_auth' | 'error'
+export type GroupReplyStatus =
+  | 'queued'
+  | 'sending'
+  | 'streaming'
+  | 'done'
+  | 'cancelled'
+  | 'needs_auth'
+  | 'error'
+
+export type GroupAcceptanceConfig = {
+  command: string
+  workdir: string
+  shell: string | null
+  autoRunOnReply: boolean
+  maxAutoFixRounds: number
+  timeoutSecs: number
+}
+
+export type WorkflowCommandResult = {
+  passed: boolean
+  exitCode: number
+  output: string
+}
 
 export type GroupSharedSkill = {
   id: string
@@ -121,6 +144,7 @@ export type GroupChatRecord = {
   workflowMode: GroupWorkflowMode
   maxRelayHops: number
   threadBindings: GroupThreadBinding[]
+  acceptance?: GroupAcceptanceConfig | null
 }
 
 export type WebBotsSettings = {

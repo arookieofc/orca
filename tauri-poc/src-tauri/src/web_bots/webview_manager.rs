@@ -412,7 +412,20 @@ pub async fn reset_web_bot_chat(
 
 pub enum WebBotReplyError {
     NeedsAuth(String),
+    Cancelled,
     Other(String),
+}
+
+async fn wait_for_reply_cancel(cancel_rx: &mut tokio::sync::watch::Receiver<bool>) {
+    if *cancel_rx.borrow() {
+        return;
+    }
+    while cancel_rx.changed().await.is_ok() {
+        if *cancel_rx.borrow() {
+            return;
+        }
+    }
+    std::future::pending::<()>().await;
 }
 
 pub async fn send_and_collect_web_bot_reply<F>(
@@ -420,14 +433,21 @@ pub async fn send_and_collect_web_bot_reply<F>(
     adapter: &SiteAdapterConfig,
     prompt: &str,
     thread_url: Option<&str>,
+    mut cancel_rx: tokio::sync::watch::Receiver<bool>,
     mut on_progress: F,
 ) -> Result<(String, Option<String>), WebBotReplyError>
 where
     F: FnMut(String) + Send,
 {
+    if *cancel_rx.borrow() {
+        return Err(WebBotReplyError::Cancelled);
+    }
     navigate_and_wait_ready(webview, thread_url)
         .await
         .map_err(WebBotReplyError::Other)?;
+    if *cancel_rx.borrow() {
+        return Err(WebBotReplyError::Cancelled);
+    }
 
     // Wait briefly for SPA composer hydration if freshly navigated.
     let mut send_result = Value::Null;
@@ -472,7 +492,12 @@ where
     let mut last_url: Option<String> = None;
 
     loop {
-        tokio::time::sleep(Duration::from_millis(600)).await;
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_millis(600)) => {}
+            _ = wait_for_reply_cancel(&mut cancel_rx) => {
+                return Err(WebBotReplyError::Cancelled);
+            }
+        }
         if started.elapsed() > max_wait {
             if !last_text.trim().is_empty() {
                 return Ok((last_text.trim().to_string(), last_url));

@@ -38,6 +38,7 @@ const ArtifactsPage = lazy(() => import('../components/artifacts/ArtifactsPage')
 const WorkbenchPage = lazy(() => import('../components/workbench/workbench-page'))
 const WorkspaceSpacePage = lazy(() => import('../components/workspace-space/WorkspaceSpacePage'))
 const MobilePage = lazy(() => import('../components/mobile/MobilePage'))
+const RoomsPage = lazy(() => import('../components/rooms/RoomsPage'))
 const WebBotsPage = lazy(() => import('../components/web-bots/WebBotsPage'))
 const HandToBotFlow = lazy(() =>
   import('../components/bots/hand-to-bot/HandToBotFlow').then((module) => ({
@@ -148,6 +149,7 @@ function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element 
       {activeView === 'activity' ? <ActivityPrototypePage /> : null}
       {activeView === 'space' ? <WorkspaceSpacePage /> : null}
       {activeView === 'mobile' ? <MobilePage /> : null}
+      {activeView === 'rooms' ? <RoomsPage /> : null}
       {activeView === 'web-bots' ? <WebBotsPage /> : null}
       <BotShareReceiveMount />
       <BotTemplatesMount />

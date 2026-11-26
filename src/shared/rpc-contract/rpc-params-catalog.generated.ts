@@ -621,6 +621,23 @@ import {
   OrcaAccountSignInWaitParams,
   OrcaAccountUnsubscribeParams
 } from './orca-account-params'
+import {
+  RoomAbortParams,
+  RoomBotCreateParams,
+  RoomCreateParams,
+  RoomDeleteParams,
+  RoomEnsureMainBotParams,
+  RoomListParams,
+  RoomLogParams,
+  RoomMemberAddParams,
+  RoomMemberModelParams,
+  RoomMemberRemoveParams,
+  RoomPostParams,
+  RoomSendParams,
+  RoomShowParams,
+  RoomWebBotTurnFailParams,
+  RoomWebBotTurnsClaimParams
+} from './orchestration-rooms-params'
 import { ApprovalAnswerParams } from './orchestration/orchestration-approval-answer-params'
 import {
   FederationDispatchParams,
@@ -954,6 +971,15 @@ import {
   TerminalUpdateViewport
 } from './terminal/terminal-viewport-schemas-params'
 import { UpdaterCheckParams } from './updater/updater-params'
+import {
+  WebBotsAskParams,
+  WebBotsBridgeCompleteParams,
+  WebBotsBridgeFailParams,
+  WebBotsBridgePollParams,
+  WebBotsCancelParams,
+  WebBotsListParams,
+  WebBotsSyncCatalogParams
+} from './web-bots-params'
 import {
   WebhookCallShow,
   WebhookCalls,
@@ -1851,6 +1877,21 @@ export const RPC_PARAMS_BY_METHOD = {
   'orchestration.reply': ReplyParams,
   'orchestration.requestShow': RequestShowParams,
   'orchestration.reset': ResetParams,
+  'orchestration.roomAbort': RoomAbortParams,
+  'orchestration.roomBotCreate': RoomBotCreateParams,
+  'orchestration.roomCreate': RoomCreateParams,
+  'orchestration.roomDelete': RoomDeleteParams,
+  'orchestration.roomEnsureMainBot': RoomEnsureMainBotParams,
+  'orchestration.roomList': RoomListParams,
+  'orchestration.roomLog': RoomLogParams,
+  'orchestration.roomMemberAdd': RoomMemberAddParams,
+  'orchestration.roomMemberRemove': RoomMemberRemoveParams,
+  'orchestration.roomMemberSetModel': RoomMemberModelParams,
+  'orchestration.roomPost': RoomPostParams,
+  'orchestration.roomSend': RoomSendParams,
+  'orchestration.roomShow': RoomShowParams,
+  'orchestration.roomWebBotTurnFail': RoomWebBotTurnFailParams,
+  'orchestration.roomWebBotTurnsClaim': RoomWebBotTurnsClaimParams,
   'orchestration.run': RunParams,
   'orchestration.runCreate': RunCreateParams,
   'orchestration.runCurrent': RunCurrentParams,
@@ -2119,6 +2160,13 @@ export const RPC_PARAMS_BY_METHOD = {
   'updater.getStatus': null,
   'updater.install': null,
   'usage.call': UsageCallParams,
+  'webBots.ask': WebBotsAskParams,
+  'webBots.bridgeComplete': WebBotsBridgeCompleteParams,
+  'webBots.bridgeFail': WebBotsBridgeFailParams,
+  'webBots.bridgePoll': WebBotsBridgePollParams,
+  'webBots.cancel': WebBotsCancelParams,
+  'webBots.list': WebBotsListParams,
+  'webBots.syncCatalog': WebBotsSyncCatalogParams,
   'webhooks.call': WebhookCallShow,
   'webhooks.calls': WebhookCalls,
   'webhooks.card': WebhookCard,

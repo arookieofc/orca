@@ -265,6 +265,7 @@ mod tests {
             cookie_session_only: false,
             cooldown_until_ms: None,
             last_used_at_ms: None,
+            ssh_host: None,
         }
     }
 

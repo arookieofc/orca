@@ -164,9 +164,12 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
       'orchestration room-add',
       'orchestration room-bot-create',
       'orchestration room-remove',
+      'orchestration room-member-set-model',
       'orchestration room-send',
       'orchestration room-post',
-      'orchestration room-log'
+      'orchestration room-log',
+      'orchestration room-abort',
+      'orchestration room-ensure-main-bot'
     ],
     load: async () =>
       (await import('../orchestration/orchestration-handlers.js')).ORCHESTRATION_HANDLERS
@@ -283,5 +286,10 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'ports',
     keys: ['ports'],
     load: async () => (await import('../workspace-ports/ports.js')).PORTS_HANDLERS
+  },
+  {
+    name: 'web-bot',
+    keys: ['web-bot list', 'web-bot ask', 'web-bot cancel'],
+    load: async () => (await import('../web-bots/web-bot-handlers.js')).WEB_BOT_HANDLERS
   }
 ]

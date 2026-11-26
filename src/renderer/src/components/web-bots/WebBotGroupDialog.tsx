@@ -27,12 +27,14 @@ import {
   type AccountKey,
   type AccountRecord,
   type ExternalAgentRecord,
+  type GroupAcceptanceConfig,
   type GroupChatRecord,
   type GroupMemberRole,
   type GroupSharedSkill,
   type GroupWorkflowMode,
   type WebBotsSnapshot
 } from '@/web/tauri-native-web-bots'
+import { WebBotGroupAcceptanceFields } from './WebBotGroupAcceptanceFields'
 
 type Props = {
   open: boolean
@@ -62,6 +64,12 @@ export function WebBotGroupDialog({
   const [sharedContext, setSharedContext] = useState('')
   const [rolesByKey, setRolesByKey] = useState<Record<string, string>>({})
   const [skills, setSkills] = useState<GroupSharedSkill[]>([])
+  const [acceptCmd, setAcceptCmd] = useState('')
+  const [acceptWorkdir, setAcceptWorkdir] = useState('')
+  const [acceptShell, setAcceptShell] = useState('auto')
+  const [acceptTimeout, setAcceptTimeout] = useState('300')
+  const [acceptAutoRun, setAcceptAutoRun] = useState(false)
+  const [acceptMaxRounds, setAcceptMaxRounds] = useState('2')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -97,6 +105,12 @@ export function WebBotGroupDialog({
     }
     setRolesByKey(roleMap)
     setSkills(editingGroup?.sharedSkills ?? [])
+    setAcceptCmd(editingGroup?.acceptance?.command ?? '')
+    setAcceptWorkdir(editingGroup?.acceptance?.workdir ?? '')
+    setAcceptShell(editingGroup?.acceptance?.shell ?? 'auto')
+    setAcceptTimeout(String(editingGroup?.acceptance?.timeoutSecs ?? 300))
+    setAcceptAutoRun(editingGroup?.acceptance?.autoRunOnReply ?? false)
+    setAcceptMaxRounds(String(editingGroup?.acceptance?.maxAutoFixRounds ?? 2))
     setError(null)
   }, [open, editingGroup])
 
@@ -136,6 +150,21 @@ export function WebBotGroupDialog({
       .map((m) => ({ member: m, role: (rolesByKey[keyId(m)] ?? '').trim() }))
       .filter((r) => r.role.length > 0)
     const hops = Math.max(1, Math.min(6, Number.parseInt(maxRelayHops, 10) || 3))
+    let acceptance: GroupAcceptanceConfig | null = null
+    if (acceptCmd.trim()) {
+      if (!acceptWorkdir.trim()) {
+        setError('填写验收命令时请同时指定工作目录')
+        return
+      }
+      acceptance = {
+        command: acceptCmd.trim(),
+        workdir: acceptWorkdir.trim(),
+        shell: acceptShell === 'auto' ? null : acceptShell,
+        autoRunOnReply: acceptAutoRun,
+        maxAutoFixRounds: Math.max(1, Math.min(5, Number.parseInt(acceptMaxRounds, 10) || 2)),
+        timeoutSecs: Math.max(5, Math.min(1800, Number.parseInt(acceptTimeout, 10) || 300))
+      }
+    }
 
     setSaving(true)
     setError(null)
@@ -149,7 +178,8 @@ export function WebBotGroupDialog({
             maxRelayHops: hops,
             sharedContext: sharedContext.trim() || null,
             sharedSkills: skills.filter((s) => s.name.trim() && s.content.trim()),
-            memberRoles
+            memberRoles,
+            acceptance
           })
         : await createWebBotGroup({
             name: name.trim(),
@@ -158,7 +188,8 @@ export function WebBotGroupDialog({
             maxRelayHops: hops,
             sharedContext: sharedContext.trim() || null,
             sharedSkills: skills.filter((s) => s.name.trim() && s.content.trim()),
-            memberRoles
+            memberRoles,
+            acceptance
           })
       onUpdated(snapshot)
       onOpenChange(false)
@@ -333,6 +364,21 @@ export function WebBotGroupDialog({
               </div>
             ))}
           </div>
+
+          <WebBotGroupAcceptanceFields
+            command={acceptCmd}
+            workdir={acceptWorkdir}
+            shell={acceptShell}
+            timeoutSecs={acceptTimeout}
+            autoRun={acceptAutoRun}
+            maxAutoFixRounds={acceptMaxRounds}
+            onCommandChange={setAcceptCmd}
+            onWorkdirChange={setAcceptWorkdir}
+            onShellChange={setAcceptShell}
+            onTimeoutChange={setAcceptTimeout}
+            onAutoRunChange={setAcceptAutoRun}
+            onMaxRoundsChange={setAcceptMaxRounds}
+          />
 
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
 

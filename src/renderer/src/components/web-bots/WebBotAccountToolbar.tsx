@@ -2,12 +2,14 @@ import { useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
+  Bot,
   Cookie,
   Home,
   Loader2,
   Pencil,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Terminal
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +29,7 @@ type Props = {
   selectedProvider: ProviderInfo | null
   onOpenCookie: (account: AccountRecord) => void
   onOpenEdit: (account: AccountRecord) => void
+  onOpenJoinRoom: (account: AccountRecord) => void
   onSnapshot: (snapshot: WebBotsSnapshot) => void
 }
 
@@ -35,6 +38,7 @@ export function WebBotAccountToolbar({
   selectedProvider,
   onOpenCookie,
   onOpenEdit,
+  onOpenJoinRoom,
   onSnapshot
 }: Props): React.JSX.Element {
   const [syncing, setSyncing] = useState(false)
@@ -105,6 +109,24 @@ export function WebBotAccountToolbar({
       </div>
 
       <div className="flex items-center gap-1.5">
+        {activeAccount.sshHost ? (
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => {
+              const cmd = `ssh ${activeAccount.sshHost}`
+              void navigator.clipboard.writeText(cmd)
+              toast.success(`已复制 ${cmd}（可在 Orca 主界面添加为 ssh:* 纯算力主机）`)
+            }}
+          >
+            <Terminal className="size-3" />
+            SSH 算力
+          </Button>
+        ) : null}
+        <Button variant="outline" size="xs" onClick={() => onOpenJoinRoom(activeAccount)}>
+          <Bot className="size-3" />
+          加入 Bots 群聊
+        </Button>
         <Button variant="outline" size="xs" onClick={() => void handleSync()} disabled={syncing}>
           {syncing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
           同步状态

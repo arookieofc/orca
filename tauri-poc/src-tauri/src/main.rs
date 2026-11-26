@@ -1295,6 +1295,11 @@ fn main() {
             web_bots::poc_web_bots_append_group_context,
             web_bots::poc_web_bots_export_sync_bundle,
             web_bots::poc_web_bots_import_sync_bundle,
+            web_bots::poc_web_bots_ask_member,
+            web_bots::poc_web_bots_cancel_group,
+            web_bots::poc_web_bots_cancel_member,
+            web_bots::poc_web_bots_run_group_acceptance,
+            web_bots::poc_web_bots_reject_group_for_fix,
             // Updater and Workspace Space window removed.
             // updater::poc_updater_get_version,
             // updater::poc_updater_get_status,

@@ -74,6 +74,8 @@ pub struct AccountRecord {
     pub cooldown_until_ms: Option<u64>,
     #[serde(default)]
     pub last_used_at_ms: Option<u64>,
+    #[serde(default)]
+    pub ssh_host: Option<String>,
 }
 
 impl AccountRecord {
@@ -145,8 +147,32 @@ pub enum GroupReplyStatus {
     Sending,
     Streaming,
     Done,
+    Cancelled,
     NeedsAuth,
     Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupAcceptanceConfig {
+    pub command: String,
+    pub workdir: String,
+    #[serde(default)]
+    pub shell: Option<String>,
+    #[serde(default)]
+    pub auto_run_on_reply: bool,
+    #[serde(default = "default_max_auto_fix_rounds")]
+    pub max_auto_fix_rounds: u32,
+    #[serde(default = "default_acceptance_timeout_secs")]
+    pub timeout_secs: u64,
+}
+
+fn default_max_auto_fix_rounds() -> u32 {
+    2
+}
+
+fn default_acceptance_timeout_secs() -> u64 {
+    300
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,6 +244,8 @@ pub struct GroupChatRecord {
     pub max_relay_hops: u32,
     #[serde(default)]
     pub thread_bindings: Vec<GroupThreadBinding>,
+    #[serde(default)]
+    pub acceptance: Option<GroupAcceptanceConfig>,
 }
 
 fn default_max_relay_hops() -> u32 {

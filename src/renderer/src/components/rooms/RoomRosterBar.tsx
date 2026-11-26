@@ -14,6 +14,7 @@ import { shortSessionLabel } from './room-session-pool'
 import { SpawnBotForm } from './SpawnBotForm'
 import { RoomMemberAvatar, agentFromMemberId } from './RoomMemberAvatar'
 import { RoomMemberModelPicker } from './RoomMemberModelPicker'
+import { RoomWebBotPickerSection } from './RoomWebBotPickerSection'
 
 /** Member management lives off the chat surface so ordinary conversations stay clean. */
 export function RoomRosterBar(props: {
@@ -24,6 +25,7 @@ export function RoomRosterBar(props: {
   worktreeNames: Map<string, string>
   onSpawned: () => void
   onAddMember: (sessionId: string, isAdmin: boolean) => void
+  onAddWebBot: (memberId: string, name: string, isAdmin: boolean) => void
   onRemoveMember: (memberId: string) => void
 }) {
   const t = useTranslate()
@@ -115,6 +117,12 @@ export function RoomRosterBar(props: {
               onCancel={() => props.onOpenChange(false)}
             />
           </div>
+
+          <RoomWebBotPickerSection
+            room={selected}
+            open={props.open}
+            onAddWebBot={props.onAddWebBot}
+          />
 
           <div className="space-y-2 p-4 pt-0">
             <h3 className="text-xs font-semibold text-muted-foreground">

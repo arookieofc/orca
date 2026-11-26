@@ -3,6 +3,7 @@ import type {
   AccountKey,
   ExportSyncBundleResponse,
   ExternalAgentKind,
+  GroupAcceptanceConfig,
   GroupMemberRole,
   GroupSharedSkill,
   GroupWorkflowMode,
@@ -11,7 +12,8 @@ import type {
   SiteAdaptersSnapshot,
   WebBotViewportBounds,
   WebBotsSettings,
-  WebBotsSnapshot
+  WebBotsSnapshot,
+  WorkflowCommandResult
 } from './tauri-native-web-bots-types'
 
 export * from './tauri-native-web-bots-types'
@@ -43,8 +45,12 @@ export function addWebBotAccount(input: {
   proxyUrl: string | null
   timezone: string | null
   rawCookies: string | null
+  sshHost?: string | null
 }): Promise<WebBotsSnapshot> {
-  return invokeNative<WebBotsSnapshot>('poc_web_bots_add_account', input)
+  return invokeNative<WebBotsSnapshot>('poc_web_bots_add_account', {
+    ...input,
+    sshHost: input.sshHost ?? null
+  })
 }
 
 export function updateWebBotAccount(input: {
@@ -53,8 +59,12 @@ export function updateWebBotAccount(input: {
   alias: string
   proxyUrl: string | null
   timezone: string | null
+  sshHost?: string | null
 }): Promise<WebBotsSnapshot> {
-  return invokeNative<WebBotsSnapshot>('poc_web_bots_update_account', input)
+  return invokeNative<WebBotsSnapshot>('poc_web_bots_update_account', {
+    ...input,
+    sshHost: input.sshHost ?? null
+  })
 }
 
 export function removeWebBotAccount(providerId: string, uuid: string): Promise<WebBotsSnapshot> {
@@ -154,8 +164,12 @@ export function createWebBotGroup(input: {
   sharedContext: string | null
   sharedSkills: GroupSharedSkill[] | null
   memberRoles: GroupMemberRole[] | null
+  acceptance?: GroupAcceptanceConfig | null
 }): Promise<WebBotsSnapshot> {
-  return invokeNative<WebBotsSnapshot>('poc_web_bots_create_group', input)
+  return invokeNative<WebBotsSnapshot>('poc_web_bots_create_group', {
+    ...input,
+    acceptance: input.acceptance ?? null
+  })
 }
 
 export function updateWebBotGroup(input: {
@@ -167,8 +181,12 @@ export function updateWebBotGroup(input: {
   sharedContext: string | null
   sharedSkills: GroupSharedSkill[] | null
   memberRoles: GroupMemberRole[] | null
+  acceptance?: GroupAcceptanceConfig | null
 }): Promise<WebBotsSnapshot> {
-  return invokeNative<WebBotsSnapshot>('poc_web_bots_update_group', input)
+  return invokeNative<WebBotsSnapshot>('poc_web_bots_update_group', {
+    ...input,
+    acceptance: input.acceptance ?? null
+  })
 }
 
 export function deleteWebBotGroup(groupId: string): Promise<WebBotsSnapshot> {
@@ -243,6 +261,62 @@ export function importWebBotsSyncBundle(
   return invokeNative<ImportSyncBundleResponse>('poc_web_bots_import_sync_bundle', {
     bundleJson,
     passphrase
+  })
+}
+
+export function askWebBotMember(input: {
+  providerId: string
+  uuid: string
+  prompt: string
+  roomId?: string | null
+  newChat?: boolean
+}): Promise<string> {
+  return invokeNative<string>('poc_web_bots_ask_member', {
+    providerId: input.providerId,
+    uuid: input.uuid,
+    prompt: input.prompt,
+    roomId: input.roomId ?? null,
+    newChat: input.newChat ?? false
+  })
+}
+
+export function cancelWebBotGroup(groupId: string): Promise<WebBotsSnapshot> {
+  return invokeNative<WebBotsSnapshot>('poc_web_bots_cancel_group', { groupId })
+}
+
+export function cancelWebBotMember(providerId: string, uuid: string): Promise<void> {
+  return invokeNative<void>('poc_web_bots_cancel_member', { providerId, uuid })
+}
+
+export function runWebBotGroupAcceptance(groupId: string): Promise<WebBotsSnapshot> {
+  return invokeNative<WebBotsSnapshot>('poc_web_bots_run_group_acceptance', { groupId })
+}
+
+export function rejectWebBotGroupForFix(input: {
+  groupId: string
+  target?: AccountKey | null
+  note?: string | null
+}): Promise<WebBotsSnapshot> {
+  return invokeNative<WebBotsSnapshot>('poc_web_bots_reject_group_for_fix', {
+    groupId: input.groupId,
+    target: input.target ?? null,
+    note: input.note ?? null
+  })
+}
+
+export function runLocalWorkflowCommand(input: {
+  workdir: string
+  command: string
+  shell?: string | null
+  timeoutSecs?: number | null
+}): Promise<WorkflowCommandResult> {
+  return invokeNative<WorkflowCommandResult>('poc_run_workflow_command', {
+    args: {
+      workdir: input.workdir,
+      command: input.command,
+      shell: input.shell ?? null,
+      timeoutSecs: input.timeoutSecs ?? null
+    }
   })
 }
 

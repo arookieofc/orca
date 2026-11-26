@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  BookmarkPlus,
   Copy,
   Loader2,
   MessageSquarePlus,
   Pencil,
-  RefreshCw,
   Send,
+  ShieldCheck,
+  Square,
   Trash2
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -22,19 +22,22 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import {
   appendWebBotGroupContext,
+  cancelWebBotGroup,
   clearWebBotGroupMessages,
   newWebBotGroupTopic,
+  rejectWebBotGroupForFix,
   retryWebBotGroupMessage,
+  runWebBotGroupAcceptance,
   sendWebBotGroupMessage,
   updateWebBotGroup,
   type AccountKey,
   type AccountRecord,
   type ExternalAgentRecord,
   type GroupChatRecord,
-  type GroupReplyStatus,
   type GroupWorkflowMode,
   type WebBotsSnapshot
 } from '@/web/tauri-native-web-bots'
+import { WebBotGroupMessageCard } from './WebBotGroupMessageCard'
 
 type Props = {
   group: GroupChatRecord
@@ -48,15 +51,6 @@ const WORKFLOW_LABELS: Record<GroupChatRecord['workflowMode'], string> = {
   parallel: '并行讨论',
   review: '评审流',
   a2a_relay: 'A2A 接力'
-}
-
-const STATUS_LABELS: Record<GroupReplyStatus, string> = {
-  queued: '排队中',
-  sending: '发送中',
-  streaming: '生成中',
-  done: '已完成',
-  needs_auth: '需登录',
-  error: '失败'
 }
 
 function keyId(key: AccountKey): string {
@@ -73,11 +67,20 @@ export function WebBotsGroupChat({
   const [composer, setComposer] = useState('')
   const [sending, setSending] = useState(false)
   const [topicBusy, setTopicBusy] = useState(false)
+  const [verifyBusy, setVerifyBusy] = useState(false)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [group.messages.length])
+
+  const hasActiveRequests = useMemo(
+    () =>
+      group.messages.some(
+        (m) => m.status === 'queued' || m.status === 'sending' || m.status === 'streaming'
+      ),
+    [group.messages]
+  )
 
   const memberNameMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -133,6 +136,38 @@ export function WebBotsGroupChat({
     }
   }
 
+  const handleStop = async () => {
+    try {
+      const snapshot = await cancelWebBotGroup(group.id)
+      onUpdated(snapshot)
+      toast.success('已中止当前群聊进行中的请求')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const handleRunAcceptance = async () => {
+    setVerifyBusy(true)
+    try {
+      const snapshot = await runWebBotGroupAcceptance(group.id)
+      onUpdated(snapshot)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setVerifyBusy(false)
+    }
+  }
+
+  const handleRejectForFix = async () => {
+    try {
+      const snapshot = await rejectWebBotGroupForFix({ groupId: group.id })
+      onUpdated(snapshot)
+      toast.success('已附带验收输出打回重做')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const handleNewTopic = async () => {
     setTopicBusy(true)
     try {
@@ -148,8 +183,7 @@ export function WebBotsGroupChat({
 
   const handleClear = async () => {
     try {
-      const snapshot = await clearWebBotGroupMessages(group.id)
-      onUpdated(snapshot)
+      onUpdated(await clearWebBotGroupMessages(group.id))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err))
     }
@@ -157,8 +191,7 @@ export function WebBotsGroupChat({
 
   const handleRetry = async (messageId: string) => {
     try {
-      const snapshot = await retryWebBotGroupMessage(group.id, messageId)
-      onUpdated(snapshot)
+      onUpdated(await retryWebBotGroupMessage(group.id, messageId))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err))
     }
@@ -174,7 +207,8 @@ export function WebBotsGroupChat({
         maxRelayHops: group.maxRelayHops,
         sharedContext: group.sharedContext,
         sharedSkills: group.sharedSkills,
-        memberRoles: group.memberRoles
+        memberRoles: group.memberRoles,
+        acceptance: group.acceptance ?? null
       })
       onUpdated(snapshot)
       toast.success(`已切换为「${WORKFLOW_LABELS[mode]}」`)
@@ -186,8 +220,7 @@ export function WebBotsGroupChat({
   const handleAppendContext = async (senderName: string, content: string) => {
     try {
       const snippet = `[${senderName}] ${content.trim()}`
-      const snapshot = await appendWebBotGroupContext(group.id, snippet)
-      onUpdated(snapshot)
+      onUpdated(await appendWebBotGroupContext(group.id, snippet))
       toast.success('已沉淀到群聊共享上下文')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err))
@@ -225,6 +258,27 @@ export function WebBotsGroupChat({
           <span className="text-xs text-muted-foreground">{group.members.length} 位成员</span>
         </div>
         <div className="flex items-center gap-1.5">
+          {hasActiveRequests ? (
+            <Button variant="destructive" size="xs" onClick={() => void handleStop()}>
+              <Square className="size-3" />
+              停止
+            </Button>
+          ) : null}
+          {group.acceptance?.command ? (
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => void handleRunAcceptance()}
+              disabled={verifyBusy}
+            >
+              {verifyBusy ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <ShieldCheck className="size-3" />
+              )}
+              运行验收
+            </Button>
+          ) : null}
           <Button variant="outline" size="xs" onClick={() => void handleExportMarkdown()}>
             <Copy className="size-3" />
             导出 MD
@@ -274,76 +328,15 @@ export function WebBotsGroupChat({
           </div>
         ) : (
           <div className="mx-auto flex max-w-3xl flex-col gap-3">
-            {group.messages.map((msg) => {
-              const isUser = msg.role === 'user'
-              const isPending =
-                msg.status === 'queued' || msg.status === 'sending' || msg.status === 'streaming'
-              return (
-                <div
-                  key={msg.id}
-                  className={
-                    isUser
-                      ? 'ml-auto max-w-[82%] rounded-xl border border-border bg-accent px-3.5 py-2.5'
-                      : 'mr-auto w-full rounded-xl border border-border bg-card px-3.5 py-2.5'
-                  }
-                >
-                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold">{msg.senderName}</span>
-                      {!isUser ? (
-                        <Badge
-                          variant={
-                            msg.status === 'error' || msg.status === 'needs_auth'
-                              ? 'destructive'
-                              : 'secondary'
-                          }
-                          className="text-3xs"
-                        >
-                          {isPending ? <Loader2 className="size-2.5 animate-spin" /> : null}
-                          {STATUS_LABELS[msg.status]}
-                        </Badge>
-                      ) : null}
-                      {msg.stageLabel ? (
-                        <Badge variant="outline" className="text-3xs">
-                          {msg.stageLabel}
-                        </Badge>
-                      ) : null}
-                      {msg.autoRoutedChannel ? (
-                        <Badge variant="outline" className="text-3xs">
-                          @{msg.autoRoutedChannel}
-                        </Badge>
-                      ) : null}
-                    </div>
-                    {!isUser && msg.status === 'done' && msg.content.trim() ? (
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => void handleAppendContext(msg.senderName, msg.content)}
-                      >
-                        <BookmarkPlus className="size-3" />
-                        沉淀结论
-                      </Button>
-                    ) : null}
-                    {!isUser && (msg.status === 'error' || msg.status === 'needs_auth') ? (
-                      <Button variant="ghost" size="xs" onClick={() => handleRetry(msg.id)}>
-                        <RefreshCw className="size-3" />
-                        重试
-                      </Button>
-                    ) : null}
-                  </div>
-                  {msg.content ? (
-                    <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground">
-                      {msg.content}
-                    </pre>
-                  ) : isPending ? (
-                    <p className="text-xs text-muted-foreground">等待节点响应…</p>
-                  ) : null}
-                  {msg.error ? (
-                    <p className="mt-1.5 text-xs text-destructive">{msg.error}</p>
-                  ) : null}
-                </div>
-              )
-            })}
+            {group.messages.map((msg) => (
+              <WebBotGroupMessageCard
+                key={msg.id}
+                msg={msg}
+                onAppendContext={(name, body) => void handleAppendContext(name, body)}
+                onRetry={(id) => void handleRetry(id)}
+                onRejectForFix={() => void handleRejectForFix()}
+              />
+            ))}
             <div ref={bottomRef} />
           </div>
         )}

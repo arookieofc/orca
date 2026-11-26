@@ -240,6 +240,11 @@ fn main() {
             "poc_web_bots_append_group_context",
             "poc_web_bots_export_sync_bundle",
             "poc_web_bots_import_sync_bundle",
+            "poc_web_bots_ask_member",
+            "poc_web_bots_cancel_group",
+            "poc_web_bots_cancel_member",
+            "poc_web_bots_run_group_acceptance",
+            "poc_web_bots_reject_group_for_fix",
         ]));
     tauri_build::try_build(attributes).expect("failed to run tauri-build");
 }

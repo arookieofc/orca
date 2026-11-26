@@ -188,6 +188,11 @@
     "allow-poc-web-bots-navigate",
     "allow-poc-web-bots-append-group-context",
     "allow-poc-web-bots-export-sync-bundle",
-    "allow-poc-web-bots-import-sync-bundle"
+    "allow-poc-web-bots-import-sync-bundle",
+    "allow-poc-web-bots-ask-member",
+    "allow-poc-web-bots-cancel-group",
+    "allow-poc-web-bots-cancel-member",
+    "allow-poc-web-bots-run-group-acceptance",
+    "allow-poc-web-bots-reject-group-for-fix"
   ]
 }

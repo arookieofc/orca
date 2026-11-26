@@ -94,3 +94,15 @@ export const RoomEnsureMainBotParams = z.object({
   roomName: OptionalString,
   botName: OptionalString
 })
+
+export const RoomWebBotTurnsClaimParams = z.object({})
+
+export const RoomWebBotTurnFailParams = z.object({
+  id: requiredString('Missing --id'),
+  memberId: requiredString('Missing --member-id'),
+  error: requiredString('Missing --error')
+})
+
+export const RoomAbortParams = z.object({
+  id: requiredString('Missing --id')
+})

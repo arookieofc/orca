@@ -230,18 +230,39 @@ pub fn extract_openai_sse_delta(line: &str) -> Option<String> {
     None
 }
 
+pub enum ExternalTransportError {
+    Cancelled,
+    Other(String),
+}
+
+async fn wait_for_transport_cancel(cancel_rx: &mut tokio::sync::watch::Receiver<bool>) {
+    if *cancel_rx.borrow() {
+        return;
+    }
+    while cancel_rx.changed().await.is_ok() {
+        if *cancel_rx.borrow() {
+            return;
+        }
+    }
+    std::future::pending::<()>().await;
+}
+
 pub async fn run_openai_stream<F>(
     agent: &ExternalAgentRecord,
     prompt: &str,
+    mut cancel_rx: tokio::sync::watch::Receiver<bool>,
     mut on_progress: F,
-) -> Result<String, String>
+) -> Result<String, ExternalTransportError>
 where
     F: FnMut(String) + Send,
 {
+    if *cancel_rx.borrow() {
+        return Err(ExternalTransportError::Cancelled);
+    }
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(120))
         .build()
-        .map_err(|e| format!("初始化 HTTP 客户端失败: {e}"))?;
+        .map_err(|e| ExternalTransportError::Other(format!("初始化 HTTP 客户端失败: {e}")))?;
 
     let endpoint = build_openai_endpoint(&agent.base_url);
     let body = json!({
@@ -260,12 +281,15 @@ where
         req = req.bearer_auth(agent.api_key.trim());
     }
 
-    let mut resp = req.send().await.map_err(|e| format!("请求 API 失败: {e}"))?;
+    let mut resp = tokio::select! {
+        res = req.send() => res.map_err(|e| ExternalTransportError::Other(format!("请求 API 失败: {e}")))?,
+        _ = wait_for_transport_cancel(&mut cancel_rx) => return Err(ExternalTransportError::Cancelled),
+    };
     let status = resp.status();
     if !status.is_success() {
         let err_text = resp.text().await.unwrap_or_default();
         let brief: String = err_text.chars().take(300).collect();
-        return Err(format!("API 返回错误 ({status}): {brief}"));
+        return Err(ExternalTransportError::Other(format!("API 返回错误 ({status}): {brief}")));
     }
 
     let content_type = resp
@@ -276,7 +300,10 @@ where
         .to_ascii_lowercase();
 
     if !content_type.contains("text/event-stream") {
-        let text = resp.text().await.map_err(|e| format!("读取响应失败: {e}"))?;
+        let text = tokio::select! {
+            res = resp.text() => res.map_err(|e| ExternalTransportError::Other(format!("读取响应失败: {e}")))?,
+            _ = wait_for_transport_cancel(&mut cancel_rx) => return Err(ExternalTransportError::Cancelled),
+        };
         if let Ok(parsed) = serde_json::from_str::<Value>(&text) {
             if let Some(content) = parsed
                 .pointer("/choices/0/message/content")
@@ -285,18 +312,21 @@ where
                 return Ok(content.trim().to_string());
             }
         }
-        return Err("API 响应格式非预期".to_string());
+        return Err(ExternalTransportError::Other("API 响应格式非预期".to_string()));
     }
 
     let mut acc = String::new();
     let mut pending_line = String::new();
     let mut last_emit = Instant::now() - Duration::from_secs(1);
 
-    while let Some(chunk) = resp
-        .chunk()
-        .await
-        .map_err(|e| format!("读取流式响应中断: {e}"))?
-    {
+    loop {
+        let chunk_opt = tokio::select! {
+            res = resp.chunk() => res.map_err(|e| ExternalTransportError::Other(format!("读取流式响应中断: {e}")))?,
+            _ = wait_for_transport_cancel(&mut cancel_rx) => return Err(ExternalTransportError::Cancelled),
+        };
+        let Some(chunk) = chunk_opt else {
+            break;
+        };
         let piece = String::from_utf8_lossy(&chunk);
         pending_line.push_str(&piece);
         while let Some(pos) = pending_line.find('\n') {
@@ -315,7 +345,7 @@ where
     }
     let final_text = acc.trim().to_string();
     if final_text.is_empty() {
-        Err("API 未返回有效文本内容".to_string())
+        Err(ExternalTransportError::Other("API 未返回有效文本内容".to_string()))
     } else {
         Ok(final_text)
     }
@@ -342,14 +372,34 @@ pub fn build_cli_args_and_stdin(args: &[String], prompt: &str) -> (Vec<String>, 
     (resolved, stdin_payload)
 }
 
+async fn kill_cli_child(child: &mut tokio::process::Child) {
+    #[cfg(windows)]
+    if let Some(pid) = child.id() {
+        let mut kill_cmd = tokio::process::Command::new("taskkill");
+        kill_cmd
+            .args(["/T", "/F", "/PID", &pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(0x0800_0000);
+        let _ = kill_cmd.status().await;
+    }
+    let _ = child.kill().await;
+    let _ = child.wait().await;
+}
+
 pub async fn run_local_cli<F>(
     agent: &ExternalAgentRecord,
     prompt: &str,
+    mut cancel_rx: tokio::sync::watch::Receiver<bool>,
     mut on_progress: F,
-) -> Result<String, String>
+) -> Result<String, ExternalTransportError>
 where
     F: FnMut(String) + Send,
 {
+    if *cancel_rx.borrow() {
+        return Err(ExternalTransportError::Cancelled);
+    }
     let (args, stdin_payload) = build_cli_args_and_stdin(&agent.args, prompt);
     let mut cmd = tokio::process::Command::new(&agent.command);
     cmd.args(&args)
@@ -370,7 +420,7 @@ where
 
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("启动本地 CLI '{}' 失败: {e}", agent.command))?;
+        .map_err(|e| ExternalTransportError::Other(format!("启动本地 CLI '{}' 失败: {e}", agent.command)))?;
 
     if let Some(input) = stdin_payload {
         if let Some(mut stdin) = child.stdin.take() {
@@ -401,51 +451,60 @@ where
         };
         let remain = deadline.saturating_duration_since(tokio::time::Instant::now());
         if remain.is_zero() {
-            let _ = child.kill().await;
-            return Err("本地 CLI 执行超时（120 秒）".to_string());
+            kill_cli_child(&mut child).await;
+            return Err(ExternalTransportError::Other("本地 CLI 执行超时（120 秒）".to_string()));
         }
-        match tokio::time::timeout(remain, out.read(&mut buf)).await {
-            Ok(Ok(0)) => break,
-            Ok(Ok(n)) => {
-                stdout_acc.push_str(&String::from_utf8_lossy(&buf[..n]));
-                if last_emit.elapsed() >= Duration::from_millis(180)
-                    && !stdout_acc.trim().is_empty()
-                {
-                    last_emit = Instant::now();
-                    on_progress(stdout_acc.trim().to_string());
+        tokio::select! {
+            read_res = tokio::time::timeout(remain, out.read(&mut buf)) => {
+                match read_res {
+                    Ok(Ok(0)) => break,
+                    Ok(Ok(n)) => {
+                        stdout_acc.push_str(&String::from_utf8_lossy(&buf[..n]));
+                        if last_emit.elapsed() >= Duration::from_millis(180)
+                            && !stdout_acc.trim().is_empty()
+                        {
+                            last_emit = Instant::now();
+                            on_progress(stdout_acc.trim().to_string());
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        kill_cli_child(&mut child).await;
+                        return Err(ExternalTransportError::Other(format!("读取 CLI 输出失败: {e}")));
+                    }
+                    Err(_) => {
+                        kill_cli_child(&mut child).await;
+                        return Err(ExternalTransportError::Other("本地 CLI 执行超时（120 秒）".to_string()));
+                    }
                 }
             }
-            Ok(Err(e)) => {
-                let _ = child.kill().await;
-                return Err(format!("读取 CLI 输出失败: {e}"));
-            }
-            Err(_) => {
-                let _ = child.kill().await;
-                return Err("本地 CLI 执行超时（120 秒）".to_string());
+            _ = wait_for_transport_cancel(&mut cancel_rx) => {
+                kill_cli_child(&mut child).await;
+                stderr_task.abort();
+                return Err(ExternalTransportError::Cancelled);
             }
         }
     }
 
     let status = tokio::time::timeout(Duration::from_secs(5), child.wait())
         .await
-        .map_err(|_| "等待 CLI 退出超时".to_string())?
-        .map_err(|e| format!("等待 CLI 退出失败: {e}"))?;
+        .map_err(|_| ExternalTransportError::Other("等待 CLI 退出超时".to_string()))?
+        .map_err(|e| ExternalTransportError::Other(format!("等待 CLI 退出失败: {e}")))?;
     let err_detail = stderr_task.await.unwrap_or_default();
     let final_out = stdout_acc.trim().to_string();
 
     if !status.success() && final_out.is_empty() {
-        return Err(if err_detail.trim().is_empty() {
+        return Err(ExternalTransportError::Other(if err_detail.trim().is_empty() {
             format!("本地 CLI 退出异常 ({status})")
         } else {
             format!("CLI 错误 ({status}): {}", err_detail.trim())
-        });
+        }));
     }
     if final_out.is_empty() {
-        return Err(if err_detail.trim().is_empty() {
+        return Err(ExternalTransportError::Other(if err_detail.trim().is_empty() {
             "本地 CLI 未输出有效内容".to_string()
         } else {
             err_detail.trim().to_string()
-        });
+        }));
     }
     Ok(final_out)
 }

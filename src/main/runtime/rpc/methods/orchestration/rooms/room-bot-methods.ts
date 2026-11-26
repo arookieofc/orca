@@ -2,7 +2,7 @@
  * Room bot methods: seat per-room bots and repair the HQ main bot.
  */
 
-import { defineMethod } from '../../../core'
+import { defineOrchestrationMethod } from '../access/orchestration-method-access'
 import { spawnRoomBot } from '../../../../orchestration/room-bot-spawn'
 import { MAIN_BOT_NAME, MAIN_BOT_ROOM_NAME } from '../../../../orchestration/room-admin-tools'
 import { OrchestrationError } from '../../../../orchestration/orchestration-error'
@@ -32,9 +32,10 @@ const adminNeedsRespawn = (
 }
 
 export const ORCHESTRATION_ROOM_BOT_METHODS = [
-  defineMethod({
+  defineOrchestrationMethod({
     name: 'orchestration.roomBotCreate',
     permission: 'workspace',
+    access: { kind: 'writes', targets: {} },
     params: RoomBotCreateParams,
     handler: async (params, ctx) => {
       const db = ctx.runtime.getOrchestrationDb()
@@ -64,9 +65,10 @@ export const ORCHESTRATION_ROOM_BOT_METHODS = [
     }
   }),
 
-  defineMethod({
+  defineOrchestrationMethod({
     name: 'orchestration.roomEnsureMainBot',
     permission: 'workspace',
+    access: { kind: 'writes', targets: {} },
     params: RoomEnsureMainBotParams,
     handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()

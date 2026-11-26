@@ -42,6 +42,7 @@ export function WebBotAccountDialog({
   const [alias, setAlias] = useState('')
   const [proxyUrl, setProxyUrl] = useState('')
   const [timezone, setTimezone] = useState('')
+  const [sshHost, setSshHost] = useState('')
   const [rawCookies, setRawCookies] = useState('')
   const [saving, setSaving] = useState(false)
   const [testingProxy, setTestingProxy] = useState(false)
@@ -55,6 +56,7 @@ export function WebBotAccountDialog({
     setAlias(editingAccount?.alias ?? '')
     setProxyUrl(editingAccount?.proxyUrl ?? '')
     setTimezone(editingAccount?.timezone ?? '')
+    setSshHost(editingAccount?.sshHost ?? '')
     setRawCookies('')
     setProxyResult(null)
     setError(null)
@@ -84,14 +86,16 @@ export function WebBotAccountDialog({
             uuid: editingAccount.uuid,
             alias: alias.trim(),
             proxyUrl: proxyUrl.trim() || null,
-            timezone: timezone.trim() || null
+            timezone: timezone.trim() || null,
+            sshHost: sshHost.trim() || null
           })
         : await addWebBotAccount({
             providerId,
             alias: alias.trim(),
             proxyUrl: proxyUrl.trim() || null,
             timezone: timezone.trim() || null,
-            rawCookies: rawCookies.trim() || null
+            rawCookies: rawCookies.trim() || null,
+            sshHost: sshHost.trim() || null
           })
       onUpdated(snapshot)
       onOpenChange(false)
@@ -165,6 +169,17 @@ export function WebBotAccountDialog({
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
               placeholder="例如 Asia/Shanghai"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="webbot-ssh">关联 SSH 纯算力节点（可选）</Label>
+            <Input
+              id="webbot-ssh"
+              value={sshHost}
+              onChange={(e) => setSshHost(e.target.value)}
+              placeholder="例如 bot1@100.64.0.21（可在 Orca 添加为 ssh:* 节点）"
+              className="font-mono text-xs"
             />
           </div>
 

@@ -1,9 +1,14 @@
-import { Bot, Crown, User } from 'lucide-react'
+import { Bot, Cpu, Crown, Globe, User } from 'lucide-react'
 import { AgentIcon } from '@/components/agent/icons/AgentIcon'
 import { cn } from '@/lib/class-names'
+import { parseWebBotRoomMemberId } from '../../../../shared/web-bots/web-bot-room-address'
 import type { RoomMember } from './room-types'
 
-type AvatarMember = Pick<RoomMember, 'name'> & { isAdmin?: boolean; agent?: string }
+type AvatarMember = Pick<RoomMember, 'name'> & {
+  memberId?: string
+  isAdmin?: boolean
+  agent?: string
+}
 
 const ROOM_AGENT_IDS = new Set(['codex', 'claude', 'pi', 'grok', 'opencode', 'opencode2', 'omp'])
 
@@ -25,8 +30,17 @@ export function RoomMemberAvatar(props: {
   const name = props.member?.name ?? props.fallbackName ?? ''
   const isAdmin = props.member?.isAdmin === true
   const agent = props.member?.agent ?? null
+  const webBot = parseWebBotRoomMemberId(props.member?.memberId)
   const showAgent = !isAdmin && agent && ROOM_AGENT_IDS.has(agent)
-  const Icon = isAdmin ? Crown : props.member && !showAgent ? Bot : User
+  const Icon = isAdmin
+    ? Crown
+    : webBot
+      ? webBot.providerId === 'api' || webBot.providerId === 'cli'
+        ? Cpu
+        : Globe
+      : props.member && !showAgent
+        ? Bot
+        : User
   return (
     <span
       aria-hidden

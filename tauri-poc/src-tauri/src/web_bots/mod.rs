@@ -18,9 +18,14 @@ use cookies::{
     clear_cookies_via_cdp, export_cookies_via_cdp, export_parsed_cookies_via_cdp,
     inject_cookies_via_cdp, parse_raw_cookies,
 };
-use external_transport::{normalize_external_agent_input, normalize_proxy_url, test_proxy, ProxyTestResult};
+use external_transport::{
+    normalize_external_agent_input, normalize_proxy_url, run_local_cli, run_openai_stream,
+    test_proxy, ExternalTransportError, ProxyTestResult,
+};
 use group_orchestrator::{
-    dispatch_group_message, retry_single_group_message, WebBotsRuntimeInner,
+    cancel_group_execution, cancel_member_execution, dispatch_group_message,
+    normalize_acceptance_config, register_member_cancel_channel, reject_group_for_fix,
+    retry_single_group_message, start_group_acceptance, WebBotsRuntimeInner,
 };
 use providers::{normalize_custom_provider_input, resolve_provider_spec};
 use site_adapters::{
@@ -29,8 +34,8 @@ use site_adapters::{
 };
 use storage::{
     build_snapshot, load_state, new_uuid_v4, now_ms, AccountKey, AccountRecord, AuthState,
-    ExternalAgentKind, GroupChatRecord, GroupMemberRole, GroupSharedSkill, GroupWorkflowMode,
-    WebBotsSettings, WebBotsSnapshot,
+    ExternalAgentKind, GroupAcceptanceConfig, GroupChatRecord, GroupMemberRole, GroupSharedSkill,
+    GroupWorkflowMode, WebBotsSettings, WebBotsSnapshot,
 };
 use sync_bundle::{
     decrypt_sync_bundle, encrypt_sync_bundle, merge_sync_payload, ExportSyncBundleResponse,
@@ -38,7 +43,8 @@ use sync_bundle::{
 };
 use webview_manager::{
     apply_timezone_override, navigate_account_webview, probe_account_webview,
-    remove_profile_directory, reset_web_bot_chat, WebBotViewportBounds, WebBotWebviewManager,
+    remove_profile_directory, reset_web_bot_chat, send_and_collect_web_bot_reply,
+    WebBotReplyError, WebBotViewportBounds, WebBotWebviewManager,
 };
 
 const STATE_FILE_NAME: &str = "web-bots-state.json";
@@ -63,6 +69,9 @@ impl WebBotsState {
                 persisted,
                 webviews: WebBotWebviewManager::default(),
                 account_errors: HashMap::new(),
+                room_threads: HashMap::new(),
+                group_cancels: HashMap::new(),
+                member_cancels: HashMap::new(),
             })),
         }
     }
@@ -230,9 +239,15 @@ pub async fn poc_web_bots_add_account(
     proxy_url: Option<String>,
     timezone: Option<String>,
     raw_cookies: Option<String>,
+    ssh_host: Option<String>,
 ) -> Result<WebBotsSnapshot, String> {
     let clean_proxy = normalize_proxy_url(proxy_url.as_deref())?;
     let clean_tz = timezone
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToOwned::to_owned);
+    let clean_ssh_host = ssh_host
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
@@ -296,6 +311,7 @@ pub async fn poc_web_bots_add_account(
             cookie_session_only: false,
             cooldown_until_ms: None,
             last_used_at_ms: None,
+            ssh_host: clean_ssh_host,
         };
 
         if guard.persisted.settings.isolate_same_proxy_keep_alive {
@@ -356,9 +372,15 @@ pub async fn poc_web_bots_update_account(
     alias: String,
     proxy_url: Option<String>,
     timezone: Option<String>,
+    ssh_host: Option<String>,
 ) -> Result<WebBotsSnapshot, String> {
     let clean_proxy = normalize_proxy_url(proxy_url.as_deref())?;
     let clean_tz = timezone
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToOwned::to_owned);
+    let clean_ssh_host = ssh_host
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
@@ -381,6 +403,7 @@ pub async fn poc_web_bots_update_account(
     guard.persisted.accounts[idx].auto_alias = false;
     guard.persisted.accounts[idx].proxy_url = clean_proxy;
     guard.persisted.accounts[idx].timezone = clean_tz;
+    guard.persisted.accounts[idx].ssh_host = clean_ssh_host;
 
     if proxy_changed {
         // Recreate WebView on next switch so WebView2 applies the new proxy_url.
@@ -916,6 +939,7 @@ pub async fn poc_web_bots_create_group(
     shared_context: Option<String>,
     shared_skills: Option<Vec<GroupSharedSkill>>,
     member_roles: Option<Vec<GroupMemberRole>>,
+    acceptance: Option<GroupAcceptanceConfig>,
 ) -> Result<WebBotsSnapshot, String> {
     let clean_name = name.trim();
     if clean_name.is_empty() {
@@ -924,6 +948,7 @@ pub async fn poc_web_bots_create_group(
     if members.is_empty() {
         return Err("请至少选择一个群聊成员".to_string());
     }
+    let normalized_acceptance = normalize_acceptance_config(acceptance)?;
     let id = new_uuid_v4();
     let record = GroupChatRecord {
         id: id.clone(),
@@ -937,6 +962,7 @@ pub async fn poc_web_bots_create_group(
         workflow_mode,
         max_relay_hops: max_relay_hops.unwrap_or(3).clamp(1, 6),
         thread_bindings: Vec::new(),
+        acceptance: normalized_acceptance,
     };
     let mut guard = state.inner.lock().await;
     guard.persisted.active_group_id = Some(id);
@@ -961,6 +987,7 @@ pub async fn poc_web_bots_update_group(
     shared_context: Option<String>,
     shared_skills: Option<Vec<GroupSharedSkill>>,
     member_roles: Option<Vec<GroupMemberRole>>,
+    acceptance: Option<GroupAcceptanceConfig>,
 ) -> Result<WebBotsSnapshot, String> {
     let clean_name = name.trim();
     if clean_name.is_empty() {
@@ -969,6 +996,7 @@ pub async fn poc_web_bots_update_group(
     if members.is_empty() {
         return Err("请至少选择一个群聊成员".to_string());
     }
+    let normalized_acceptance = normalize_acceptance_config(acceptance)?;
     let mut guard = state.inner.lock().await;
     let group = guard
         .persisted
@@ -991,6 +1019,7 @@ pub async fn poc_web_bots_update_group(
     if let Some(roles) = member_roles {
         group.member_roles = roles;
     }
+    group.acceptance = normalized_acceptance;
     guard.save_and_emit(&app);
     Ok(build_snapshot(
         &guard.persisted,
@@ -1466,4 +1495,196 @@ pub async fn poc_web_bots_import_sync_bundle(
         ),
         summary,
     })
+}
+
+#[tauri::command]
+pub async fn poc_web_bots_ask_member(
+    app: AppHandle,
+    state: State<'_, WebBotsState>,
+    provider_id: String,
+    uuid: String,
+    prompt: String,
+    room_id: Option<String>,
+    new_chat: Option<bool>,
+) -> Result<String, String> {
+    let clean_prompt = prompt.trim().to_string();
+    if clean_prompt.is_empty() {
+        return Err("发送内容不能为空".to_string());
+    }
+    let composite = format!("{provider_id}:{uuid}");
+
+    if provider_id == "api" || provider_id == "cli" {
+        let (ext, cancel_rx) = {
+            let mut guard = state.inner.lock().await;
+            let ext = guard
+                .persisted
+                .external_agents
+                .iter()
+                .find(|a| a.id == uuid && a.provider_id() == provider_id)
+                .cloned()
+                .ok_or_else(|| "未找到目标外部 Agent".to_string())?;
+            let rx = register_member_cancel_channel(&mut guard, &composite);
+            (ext, rx)
+        };
+        let res = match ext.kind {
+            ExternalAgentKind::OpenaiApi => {
+                run_openai_stream(&ext, &clean_prompt, cancel_rx, |_| {}).await
+            }
+            ExternalAgentKind::LocalCli => {
+                run_local_cli(&ext, &clean_prompt, cancel_rx, |_| {}).await
+            }
+        };
+        return res.map_err(|err| match err {
+            ExternalTransportError::Cancelled => "请求已手动中止".to_string(),
+            ExternalTransportError::Other(msg) => msg,
+        });
+    }
+
+    let key = AccountKey {
+        provider_id: provider_id.clone(),
+        uuid: uuid.clone(),
+    };
+    let use_new_chat = new_chat.unwrap_or(false);
+    let room_thread_key = room_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|rid| format!("{rid}:{provider_id}:{uuid}"));
+
+    let (webview, account, entry_url, adapter_dir, thread_url, cancel_rx) = {
+        let mut guard = state.inner.lock().await;
+        let account = guard
+            .persisted
+            .accounts
+            .iter()
+            .find(|a| a.key() == key)
+            .cloned()
+            .ok_or_else(|| "未找到目标 Web Bot 账号".to_string())?;
+        let spec = resolve_provider_spec(&account.provider_id, &guard.persisted.custom_providers)
+            .ok_or_else(|| format!("未知服务提供商: {}", account.provider_id))?;
+        let (wv, _) = guard
+            .webviews
+            .ensure_webview(&app, &account, &spec.info.entry_url, false)?;
+        let thread_url = if use_new_chat {
+            None
+        } else {
+            room_thread_key
+                .as_ref()
+                .and_then(|tk| guard.room_threads.get(tk).cloned())
+        };
+        let adapter_dir = guard.adapter_dir.clone();
+        let rx = register_member_cancel_channel(&mut guard, &composite);
+        (wv, account, spec.info.entry_url, adapter_dir, thread_url, rx)
+    };
+
+    let _ = apply_timezone_override(&webview, account.timezone.as_deref()).await;
+    let host = url::Url::parse(&entry_url)
+        .ok()
+        .and_then(|u| u.host_str().map(ToOwned::to_owned))
+        .unwrap_or_default();
+    let adapter = resolve_adapter_for_host(&adapter_dir, &host);
+
+    if use_new_chat {
+        let _ = reset_web_bot_chat(&webview, &adapter, &entry_url).await;
+    }
+
+    let reply = send_and_collect_web_bot_reply(
+        &webview,
+        &adapter,
+        &clean_prompt,
+        thread_url.as_deref(),
+        cancel_rx,
+        |_| {},
+    )
+    .await;
+
+    let now = now_ms();
+    let mut guard = state.inner.lock().await;
+    match reply {
+        Ok((text, next_url)) => {
+            if let Some(acc) = guard.persisted.accounts.iter_mut().find(|a| a.key() == key) {
+                acc.last_used_at_ms = Some(now);
+                acc.cooldown_until_ms = None;
+                acc.auth_state = AuthState::Authenticated;
+            }
+            if let (Some(tk), Some(url)) = (room_thread_key, next_url) {
+                guard.room_threads.insert(tk, url);
+            }
+            guard.save_and_emit(&app);
+            Ok(text)
+        }
+        Err(WebBotReplyError::Cancelled) => Err("请求已手动中止".to_string()),
+        Err(WebBotReplyError::NeedsAuth(msg)) => {
+            if let Some(acc) = guard.persisted.accounts.iter_mut().find(|a| a.key() == key) {
+                acc.cooldown_until_ms = Some(now + 60_000);
+                acc.auth_state = AuthState::LoggedOut;
+            }
+            guard.save_and_emit(&app);
+            Err(format!("需要登录认证: {msg}"))
+        }
+        Err(WebBotReplyError::Other(msg)) => {
+            if let Some(acc) = guard.persisted.accounts.iter_mut().find(|a| a.key() == key) {
+                acc.cooldown_until_ms = Some(now + 60_000);
+            }
+            guard.save_and_emit(&app);
+            Err(msg)
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn poc_web_bots_cancel_group(
+    app: AppHandle,
+    state: State<'_, WebBotsState>,
+    group_id: String,
+) -> Result<WebBotsSnapshot, String> {
+    cancel_group_execution(&app, &state.inner, &group_id).await?;
+    let guard = state.inner.lock().await;
+    Ok(build_snapshot(
+        &guard.persisted,
+        guard.webviews.warm_accounts(),
+        &guard.account_errors,
+    ))
+}
+
+#[tauri::command]
+pub async fn poc_web_bots_cancel_member(
+    state: State<'_, WebBotsState>,
+    provider_id: String,
+    uuid: String,
+) -> Result<(), String> {
+    cancel_member_execution(&state.inner, &provider_id, &uuid).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn poc_web_bots_run_group_acceptance(
+    app: AppHandle,
+    state: State<'_, WebBotsState>,
+    group_id: String,
+) -> Result<WebBotsSnapshot, String> {
+    start_group_acceptance(app.clone(), Arc::clone(&state.inner), group_id).await?;
+    let guard = state.inner.lock().await;
+    Ok(build_snapshot(
+        &guard.persisted,
+        guard.webviews.warm_accounts(),
+        &guard.account_errors,
+    ))
+}
+
+#[tauri::command]
+pub async fn poc_web_bots_reject_group_for_fix(
+    app: AppHandle,
+    state: State<'_, WebBotsState>,
+    group_id: String,
+    target: Option<AccountKey>,
+    note: Option<String>,
+) -> Result<WebBotsSnapshot, String> {
+    reject_group_for_fix(app.clone(), Arc::clone(&state.inner), group_id, target, note).await?;
+    let guard = state.inner.lock().await;
+    Ok(build_snapshot(
+        &guard.persisted,
+        guard.webviews.warm_accounts(),
+        &guard.account_errors,
+    ))
 }

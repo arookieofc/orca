@@ -18,6 +18,7 @@ import { WebBotAccountToolbar } from './WebBotAccountToolbar'
 import { WebBotCookieDialog } from './WebBotCookieDialog'
 import { WebBotExternalAgentDialog } from './WebBotExternalAgentDialog'
 import { WebBotGroupDialog } from './WebBotGroupDialog'
+import { WebBotJoinRoomDialog } from './WebBotJoinRoomDialog'
 import { WebBotProviderDialog } from './WebBotProviderDialog'
 import { WebBotSettingsDialog } from './WebBotSettingsDialog'
 import { WebBotSiteAdaptersDialog } from './WebBotSiteAdaptersDialog'
@@ -46,6 +47,7 @@ export default function WebBotsPage(): React.JSX.Element {
   const [adaptersDialogOpen, setAdaptersDialogOpen] = useState(false)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
   const [syncDialogOpen, setSyncDialogOpen] = useState(false)
+  const [joinRoomAccount, setJoinRoomAccount] = useState<AccountRecord | null>(null)
 
   const viewportRef = useRef<HTMLDivElement | null>(null)
 
@@ -83,6 +85,7 @@ export default function WebBotsPage(): React.JSX.Element {
     adaptersDialogOpen ||
     settingsDialogOpen ||
     syncDialogOpen ||
+    joinRoomAccount !== null ||
     activeModal !== null
 
   const shouldShowWebView =
@@ -243,6 +246,7 @@ export default function WebBotsPage(): React.JSX.Element {
                 setEditingAccount(acc)
                 setAccountDialogOpen(true)
               }}
+              onOpenJoinRoom={setJoinRoomAccount}
               onSnapshot={setSnapshot}
             />
 
@@ -345,6 +349,16 @@ export default function WebBotsPage(): React.JSX.Element {
         open={syncDialogOpen}
         onOpenChange={setSyncDialogOpen}
         onUpdated={setSnapshot}
+      />
+
+      <WebBotJoinRoomDialog
+        open={joinRoomAccount !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setJoinRoomAccount(null)
+          }
+        }}
+        account={joinRoomAccount}
       />
 
       {snapshot ? (

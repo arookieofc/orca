@@ -2,19 +2,23 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::Mutex;
+use tokio::sync::{watch, Mutex};
 
-use crate::web_bots::external_transport::{run_local_cli, run_openai_stream};
+use crate::web_bots::external_transport::{
+    run_local_cli, run_openai_stream, ExternalTransportError,
+};
 use crate::web_bots::providers::{resolve_provider_spec, CustomWebProviderRecord};
 use crate::web_bots::site_adapters::resolve_adapter_for_host;
 use crate::web_bots::storage::{
     build_snapshot, new_uuid_v4, now_ms, save_state, AccountKey, AccountRecord, AuthState,
-    ExternalAgentKind, ExternalAgentRecord, GroupChatMessage, GroupChatRecord, GroupReplyStatus,
-    GroupThreadBinding, GroupWorkflowMode, WebBotsPersistedState,
+    ExternalAgentKind, ExternalAgentRecord, GroupAcceptanceConfig, GroupChatMessage,
+    GroupChatRecord, GroupReplyStatus, GroupThreadBinding, GroupWorkflowMode,
+    WebBotsPersistedState,
 };
 use crate::web_bots::webview_manager::{
     send_and_collect_web_bot_reply, WebBotReplyError, WebBotWebviewManager,
 };
+use crate::workflow_command::run_workflow_command_with_cancel;
 
 pub const EVENT_WEB_BOTS_STATE: &str = "web-bots:state-changed";
 
@@ -24,6 +28,92 @@ pub struct WebBotsRuntimeInner {
     pub persisted: WebBotsPersistedState,
     pub webviews: WebBotWebviewManager,
     pub account_errors: HashMap<String, String>,
+    pub room_threads: HashMap<String, String>,
+    pub group_cancels: HashMap<String, watch::Sender<bool>>,
+    pub member_cancels: HashMap<String, watch::Sender<bool>>,
+}
+
+pub fn normalize_acceptance_config(
+    config: Option<GroupAcceptanceConfig>,
+) -> Result<Option<GroupAcceptanceConfig>, String> {
+    let Some(mut cfg) = config else {
+        return Ok(None);
+    };
+    cfg.command = cfg.command.trim().to_string();
+    cfg.workdir = cfg.workdir.trim().to_string();
+    if cfg.command.is_empty() {
+        return Ok(None);
+    }
+    if cfg.workdir.is_empty() {
+        return Err("请填写验收命令的工作目录".to_string());
+    }
+    cfg.shell = cfg
+        .shell
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && *s != "auto")
+        .map(ToOwned::to_owned);
+    cfg.max_auto_fix_rounds = cfg.max_auto_fix_rounds.clamp(1, 5);
+    cfg.timeout_secs = cfg.timeout_secs.clamp(5, 1800);
+    Ok(Some(cfg))
+}
+
+async fn watch_member_or_group_cancel(
+    mut group_rx: watch::Receiver<bool>,
+    mut member_rx: watch::Receiver<bool>,
+) -> watch::Receiver<bool> {
+    let (tx, rx) = watch::channel(*group_rx.borrow() || *member_rx.borrow());
+    if !*rx.borrow() {
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    res = group_rx.changed() => {
+                        if *group_rx.borrow() {
+                            let _ = tx.send(true);
+                            break;
+                        }
+                        if res.is_err() {
+                            break;
+                        }
+                    }
+                    res = member_rx.changed() => {
+                        if *member_rx.borrow() {
+                            let _ = tx.send(true);
+                            break;
+                        }
+                        if res.is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+    }
+    rx
+}
+
+pub fn register_group_cancel_channel(
+    inner: &mut WebBotsRuntimeInner,
+    group_id: &str,
+) -> watch::Receiver<bool> {
+    if let Some(prev) = inner.group_cancels.insert(group_id.to_string(), watch::channel(false).0) {
+        let _ = prev.send(true);
+    }
+    let (tx, rx) = watch::channel(false);
+    inner.group_cancels.insert(group_id.to_string(), tx);
+    rx
+}
+
+pub fn register_member_cancel_channel(
+    inner: &mut WebBotsRuntimeInner,
+    composite_key: &str,
+) -> watch::Receiver<bool> {
+    if let Some(prev) = inner.member_cancels.remove(composite_key) {
+        let _ = prev.send(true);
+    }
+    let (tx, rx) = watch::channel(false);
+    inner.member_cancels.insert(composite_key.to_string(), tx);
+    rx
 }
 
 impl WebBotsRuntimeInner {
@@ -234,9 +324,12 @@ async fn execute_single_reply(
     reply_msg_id: String,
     member: AccountKey,
     prompt: String,
+    group_cancel_rx: watch::Receiver<bool>,
 ) -> Result<String, String> {
-    // Mark sending.
-    {
+    if *group_cancel_rx.borrow() {
+        return Err("已手动中止".to_string());
+    }
+    let member_rx = {
         let mut guard = runtime.lock().await;
         if let Some(group) = guard
             .persisted
@@ -250,7 +343,9 @@ async fn execute_single_reply(
             }
         }
         guard.save_and_emit(&app);
-    }
+        register_member_cancel_channel(&mut guard, &member.composite_key())
+    };
+    let cancel_rx = watch_member_or_group_cancel(group_cancel_rx, member_rx).await;
 
     // Decide whether this is an external agent or a Web Bot account.
     enum TargetKind {
@@ -334,14 +429,18 @@ async fn execute_single_reply(
         TargetKind::External(ext) => {
             let res = match ext.kind {
                 ExternalAgentKind::OpenaiApi => {
-                    run_openai_stream(&ext, &prompt, update_streaming).await
+                    run_openai_stream(&ext, &prompt, cancel_rx.clone(), update_streaming).await
                 }
                 ExternalAgentKind::LocalCli => {
-                    run_local_cli(&ext, &prompt, update_streaming).await
+                    run_local_cli(&ext, &prompt, cancel_rx.clone(), update_streaming).await
                 }
             };
-            res.map(|text| (text, None))
-                .map_err(|err| (GroupReplyStatus::Error, err))
+            res.map(|text| (text, None)).map_err(|err| match err {
+                ExternalTransportError::Cancelled => {
+                    (GroupReplyStatus::Cancelled, "已手动中止".to_string())
+                }
+                ExternalTransportError::Other(msg) => (GroupReplyStatus::Error, msg),
+            })
         }
         TargetKind::Web {
             account,
@@ -370,6 +469,7 @@ async fn execute_single_reply(
                         &adapter,
                         &prompt,
                         thread_url.as_deref(),
+                        cancel_rx,
                         update_streaming,
                     )
                     .await
@@ -377,6 +477,9 @@ async fn execute_single_reply(
                         Ok(ok) => Ok(ok),
                         Err(WebBotReplyError::NeedsAuth(msg)) => {
                             Err((GroupReplyStatus::NeedsAuth, msg))
+                        }
+                        Err(WebBotReplyError::Cancelled) => {
+                            Err((GroupReplyStatus::Cancelled, "已手动中止".to_string()))
                         }
                         Err(WebBotReplyError::Other(msg)) => Err((GroupReplyStatus::Error, msg)),
                     }
@@ -431,15 +534,17 @@ async fn execute_single_reply(
             Ok(reply_text)
         }
         Err((status, err_msg)) => {
-            if let Some(acc) = guard
-                .persisted
-                .accounts
-                .iter_mut()
-                .find(|a| a.key() == member)
-            {
-                acc.cooldown_until_ms = Some(now + 60_000);
-                if status == GroupReplyStatus::NeedsAuth {
-                    acc.auth_state = AuthState::LoggedOut;
+            if status != GroupReplyStatus::Cancelled {
+                if let Some(acc) = guard
+                    .persisted
+                    .accounts
+                    .iter_mut()
+                    .find(|a| a.key() == member)
+                {
+                    acc.cooldown_until_ms = Some(now + 60_000);
+                    if status == GroupReplyStatus::NeedsAuth {
+                        acc.auth_state = AuthState::LoggedOut;
+                    }
                 }
             }
             if let Some(group) = guard
@@ -471,7 +576,7 @@ pub async fn dispatch_group_message(
     }
     let now = now_ms();
 
-    let (group_snapshot, routing, reply_ids, accounts, external_agents, custom_providers) = {
+    let (group_snapshot, routing, reply_ids, accounts, external_agents, custom_providers, cancel_rx) = {
         let mut guard = runtime.lock().await;
         let group = guard
             .persisted
@@ -550,6 +655,7 @@ pub async fn dispatch_group_message(
             g_mut.messages.push(user_msg);
             g_mut.messages.extend(placeholders);
         }
+        let cancel_rx = register_group_cancel_channel(&mut guard, &group_id);
         guard.save_and_emit(&app);
         (
             group,
@@ -558,10 +664,12 @@ pub async fn dispatch_group_message(
             guard.persisted.accounts.clone(),
             guard.persisted.external_agents.clone(),
             guard.persisted.custom_providers.clone(),
+            cancel_rx,
         )
     };
 
     tokio::spawn(async move {
+        let mut had_success = false;
         match group_snapshot.workflow_mode {
             GroupWorkflowMode::Parallel => {
                 let mut handles = Vec::new();
@@ -577,18 +685,25 @@ pub async fn dispatch_group_message(
                     let app_c = app.clone();
                     let rt_c = Arc::clone(&runtime);
                     let gid = group_id.clone();
+                    let rx = cancel_rx.clone();
                     handles.push(tokio::spawn(async move {
-                        let _ =
-                            execute_single_reply(app_c, rt_c, gid, reply_id, target, prompt).await;
+                        execute_single_reply(app_c, rt_c, gid, reply_id, target, prompt, rx)
+                            .await
+                            .is_ok()
                     }));
                 }
                 for h in handles {
-                    let _ = h.await;
+                    if h.await.unwrap_or(false) {
+                        had_success = true;
+                    }
                 }
             }
             GroupWorkflowMode::Review => {
                 let mut prior: Vec<(String, String)> = Vec::new();
                 for (target, reply_id) in routing.targets.into_iter().zip(reply_ids.into_iter()) {
+                    if *cancel_rx.borrow() {
+                        break;
+                    }
                     let prompt = compose_member_prompt(
                         &group_snapshot,
                         &target,
@@ -605,9 +720,11 @@ pub async fn dispatch_group_message(
                         reply_id,
                         target,
                         prompt,
+                        cancel_rx.clone(),
                     )
                     .await
                     {
+                        had_success = true;
                         prior.push((name, output));
                     }
                 }
@@ -620,11 +737,17 @@ pub async fn dispatch_group_message(
                 let mut hop = 0u32;
 
                 loop {
+                    if *cancel_rx.borrow() {
+                        break;
+                    }
                     let mut last_sender: Option<AccountKey> = None;
                     let mut last_output = String::new();
                     for (target, reply_id) in
                         current_targets.into_iter().zip(current_reply_ids.into_iter())
                     {
+                        if *cancel_rx.borrow() {
+                            break;
+                        }
                         let prompt = compose_member_prompt(
                             &group_snapshot,
                             &target,
@@ -641,9 +764,11 @@ pub async fn dispatch_group_message(
                             reply_id,
                             target.clone(),
                             prompt,
+                            cancel_rx.clone(),
                         )
                         .await
                         {
+                            had_success = true;
                             prior.push((name, output.clone()));
                             last_sender = Some(target);
                             last_output = output;
@@ -651,7 +776,7 @@ pub async fn dispatch_group_message(
                     }
 
                     hop += 1;
-                    if hop >= max_hops || last_output.trim().is_empty() {
+                    if *cancel_rx.borrow() || hop >= max_hops || last_output.trim().is_empty() {
                         break;
                     }
                     let next_routing = parse_mentions(
@@ -662,7 +787,6 @@ pub async fn dispatch_group_message(
                         &custom_providers,
                         now_ms(),
                     );
-                    // Only continue relay if the reply explicitly mentions another member/channel.
                     if !last_output.contains('@') {
                         break;
                     }
@@ -718,6 +842,16 @@ pub async fn dispatch_group_message(
                 }
             }
         }
+
+        if had_success
+            && !*cancel_rx.borrow()
+            && group_snapshot
+                .acceptance
+                .as_ref()
+                .is_some_and(|a| a.auto_run_on_reply && !a.command.trim().is_empty())
+        {
+            let _ = run_group_acceptance_with_rx(app, runtime, group_id, true, 0, cancel_rx).await;
+        }
     });
 
     Ok(())
@@ -729,7 +863,7 @@ pub async fn retry_single_group_message(
     group_id: String,
     message_id: String,
 ) -> Result<(), String> {
-    let (group_snapshot, target, prompt, accounts, external_agents) = {
+    let (group_snapshot, target, prompt, cancel_rx) = {
         let mut guard = runtime.lock().await;
         let group = guard
             .persisted
@@ -766,6 +900,7 @@ pub async fn retry_single_group_message(
                 m_mut.content.clear();
             }
         }
+        let cancel_rx = register_group_cancel_channel(&mut guard, &group_id);
         guard.save_and_emit(&app);
 
         let prompt = compose_member_prompt(
@@ -776,30 +911,396 @@ pub async fn retry_single_group_message(
             &guard.persisted.accounts,
             &guard.persisted.external_agents,
         );
-        (
-            group,
-            target,
-            prompt,
-            guard.persisted.accounts.clone(),
-            guard.persisted.external_agents.clone(),
-        )
+        (group, target, prompt, cancel_rx)
     };
     let _ = group_snapshot;
-    let _ = accounts;
-    let _ = external_agents;
 
     tokio::spawn(async move {
-        let _ = execute_single_reply(app, runtime, group_id, message_id, target, prompt).await;
+        let _ =
+            execute_single_reply(app, runtime, group_id, message_id, target, prompt, cancel_rx)
+                .await;
+    });
+    Ok(())
+}
+
+pub async fn cancel_group_execution(
+    app: &AppHandle,
+    runtime: &Arc<Mutex<WebBotsRuntimeInner>>,
+    group_id: &str,
+) -> Result<(), String> {
+    let mut guard = runtime.lock().await;
+    if let Some(tx) = guard.group_cancels.remove(group_id) {
+        let _ = tx.send(true);
+    }
+    let group = guard
+        .persisted
+        .group_chats
+        .iter_mut()
+        .find(|g| g.id == group_id)
+        .ok_or_else(|| "未找到目标群聊".to_string())?;
+    for msg in &mut group.messages {
+        if matches!(
+            msg.status,
+            GroupReplyStatus::Queued | GroupReplyStatus::Sending | GroupReplyStatus::Streaming
+        ) {
+            msg.status = GroupReplyStatus::Cancelled;
+            if msg.error.is_none() {
+                msg.error = Some("已手动中止".to_string());
+            }
+        }
+    }
+    guard.save_and_emit(app);
+    Ok(())
+}
+
+pub async fn cancel_member_execution(
+    runtime: &Arc<Mutex<WebBotsRuntimeInner>>,
+    provider_id: &str,
+    uuid: &str,
+) {
+    let composite = format!("{provider_id}:{uuid}");
+    let mut guard = runtime.lock().await;
+    if let Some(tx) = guard.member_cancels.remove(&composite) {
+        let _ = tx.send(true);
+    }
+}
+
+pub async fn run_group_acceptance_with_rx(
+    app: AppHandle,
+    runtime: Arc<Mutex<WebBotsRuntimeInner>>,
+    group_id: String,
+    trigger_auto_fix: bool,
+    initial_fix_round: u32,
+    cancel_rx: watch::Receiver<bool>,
+) -> Result<(), String> {
+    let mut fix_round = initial_fix_round;
+    loop {
+        if *cancel_rx.borrow() {
+            return Ok(());
+        }
+        let (cfg, msg_id, last_speaker, group_snapshot, accounts, external_agents) = {
+            let mut guard = runtime.lock().await;
+            let group = guard
+                .persisted
+                .group_chats
+                .iter()
+                .find(|g| g.id == group_id)
+                .cloned()
+                .ok_or_else(|| "未找到目标群聊".to_string())?;
+            let cfg = group
+                .acceptance
+                .clone()
+                .filter(|a| !a.command.trim().is_empty())
+                .ok_or_else(|| "当前群聊未配置本机验收命令".to_string())?;
+            let msg_id = new_uuid_v4();
+            let last_speaker = group
+                .messages
+                .iter()
+                .rev()
+                .find(|m| m.role == "assistant" && m.status == GroupReplyStatus::Done)
+                .and_then(|m| m.sender.clone())
+                .or_else(|| group.members.first().cloned());
+            let verification_msg = GroupChatMessage {
+                id: msg_id.clone(),
+                role: "verification".to_string(),
+                sender: None,
+                sender_name: "本机验收".to_string(),
+                content: format!("工作目录: {}\n执行命令: {}", cfg.workdir, cfg.command),
+                created_at_ms: now_ms(),
+                status: GroupReplyStatus::Sending,
+                targets: Vec::new(),
+                error: None,
+                stage_label: Some(if fix_round > 0 {
+                    format!("第 {fix_round} 次复验中")
+                } else {
+                    "验收中".to_string()
+                }),
+                hop_depth: None,
+                auto_routed_channel: None,
+            };
+            if let Some(g_mut) = guard
+                .persisted
+                .group_chats
+                .iter_mut()
+                .find(|g| g.id == group_id)
+            {
+                g_mut.messages.push(verification_msg);
+            }
+            guard.save_and_emit(&app);
+            (
+                cfg,
+                msg_id,
+                last_speaker,
+                group,
+                guard.persisted.accounts.clone(),
+                guard.persisted.external_agents.clone(),
+            )
+        };
+
+        let outcome = run_workflow_command_with_cancel(
+            &cfg.workdir,
+            &cfg.command,
+            cfg.shell.as_deref(),
+            cfg.timeout_secs,
+            Some(cancel_rx.clone()),
+        )
+        .await;
+
+        let (passed, output_text) = {
+            let mut guard = runtime.lock().await;
+            let mut did_pass = false;
+            let mut body_text = String::new();
+            if let Some(g_mut) = guard
+                .persisted
+                .group_chats
+                .iter_mut()
+                .find(|g| g.id == group_id)
+            {
+                if let Some(m_mut) = g_mut.messages.iter_mut().find(|m| m.id == msg_id) {
+                    match &outcome {
+                        Ok(res) if res.passed => {
+                            did_pass = true;
+                            m_mut.status = GroupReplyStatus::Done;
+                            m_mut.stage_label = Some("验收通过".to_string());
+                            m_mut.error = None;
+                            body_text = if res.output.trim().is_empty() {
+                                format!("命令 `{}` 通过（退出码 0）。", cfg.command)
+                            } else {
+                                format!("命令 `{}` 通过（退出码 0）：\n\n{}", cfg.command, res.output)
+                            };
+                            m_mut.content = body_text.clone();
+                        }
+                        Ok(res) => {
+                            m_mut.status = GroupReplyStatus::Error;
+                            m_mut.stage_label = Some("验收失败".to_string());
+                            m_mut.error = Some(format!("退出码 {}", res.exit_code));
+                            body_text = if res.output.trim().is_empty() {
+                                format!("命令 `{}` 未通过（退出码 {}）。", cfg.command, res.exit_code)
+                            } else {
+                                format!(
+                                    "命令 `{}` 未通过（退出码 {}）：\n\n{}",
+                                    cfg.command, res.exit_code, res.output
+                                )
+                            };
+                            m_mut.content = body_text.clone();
+                        }
+                        Err(err) => {
+                            m_mut.status = if *cancel_rx.borrow() {
+                                GroupReplyStatus::Cancelled
+                            } else {
+                                GroupReplyStatus::Error
+                            };
+                            m_mut.stage_label = Some(if *cancel_rx.borrow() {
+                                "验收已中止".to_string()
+                            } else {
+                                "验收异常".to_string()
+                            });
+                            m_mut.error = Some(err.clone());
+                            body_text = err.clone();
+                        }
+                    }
+                }
+            }
+            guard.save_and_emit(&app);
+            (did_pass, body_text)
+        };
+
+        if passed
+            || !trigger_auto_fix
+            || *cancel_rx.borrow()
+            || fix_round >= cfg.max_auto_fix_rounds.clamp(1, 5)
+        {
+            return Ok(());
+        }
+        let Some(target) = last_speaker else {
+            return Ok(());
+        };
+
+        fix_round += 1;
+        let reply_id = new_uuid_v4();
+        let fix_instruction = format!(
+            "本机可信验收未通过，请根据以下检查输出修复并给出修改说明：\n\n{}",
+            output_text
+        );
+        let prompt = compose_member_prompt(
+            &group_snapshot,
+            &target,
+            &fix_instruction,
+            &[],
+            &accounts,
+            &external_agents,
+        );
+        let sender_name = member_display_name(&target, &accounts, &external_agents);
+        {
+            let mut guard = runtime.lock().await;
+            if let Some(g_mut) = guard
+                .persisted
+                .group_chats
+                .iter_mut()
+                .find(|g| g.id == group_id)
+            {
+                g_mut.messages.push(GroupChatMessage {
+                    id: reply_id.clone(),
+                    role: "assistant".to_string(),
+                    sender: Some(target.clone()),
+                    sender_name,
+                    content: String::new(),
+                    created_at_ms: now_ms(),
+                    status: GroupReplyStatus::Queued,
+                    targets: Vec::new(),
+                    error: None,
+                    stage_label: Some(format!("自动修复第 {fix_round} 轮")),
+                    hop_depth: None,
+                    auto_routed_channel: None,
+                });
+            }
+            guard.save_and_emit(&app);
+        }
+
+        if execute_single_reply(
+            app.clone(),
+            Arc::clone(&runtime),
+            group_id.clone(),
+            reply_id,
+            target,
+            prompt,
+            cancel_rx.clone(),
+        )
+        .await
+        .is_err()
+        {
+            return Ok(());
+        }
+    }
+}
+
+pub async fn start_group_acceptance(
+    app: AppHandle,
+    runtime: Arc<Mutex<WebBotsRuntimeInner>>,
+    group_id: String,
+) -> Result<(), String> {
+    let cancel_rx = {
+        let mut guard = runtime.lock().await;
+        let group = guard
+            .persisted
+            .group_chats
+            .iter()
+            .find(|g| g.id == group_id)
+            .ok_or_else(|| "未找到目标群聊".to_string())?;
+        if !group
+            .acceptance
+            .as_ref()
+            .is_some_and(|a| !a.command.trim().is_empty())
+        {
+            return Err("当前群聊尚未配置验收命令".to_string());
+        }
+        register_group_cancel_channel(&mut guard, &group_id)
+    };
+    tokio::spawn(async move {
+        let _ = run_group_acceptance_with_rx(app, runtime, group_id, false, 0, cancel_rx).await;
+    });
+    Ok(())
+}
+
+pub async fn reject_group_for_fix(
+    app: AppHandle,
+    runtime: Arc<Mutex<WebBotsRuntimeInner>>,
+    group_id: String,
+    target_member: Option<AccountKey>,
+    note: Option<String>,
+) -> Result<(), String> {
+    let (prompt, target, reply_id, cancel_rx) = {
+        let mut guard = runtime.lock().await;
+        let group = guard
+            .persisted
+            .group_chats
+            .iter()
+            .find(|g| g.id == group_id)
+            .cloned()
+            .ok_or_else(|| "未找到目标群聊".to_string())?;
+        let target = target_member
+            .or_else(|| {
+                group
+                    .messages
+                    .iter()
+                    .rev()
+                    .find(|m| m.role == "assistant")
+                    .and_then(|m| m.sender.clone())
+            })
+            .or_else(|| group.members.first().cloned())
+            .ok_or_else(|| "群聊尚未添加成员".to_string())?;
+        let latest_verify = group
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role == "verification")
+            .map(|m| m.content.clone())
+            .unwrap_or_else(|| "验收未通过".to_string());
+        let clean_note = note
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| format!("\n\n补充要求：{s}"))
+            .unwrap_or_default();
+        let fix_text = format!("请根据本机验收结果打回重做：{clean_note}\n\n{latest_verify}");
+        let prompt = compose_member_prompt(
+            &group,
+            &target,
+            &fix_text,
+            &[],
+            &guard.persisted.accounts,
+            &guard.persisted.external_agents,
+        );
+        let reply_id = new_uuid_v4();
+        let sender_name = member_display_name(
+            &target,
+            &guard.persisted.accounts,
+            &guard.persisted.external_agents,
+        );
+        if let Some(g_mut) = guard
+            .persisted
+            .group_chats
+            .iter_mut()
+            .find(|g| g.id == group_id)
+        {
+            g_mut.messages.push(GroupChatMessage {
+                id: reply_id.clone(),
+                role: "assistant".to_string(),
+                sender: Some(target.clone()),
+                sender_name,
+                content: String::new(),
+                created_at_ms: now_ms(),
+                status: GroupReplyStatus::Queued,
+                targets: Vec::new(),
+                error: None,
+                stage_label: Some("打回重做".to_string()),
+                hop_depth: None,
+                auto_routed_channel: None,
+            });
+        }
+        let cancel_rx = register_group_cancel_channel(&mut guard, &group_id);
+        guard.save_and_emit(&app);
+        (prompt, target, reply_id, cancel_rx)
+    };
+
+    tokio::spawn(async move {
+        let _ =
+            execute_single_reply(app, runtime, group_id, reply_id, target, prompt, cancel_rx)
+                .await;
     });
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{compose_member_prompt, parse_mentions, select_best_account_for_provider};
+    use super::{
+        compose_member_prompt, normalize_acceptance_config, parse_mentions,
+        select_best_account_for_provider,
+    };
     use crate::web_bots::storage::{
         AccountKey, AccountRecord, AuthState, ExternalAgentKind, ExternalAgentRecord,
-        GroupChatRecord, GroupMemberRole, GroupSharedSkill, GroupWorkflowMode,
+        GroupAcceptanceConfig, GroupChatRecord, GroupMemberRole, GroupSharedSkill,
+        GroupWorkflowMode,
     };
 
     fn sample_account(provider: &str, uuid: &str, alias: &str, quota: Option<f64>) -> AccountRecord {
@@ -821,7 +1322,33 @@ mod tests {
             cookie_session_only: false,
             cooldown_until_ms: None,
             last_used_at_ms: None,
+            ssh_host: None,
         }
+    }
+
+    #[test]
+    fn account_and_acceptance_serde_defaults_preserve_legacy_records() {
+        let legacy_acc: AccountRecord = serde_json::from_str(
+            r#"{"providerId":"muse","uuid":"u1","alias":"Muse #1","createdAtMs":10}"#,
+        )
+        .expect("legacy account parses without sshHost");
+        assert_eq!(legacy_acc.ssh_host, None);
+
+        let acc = normalize_acceptance_config(Some(GroupAcceptanceConfig {
+            command: "  pnpm test  ".to_string(),
+            workdir: " D:/repo ".to_string(),
+            shell: Some("auto".to_string()),
+            auto_run_on_reply: true,
+            max_auto_fix_rounds: 99,
+            timeout_secs: 2,
+        }))
+        .expect("normalizes cleanly")
+        .expect("some config");
+        assert_eq!(acc.command, "pnpm test");
+        assert_eq!(acc.workdir, "D:/repo");
+        assert_eq!(acc.shell, None);
+        assert_eq!(acc.max_auto_fix_rounds, 5);
+        assert_eq!(acc.timeout_secs, 5);
     }
 
     #[test]
@@ -887,6 +1414,7 @@ mod tests {
             workflow_mode: GroupWorkflowMode::Review,
             max_relay_hops: 3,
             thread_bindings: vec![],
+            acceptance: None,
         };
 
         let prompt = compose_member_prompt(

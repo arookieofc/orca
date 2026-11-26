@@ -10,6 +10,7 @@ import { useAppStore } from '../store/index'
 import { ActiveWorkspaceSyncGate } from './ActiveWorkspaceSyncGate'
 import { StructuredAgentSessionAttentionBridge } from '../components/native-chat/session/attention/StructuredAgentSessionAttentionBridge'
 import { StructuredAgentSessionStatusBridge } from '../components/native-chat/session/status/StructuredAgentSessionStatusBridge'
+import { WebBotRoomBridge } from '../components/rooms/WebBotRoomBridge'
 import { NativeChatVisualGuestThemePublisher } from '../components/native-chat/media/visuals/NativeChatVisualGuestThemePublisher'
 import { usePairedMobileDevices } from '../components/mobile/paired-mobile-devices'
 
@@ -56,6 +57,7 @@ export function AppBackgroundServices(): React.JSX.Element {
       <StructuredAgentSessionStatusBridge />
       {/* Background chats have no mounted pane but still need completion attention. */}
       <StructuredAgentSessionAttentionBridge />
+      <WebBotRoomBridge />
     </>
   )
 }

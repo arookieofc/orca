@@ -4,6 +4,9 @@ name: Manual remote unit gate
 # so dispatch the same unit plan + shards the upstream PR gate runs. Delete before merge.
 on:
   workflow_dispatch:
+  # Dispatch events are rejected on this fork; a push to the branch fires the same gate.
+  push:
+    branches: [fix/unit-gate-remote-ci]
 
 permissions:
   contents: read

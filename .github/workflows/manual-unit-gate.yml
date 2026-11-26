@@ -1,0 +1,32 @@
+name: Manual remote unit gate
+
+# Temporary branch-only entry point: the fork never fires pull_request workflows,
+# so dispatch the same unit plan + shards the upstream PR gate runs. Delete before merge.
+on:
+  workflow_dispatch:
+  # Dispatch events are rejected on this fork; a push to the branch fires the same gate.
+  push:
+    branches: [fix/unit-gate-remote-ci]
+
+permissions:
+  contents: read
+
+jobs:
+  unit_plan:
+    uses: ./.github/workflows/unit-plan.yml
+    with:
+      selection_mode: shadow
+      defer_shadow: false
+
+  test:
+    needs: [unit_plan]
+    if: needs.unit_plan.result == 'success'
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      node_versions: '["24"]'
+      runner: ubuntu-24.04-arm
+      phase_diagnostics: true
+      module_cache: warm
+      shards: ${{ needs.unit_plan.outputs.shards }}
+      download_selection_plan: ${{ needs.unit_plan.outputs.selection_planned == 'true' }}
+      run_shards: true

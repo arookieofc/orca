@@ -10,9 +10,9 @@ import { pipelineConfigRootForPath } from './pipeline-config-watcher'
 
 describe('pipeline-config-watcher', () => {
   it('extracts the workspace root from pipeline config paths', () => {
-    expect(pipelineConfigRootForPath(join('C:', 'work', 'demo', '.orca', 'pipeline.json'))).toBe(
-      join('C:', 'work', 'demo')
-    )
+    // Why hardcoded spellings: join() is platform-dependent, and Windows-looking
+    // paths must keep win32 separators on every host.
+    expect(pipelineConfigRootForPath('C:\\work\\demo\\.orca\\pipeline.json')).toBe('C:\\work\\demo')
     expect(pipelineConfigRootForPath('/home/demo/.orca/pipeline.json')).toBe('/home/demo')
   })
 

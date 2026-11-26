@@ -75,8 +75,10 @@ export function drainDirectProviderOutput(
         })
       }
     }
-    // Why: Windows pipes need extra poll phases for kernel-buffered tail bytes to arrive.
-    for (let index = 0; index < 10; index += 1) {
+    // Why: Windows pipes need extra poll phases for kernel-buffered tail bytes to
+    // arrive; other platforms keep the single phase the retirement proof flushes.
+    const tailPollPhases = process.platform === 'win32' ? 10 : 1
+    for (let index = 0; index < tailPollPhases; index += 1) {
       await new Promise<void>((resolve) => setImmediate(resolve))
     }
     for (const cleanup of finalReaders) {

@@ -20,12 +20,13 @@ type RoomLineDto = {
   createdAt: string
 }
 
-const roomSummary = (room: RoomDto) =>
-  `${room.id} ${room.name} [${room.mode}] ` +
-  `${room.members.length} member${room.members.length === 1 ? '' : 's'}:` +
-  (room.members.length
+const roomSummary = (room: RoomDto) => {
+  const suffix = room.members.length === 1 ? '' : 's'
+  const membersText = room.members.length
     ? ` ${room.members.map((m) => `${m.name}${m.isAdmin ? '*' : ''}`).join(', ')}`
-    : '')
+    : ''
+  return `${room.id} ${room.name} [${room.mode}] ${room.members.length} member${suffix}:${membersText}`
+}
 
 export const ORCHESTRATION_ROOM_HANDLERS: Record<string, CommandHandler> = {
   'orchestration room-create': async ({ flags, client, json }) => {
@@ -108,6 +109,15 @@ export const ORCHESTRATION_ROOM_HANDLERS: Record<string, CommandHandler> = {
     printResult(result, json, () => `Member removed.`)
   },
 
+  'orchestration room-member-set-model': async ({ flags, client, json }) => {
+    const result = await client.call<{ ok: true }>('orchestration.roomMemberSetModel', {
+      id: getRequiredStringFlag(flags, 'id'),
+      memberId: getRequiredStringFlag(flags, 'member-id'),
+      model: getRequiredStringFlag(flags, 'model')
+    })
+    printResult(result, json, () => `Member model updated.`)
+  },
+
   'orchestration room-send': async ({ flags, client, json }) => {
     const result = await client.call<{
       seq: number
@@ -153,6 +163,15 @@ export const ORCHESTRATION_ROOM_HANDLERS: Record<string, CommandHandler> = {
     printResult(result, json, (r) =>
       r.lines.length ? r.lines.map((l) => `[${l.seq}] ${l.who}: ${l.text}`).join('\n') : '(empty)'
     )
+  },
+  'orchestration room-abort': async ({ flags, client, json }) => {
+    const result = await client.call<{ ok: true; cancelledCount: number }>(
+      'orchestration.roomAbort',
+      {
+        id: getRequiredStringFlag(flags, 'id')
+      }
+    )
+    printResult(result, json, (r) => `Aborted room round (${r.cancelledCount} cancelled).`)
   },
   'orchestration room-ensure-main-bot': async ({ flags, client, json }) => {
     const result = await client.call<{ room: RoomDto; adminSeated: boolean }>(

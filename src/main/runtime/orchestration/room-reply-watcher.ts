@@ -18,6 +18,7 @@ import type { AgentSessionTurnCompletionEvent } from '../../../shared/agent-sess
 import type { OrchestrationDb } from './db/orchestration-db'
 import type { RoomMemberRow, RoomWithMembers } from './db/rooms/room-store'
 import { postRoomReply, runRoomRound, sendRoomTurn, type RoomRoundDeps } from './room-round'
+import { consumeRoomAutoChainRound, getRoomAbortEpoch } from './room-chain-guard'
 import { assistantTextForTurn } from './room-reply-turn-text'
 import {
   parseAdminToolCalls,
@@ -154,14 +155,38 @@ async function handleCompletion(
         }
         continue
       }
+      const abortEpoch = getRoomAbortEpoch(room.id)
       const toolCalls = memberRow.is_admin === 1 ? parseAdminToolCalls(text) : []
       const postText = toolCalls.length ? stripToolBlocks(text) : text
       const result = postText
         ? await postRoomReply(room, memberRow.member_id, postText, roundDeps(deps, room))
         : { seq: room.seq, followUps: [] }
+      if (getRoomAbortEpoch(room.id) !== abortEpoch) {
+        continue
+      }
+      const needsAdminReport =
+        room.mode === 'admin' &&
+        Boolean(room.admin_member_id) &&
+        room.admin_member_id !== memberRow.member_id
+      const needsAutoChain = needsAdminReport || result.followUps.length > 0 || toolCalls.length > 0
+      if (needsAutoChain) {
+        const budget = consumeRoomAutoChainRound(room.id)
+        if (!budget.allowed) {
+          deps.db.appendRoomLine(room.id, {
+            who: 'Orca',
+            text: `已达自动协作轮次上限（${budget.limit} 轮），已暂停自动接力；如需继续请人工发言。`,
+            kind: 'stopped'
+          })
+          continue
+        }
+      }
       await reportToAdmin(room, memberRow, postText || text, deps)
       await runAdminTools(room, memberRow, text, deps)
-      if (result.followUps.length && !roomsInFlight.has(room.id)) {
+      if (
+        result.followUps.length &&
+        !roomsInFlight.has(room.id) &&
+        getRoomAbortEpoch(room.id) === abortEpoch
+      ) {
         roomsInFlight.add(room.id)
         try {
           const fresh = deps.db.getRoom(room.id)

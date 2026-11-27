@@ -1,143 +1,15 @@
 import { CLI_GLOBAL_FLAGS as GLOBAL_FLAGS } from '../../shared/cli/cli-argument-boundary'
 import type { CommandSpec } from '../discovery/command-spec'
 import { ORCHESTRATION_GATE_COMMAND_SPECS } from './orchestration-gate-specs'
+import { ORCHESTRATION_ROOM_COMMAND_SPECS } from './orchestration-room-specs'
+import { ORCHESTRATION_RUN_COMMAND_SPECS } from './orchestration-run-specs'
 import { ORCHESTRATION_WORKER_COMMAND_SPECS } from './orchestration-worker-specs'
 
 const REPLY_FLAGS = ['id', 'body', 'body-file', 'run', 'from', 'on', 'retry-request']
 
 export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
-  {
-    path: ['orchestration', 'run-create'],
-    summary: 'Create and bind a lightweight orchestration Run',
-    usage:
-      'orca orchestration run-create --objective <text> [--from <handle>] [--retry-request <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'objective', 'from', 'retry-request'],
-    identityFlagRoles: { from: 'caller' },
-    notes: [
-      'A Run is a namespace and home inbox. It never schedules or places workers. worker-start --spec creates one when none is bound; use run-create for Task graphs or a new goal.',
-      '--retry-request is only for exact recovery after an unknown mutation result.'
-    ]
-  },
-  {
-    path: ['orchestration', 'run-use'],
-    summary: 'Resume coordinating a Run',
-    usage:
-      'orca orchestration run-use --id <run_id> [--from <handle>] [--takeover-legacy] [--retry-request <id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'from', 'takeover-legacy', 'retry-request'],
-    identityFlagRoles: { from: 'caller' },
-    notes: [
-      'A worker cannot bind its own or ancestor Run or use --takeover-legacy. --takeover-legacy must run in the live coordinator agent terminal it binds; it preserves existing worker assignments.'
-    ]
-  },
-  {
-    path: ['orchestration', 'run-current'],
-    summary: 'Show the Run bound to this coordinator',
-    usage: 'orca orchestration run-current [--from <handle>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'from'],
-    identityFlagRoles: { from: 'caller' }
-  },
-  {
-    path: ['orchestration', 'run-list'],
-    summary: 'List lightweight orchestration Runs',
-    usage: 'orca orchestration run-list [--limit <n>] [--cursor <cursor>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'limit', 'cursor']
-  },
-  {
-    path: ['orchestration', 'run-show'],
-    summary: 'Show one lightweight orchestration Run',
-    usage: 'orca orchestration run-show --id <run_id> [--removed] [--cursor <cursor>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'removed', 'cursor']
-  },
-  {
-    path: ['orchestration', 'room-create'],
-    summary: 'Create a group chat room',
-    usage:
-      'orca orchestration room-create --name <name> [--mode admin|everyone] [--notice <text>] [--member <member_id[:name[:admin]]>,...] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'name', 'mode', 'notice', 'member'],
-    notes: [
-      'A member is an Orca session address: orca_session_id:<id>. Pass --member orca_session_id:abc:alice:admin to name her alice and make her the admin.'
-    ]
-  },
-  {
-    path: ['orchestration', 'room-list'],
-    summary: 'List group chat rooms',
-    usage: 'orca orchestration room-list [--json]',
-    allowedFlags: [...GLOBAL_FLAGS]
-  },
-  {
-    path: ['orchestration', 'room-show'],
-    summary: 'Show one room by id or name',
-    usage: 'orca orchestration room-show [--id <id>] [--name <name>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'name']
-  },
-  {
-    path: ['orchestration', 'room-delete'],
-    summary: 'Delete a room and its log',
-    usage: 'orca orchestration room-delete --id <id> [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id']
-  },
-  {
-    path: ['orchestration', 'room-add'],
-    summary: 'Add a member to a room',
-    usage:
-      'orca orchestration room-add --id <id> --member-id <member_id> --name <name> [--admin] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'member-id', 'name', 'admin']
-  },
-  {
-    path: ['orchestration', 'room-bot-create'],
-    summary: 'Spawn a bot session into a room',
-    usage:
-      'orca orchestration room-bot-create --id <id> --worktree <selector> --agent <lane> --name <name> [--model <model>] [--effort <effort>] [--admin] [--instructions <text>] [--json]',
-    allowedFlags: [
-      ...GLOBAL_FLAGS,
-      'id',
-      'worktree',
-      'agent',
-      'model',
-      'effort',
-      'name',
-      'admin',
-      'instructions'
-    ]
-  },
-  {
-    path: ['orchestration', 'room-remove'],
-    summary: 'Remove a member from a room',
-    usage: 'orca orchestration room-remove --id <id> --member-id <member_id> [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'member-id']
-  },
-  {
-    path: ['orchestration', 'room-send'],
-    summary: 'Post a user message into a room and run the opening round',
-    usage:
-      'orca orchestration room-send [--id <id> | --name <name>] --text <text> [--from <name>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'name', 'text', 'from'],
-    notes: [
-      'Write "@Name" to call one member; in admin mode only the room admin can "@all". Plain text with no @-mention goes to the admin, or to everyone in everyone mode.'
-    ]
-  },
-  {
-    path: ['orchestration', 'room-post'],
-    summary: 'Post a member reply into the room (for tests and external drivers)',
-    usage: 'orca orchestration room-post --id <id> --member-id <member_id> --text <text> [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'member-id', 'text'],
-    notes: [
-      'Live rooms normally write replies through the room mailbox (turn-completion watcher). This entry point exists for tests and for a member whose session is driven outside Orca.'
-    ]
-  },
-  {
-    path: ['orchestration', 'room-log'],
-    summary: 'Read the room transcript',
-    usage: 'orca orchestration room-log --id <id> [--member-id <member_id>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'id', 'member-id']
-  },
-  {
-    path: ['orchestration', 'room-ensure-main-bot'],
-    summary: 'Create the HQ room and its admin bot when missing',
-    usage:
-      'orca orchestration room-ensure-main-bot --worktree <selector> [--agent <lane>] [--model <model>] [--effort <effort>] [--room-name <name>] [--bot-name <name>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'worktree', 'agent', 'model', 'effort', 'room-name', 'bot-name']
-  },
+  ...ORCHESTRATION_RUN_COMMAND_SPECS,
+  ...ORCHESTRATION_ROOM_COMMAND_SPECS,
   {
     path: ['orchestration', 'send'],
     summary: 'Send an inter-agent message',

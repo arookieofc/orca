@@ -1,4 +1,4 @@
-import { ArrowLeft, EllipsisVertical, Settings2, Trash2 } from 'lucide-react'
+import { ArrowLeft, EllipsisVertical, Settings2, ShieldCheck, Square, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useTranslate } from '@/i18n/use-translate'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,10 @@ export function RoomChatHeader(props: {
   selected: Room
   adminName: string | null
   directMember: RoomMember | null
+  hasWorking: boolean
   onExitDirect: () => void
+  onAbort: () => void
+  onOpenAcceptance?: () => void
   onOpenMembers: () => void
   onDelete: () => void
 }) {
@@ -84,32 +87,46 @@ export function RoomChatHeader(props: {
           </div>
         </div>
       </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('auto.components.rooms.page.actions', 'Room actions')}
-          >
-            <EllipsisVertical />
+      <div className="flex items-center gap-1.5">
+        {props.hasWorking ? (
+          <Button variant="destructive" size="xs" onClick={props.onAbort}>
+            <Square className="size-3" />
+            停止本轮
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={props.onOpenMembers}>
-            <Settings2 />
-            {t('auto.components.rooms.page.manageMembers', 'Manage members')}
-          </DropdownMenuItem>
-          {!isHome ? (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={props.onDelete}>
-                <Trash2 />
-                {t('auto.components.rooms.page.deleteRoom', 'Delete room')}
+        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t('auto.components.rooms.page.actions', 'Room actions')}
+            >
+              <EllipsisVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {props.onOpenAcceptance ? (
+              <DropdownMenuItem onSelect={props.onOpenAcceptance}>
+                <ShieldCheck />
+                运行本机验收
               </DropdownMenuItem>
-            </>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
+            ) : null}
+            <DropdownMenuItem onSelect={props.onOpenMembers}>
+              <Settings2 />
+              {t('auto.components.rooms.page.manageMembers', 'Manage members')}
+            </DropdownMenuItem>
+            {!isHome ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={props.onDelete}>
+                  <Trash2 />
+                  {t('auto.components.rooms.page.deleteRoom', 'Delete room')}
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   )
 }

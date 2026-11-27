@@ -178,6 +178,7 @@ describe('worktree removal against the real Git binary', () => {
     const adminPath = marker.trim().replace(/^gitdir: /, '')
     await writeFile(join(adminPath, 'gitdir'), `${join(markerPath, '.git')}\n`)
     await writeFile(join(worktreePath, 'untracked.txt'), 'keep this work\n')
+    // Git derives the row path by stripping one trailing `/.git` from the admin target.
     const row = (await listWorktreesStrict(repoPath)).find((entry) =>
       areWorktreePathsEqual(entry.path, markerPath)
     )

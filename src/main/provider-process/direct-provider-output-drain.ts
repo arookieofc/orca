@@ -75,8 +75,12 @@ export function drainDirectProviderOutput(
         })
       }
     }
-    // An overdue deadline still gives kernel-buffered tail bytes one poll phase to arrive.
-    await new Promise<void>((resolve) => setImmediate(resolve))
+    // Why: Windows pipes need extra poll phases for kernel-buffered tail bytes to
+    // arrive; other platforms keep the single phase the retirement proof flushes.
+    const tailPollPhases = process.platform === 'win32' ? 10 : 1
+    for (let index = 0; index < tailPollPhases; index += 1) {
+      await new Promise<void>((resolve) => setImmediate(resolve))
+    }
     for (const cleanup of finalReaders) {
       cleanup()
     }

@@ -22,6 +22,9 @@ import { RoomTranscript } from './RoomTranscript'
 import { RoomComposer } from './RoomComposer'
 import { activeWorkingMembers, waitingApprovalMembers } from './room-working-members'
 import { selectRoomMemberChatLines } from './room-chat-transcript-model'
+import { ROOM_LOG_UPDATED_EVENT, triggerWebBotRoomTurnClaim } from './WebBotRoomBridge'
+import { RoomAcceptanceDialog } from './RoomAcceptanceDialog'
+import { isTauriNativeHost } from '@/web/tauri-native-host'
 import { useNow } from '@/lib/window-activity/use-now'
 
 export default function RoomsPage(): JSX.Element {
@@ -41,6 +44,8 @@ export default function RoomsPage(): JSX.Element {
   const [composer, setComposer] = useState('')
   const [sending, setSending] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
+  const [acceptanceOpen, setAcceptanceOpen] = useState(false)
+  const tauriNative = isTauriNativeHost()
   const [seenSeqByRoom, setSeenSeqByRoom] = useState<Record<string, number>>({})
   const initializedSeqs = useRef(false)
   const selected = useMemo(() => {
@@ -116,6 +121,7 @@ export default function RoomsPage(): JSX.Element {
             )
           }
           await refreshLog()
+          triggerWebBotRoomTurnClaim()
         })
       } catch (error) {
         discardPendingMessage(pendingKey)
@@ -127,6 +133,20 @@ export default function RoomsPage(): JSX.Element {
     },
     [selected, directMember, sending, refreshLog, addPendingMessage, discardPendingMessage]
   )
+
+  const abortRound = useCallback(async () => {
+    if (!selected) {
+      return
+    }
+    try {
+      await callRuntimeRpc(LOCAL, 'orchestration.roomAbort', { id: selected.id })
+      triggerWebBotRoomTurnClaim()
+      await Promise.all([refresh(), refreshLog()])
+      toast.success('已中止本轮进行中的协作')
+    } catch (error) {
+      toast.error(`中止失败: ${(error as Error).message}`)
+    }
+  }, [selected, refresh, refreshLog])
 
   const deleteRoom = async () => {
     if (!selected) {
@@ -160,6 +180,26 @@ export default function RoomsPage(): JSX.Element {
         name: shortSessionLabel(opt?.label || sessionId),
         agent,
         worktree: `id:${opt.worktreeId}`,
+        isAdmin
+      })
+      await refresh()
+      toast.success(t('auto.components.rooms.page.memberAdded', 'Member added'))
+    } catch (error) {
+      toast.error(
+        `${t('auto.components.rooms.page.addMemberFailed', 'Failed to add member')}: ${(error as Error).message}`
+      )
+    }
+  }
+
+  const addWebBotMember = async (memberId: string, name: string, isAdmin: boolean) => {
+    if (!selected) {
+      return
+    }
+    try {
+      await callRuntimeRpc(LOCAL, 'orchestration.roomMemberAdd', {
+        id: selected.id,
+        memberId,
+        name,
         isAdmin
       })
       await refresh()
@@ -262,6 +302,16 @@ export default function RoomsPage(): JSX.Element {
   useEffect(() => {
     setDirectMemberId(null)
   }, [selected?.id])
+  useEffect(() => {
+    const onRoomUpdated = () => {
+      void refresh()
+      void refreshLog()
+    }
+    window.addEventListener(ROOM_LOG_UPDATED_EVENT, onRoomUpdated)
+    return () => {
+      window.removeEventListener(ROOM_LOG_UPDATED_EVENT, onRoomUpdated)
+    }
+  }, [refresh, refreshLog])
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-background text-foreground">
@@ -285,10 +335,30 @@ export default function RoomsPage(): JSX.Element {
               selected={selected}
               adminName={adminName}
               directMember={directMember}
+              hasWorking={workingMembers.length > 0 || waitingMembers.length > 0}
               onExitDirect={() => setDirectMemberId(null)}
+              onAbort={() => void abortRound()}
+              onOpenAcceptance={tauriNative ? () => setAcceptanceOpen(true) : undefined}
               onOpenMembers={() => setMembersOpen(true)}
               onDelete={() => void deleteRoom()}
             />
+            {tauriNative ? (
+              <RoomAcceptanceDialog
+                open={acceptanceOpen}
+                onOpenChange={setAcceptanceOpen}
+                defaultWorkdir={worktrees[0]?.path ?? ''}
+                members={selected.members}
+                onPostToRoom={async (text, targetMemberId) => {
+                  await callRuntimeRpc(LOCAL, 'orchestration.roomSend', {
+                    id: selected.id,
+                    text,
+                    ...(targetMemberId ? { targetMemberId } : {})
+                  })
+                  await Promise.all([refresh(), refreshLog()])
+                  triggerWebBotRoomTurnClaim()
+                }}
+              />
+            ) : null}
             <RoomRosterBar
               selected={selected}
               open={membersOpen}
@@ -299,6 +369,9 @@ export default function RoomsPage(): JSX.Element {
                 void refresh()
               }}
               onAddMember={(sessionId, isAdmin) => void addMember(sessionId, isAdmin)}
+              onAddWebBot={(memberId, name, isAdmin) =>
+                void addWebBotMember(memberId, name, isAdmin)
+              }
               onRemoveMember={(memberId) => void removeMember(memberId)}
             />
             <RoomTranscript

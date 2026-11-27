@@ -17,11 +17,13 @@ import { createHash } from 'node:crypto'
 import type { AgentJournalMessageItem } from '../../../shared/agent-session/journal/agent-session-journal-types'
 import type { AgentMessageSource } from '../../../shared/agent-session/journal/agent-session-message-source'
 import { parseOrcaSessionAddress } from '../../../shared/agent-session/identity/orca-session-address'
+import { isWebBotRoomMemberId } from '../../../shared/web-bots/web-bot-room-address'
 import { roomMentionsIn, type RoomMentionable } from '../../../shared/orchestration-room-mentions'
 import type { OrchestrationDb } from './db/orchestration-db'
 import type { RoomMemberRow, RoomWithMembers } from './db/rooms/room-store'
 import { sendAgentTurn, type StructuredAgentTurnHost } from './turn-delivery/send-agent-turn'
 import { escapeRegExp, roomPrompt, type RoomSlot } from './room-round-prompt'
+import { enqueueWebBotRoomTurn } from './web-bot-room-queue'
 
 export type { RoomSlot, RoomSlotStatus } from './room-round-prompt'
 
@@ -83,6 +85,7 @@ export type RoomSendOutcome =
  *  member's answer arrives through the room mailbox and a later `runRoomRound` call
  *  posts it. */
 export async function sendRoomTurn(args: {
+  roomId?: string
   member: RoomMemberRow
   host: StructuredAgentTurnHost
   callerKey: string
@@ -92,6 +95,19 @@ export async function sendRoomTurn(args: {
   signal?: AbortSignal
   budgetMs?: number
 }): Promise<RoomSendOutcome> {
+  if (isWebBotRoomMemberId(args.member.member_id)) {
+    if (args.signal?.aborted) {
+      return { kind: 'failed', code: 'ABORTED', message: 'stopped' }
+    }
+    const roomId = args.roomId ?? args.callerKey.replace(/^room:/, '')
+    enqueueWebBotRoomTurn({
+      roomId,
+      memberId: args.member.member_id,
+      memberName: args.member.name,
+      prompt: args.prompt
+    })
+    return { kind: 'sent' }
+  }
   // A member's room session (`session_id`) wins over its own chat session
   // (`member_id`): a spawned bot gets its own conversation per room.
   const sessionId = parseOrcaSessionAddress(args.member.session_id ?? args.member.member_id)
@@ -205,6 +221,7 @@ export async function runRoomRound(
     const prompt = roomPrompt(room, member, { slots, startSeq }, unseen)
 
     const sent = await sendRoomTurn({
+      roomId: room.id,
       member,
       host,
       callerKey: deps.callerKey,

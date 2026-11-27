@@ -74,6 +74,7 @@ import { MOBILE_RELAY_HOSTS_METHODS } from './pairing/mobile-relay-hosts'
 import { MOBILE_PROJECT_SECTIONS_METHODS } from './mobile-delivery/mobile-project-sections'
 import { UPDATER_METHODS } from './updater/updater'
 import { AUTOMATIC_WORK_METHODS } from './automations/automatic-work'
+import { WEB_BOTS_METHODS } from './web-bots/web-bots-methods'
 import { AGENT_SESSION_METHODS } from './terminal/agent-session'
 import { STRUCTURED_AGENT_SESSION_METHODS } from './structured-sessions/structured-agent-session'
 import { STRUCTURED_AGENT_SESSION_ATTACHMENT_METHODS } from './structured-sessions/attachments/structured-agent-session-attachments'
@@ -251,7 +252,8 @@ const SERVICE_RPC_METHODS = [
   // Switch point: a window-fed build publishes no sidebar input.
   ...(ORCA_SIDEBAR_INPUTS_IS_MAIN ? SIDEBAR_INPUT_METHODS : []),
   ...UPDATER_METHODS,
-  ...AUTOMATIC_WORK_METHODS
+  ...AUTOMATIC_WORK_METHODS,
+  ...WEB_BOTS_METHODS
 ] as const
 
 type ConcatMethods<A extends readonly unknown[], B extends readonly unknown[]> = readonly [

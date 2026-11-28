@@ -1,14 +1,19 @@
 import type { BrowserGuestDiscardProtection } from '../../../../../shared/browser/guest-lifecycle/browser-guest-discard-protection'
+import type {
+  BrowserGuestEvent,
+  BrowserGuestSession,
+  BrowserGuestWebContents
+} from '../../browser-guest-surface-types'
 
 type IdleProtection = { audibleChangedAt: number | null; backgroundActivity: boolean }
-const idleProtection = new WeakMap<Electron.WebContents, IdleProtection>()
+const idleProtection = new WeakMap<BrowserGuestWebContents, IdleProtection>()
 // Orca's page visibility, not the native window's: a page shown in a minimized window stays visible.
-const semanticVisibility = new WeakMap<Electron.WebContents, boolean>()
-const notificationGrants = new WeakMap<Electron.Session, (pageUrl: string) => boolean>()
+const semanticVisibility = new WeakMap<BrowserGuestWebContents, boolean>()
+const notificationGrants = new WeakMap<BrowserGuestSession, (pageUrl: string) => boolean>()
 const RECENT_AUDIO_MS = 60_000
 
 export function setBrowserGuestSemanticVisibility(
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   visible: boolean | null
 ): void {
   if (visible === null) {
@@ -20,7 +25,7 @@ export function setBrowserGuestSemanticVisibility(
 
 /** The partition's existing permission answers; read without prompting. */
 export function registerBrowserSessionNotificationGrant(
-  sess: Electron.Session,
+  sess: BrowserGuestSession,
   isGranted: (pageUrl: string) => boolean
 ): void {
   notificationGrants.set(sess, isGranted)
@@ -28,7 +33,7 @@ export function registerBrowserSessionNotificationGrant(
 
 /** Checks live-only state at admission; proactive adds idle-only protections. */
 export function readBrowserGuestIdleProtection(
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   protection: BrowserGuestDiscardProtection,
   proactive: boolean
 ): BrowserGuestDiscardProtection {
@@ -68,7 +73,7 @@ export function readBrowserGuestIdleProtection(
 }
 
 export function installBrowserGuestIdleProtection(
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   changed: () => void
 ): () => void {
   const owner: IdleProtection = { audibleChangedAt: null, backgroundActivity: false }
@@ -87,12 +92,12 @@ export function installBrowserGuestIdleProtection(
       owner.backgroundActivity = true
     }
   }
-  const titleUpdated = (_event: Electron.Event, next: string): void => {
+  const titleUpdated = (_event: BrowserGuestEvent, next: string): void => {
     const changed = title !== null && next !== title
     title = next
     backgroundUpdate(changed)
   }
-  const faviconUpdated = (_event: Electron.Event, next: string[]): void => {
+  const faviconUpdated = (_event: BrowserGuestEvent, next: string[]): void => {
     const key = next.join('\n')
     const changed = favicons !== null && key !== favicons
     favicons = key

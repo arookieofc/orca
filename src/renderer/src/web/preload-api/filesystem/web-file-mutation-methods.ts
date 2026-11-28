@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { parseExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import type {
   SshConnectionState,

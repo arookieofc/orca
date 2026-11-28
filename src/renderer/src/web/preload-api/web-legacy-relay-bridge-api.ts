@@ -1,4 +1,4 @@
-import type { LegacyRelayBridgeApi } from '../../../../preload/api/mobile/legacy-relay-bridge-api'
+import type { LegacyRelayBridgeApi } from '../../../../shared/desktop-api/api/mobile/legacy-relay-bridge-api'
 import type {
   LegacyRelayBridgeAttachResult,
   LegacyRelayBridgeCloseResult,

@@ -1,3 +1,4 @@
+import type { BrowserWebviewLoadCommitEvent } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { hideRetainedHostWhileGuestIsBlank } from './browser-client-page-retained-elements'
 import { isWebviewDragPassthroughActive } from '../drag/webview-drag-passthrough'
 import {
@@ -83,7 +84,7 @@ export function retainBrowserClientPagePaint(page: BrowserClientRetainedRenderer
 
 export function createBrowserClientPageLoadCommitHandler(page: BrowserClientRetainedRendererPage) {
   const onLoadCommit = hideRetainedHostWhileGuestIsBlank(page.host)
-  return (event: Electron.LoadCommitEvent): void => {
+  return (event: BrowserWebviewLoadCommitEvent): void => {
     onLoadCommit(event)
     syncBrowserClientPagePaintRetention(page)
   }

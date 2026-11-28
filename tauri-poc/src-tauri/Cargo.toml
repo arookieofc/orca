@@ -5,7 +5,7 @@ default-members = ["."]
 
 [package]
 name = "orca-tauri-poc"
-version = "0.1.0"
+version = "1.4.214"
 description = "Isolated Tauri feasibility shell for Orca"
 authors = ["stablyai"]
 edition = "2021"

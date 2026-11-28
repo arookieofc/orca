@@ -17,6 +17,7 @@ import { createCodexSessionResumeLaunchPreparation } from '../../codex/history/r
 import { prepareCodexAiVaultSessionResume } from '../../codex/history/resume/codex-ai-vault-session-resume'
 import { resolveHostCodexSessionSourceHome } from '../../codex/history/rollouts/codex-session-source-home'
 import { resolveHostAgentBaseEnvironment } from '../../runtime/agent-session/environment/structured-agent-shell-environment'
+import { registerRuntimeCodexMirroredHome } from '../../codex/configuration/settings/codex-config-sync-status'
 import { isWslHostOrcadProcess } from '../../wsl/filesystem/wsl-guest-windows-drive-path'
 import type { BackendServiceCleanup } from '../../backend/service-composition'
 
@@ -109,6 +110,7 @@ export function createOrcadAccountServices(args: {
     },
     listCodexSessionHomes: () => codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery(),
     attachToRuntime: (runtime) => {
+      registerRuntimeCodexMirroredHome(runtime, services.codexRuntimeHome)
       runtime.setAccountServices({
         claudeAccounts: services.claudeAccounts,
         codexAccounts: services.codexAccounts,

@@ -7,7 +7,7 @@ import {
   WORKTREE_LINKED_ITEMS_RUNTIME_CAPABILITY,
   WORKTREE_LINKED_ITEMS_DELTA_RUNTIME_CAPABILITY
 } from '../../../../../shared/workspace-attachments/workspace-attachment-capabilities'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import type { ForceDeleteWorktreeBranchResult } from '../../../../../shared/worktree/create-types'
 import type {
   WorkspaceLineage,

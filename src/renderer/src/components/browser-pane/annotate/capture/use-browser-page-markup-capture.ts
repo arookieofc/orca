@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { useCallback, type MutableRefObject } from 'react'
 import { deliverMarkupToClipboard } from './markup-clipboard-delivery'
 import {
@@ -7,7 +8,7 @@ import {
 } from './useMarkupMode'
 
 export function useBrowserPageMarkupCapture(
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
 ): MarkupModeController {
   return useMarkupMode({
     getCaptureContext: useCallback((): MarkupCaptureContext | null => {

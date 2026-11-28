@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { useAppStore } from '@/store/index'
 import {
   issueBrowserGuestNavigation,
@@ -30,7 +31,7 @@ export function bindBrowserPageWebviewListeners({
   args
 }: {
   container: HTMLDivElement
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   needsInitialNavigation: boolean
   onContainerDragOver: (event: globalThis.DragEvent) => void
   onContainerDrop: (event: globalThis.DragEvent) => void

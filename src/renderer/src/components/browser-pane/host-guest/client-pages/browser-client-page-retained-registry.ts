@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { releaseBrowserClientRetainedRendererPage } from './browser-client-page-retained-release'
 import { observeBrowserClientPageBootstrap } from './browser-client-page-bootstrap-readiness'
 import {
@@ -49,7 +50,7 @@ export class BrowserClientPageRetainedRegistry {
       createWebview?: (identity: {
         browserPageId: string
         partition: string
-      }) => Electron.WebviewTag
+      }) => BrowserWebviewElement
       maxPages?: number
       maxPagesPerPartition?: number
       attachTimeoutMs?: number

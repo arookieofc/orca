@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import type { LinkPreviewResult } from '../../../../../shared/browser/link-preview'
 import { callRuntimeResult } from '../../runtime/client/web-runtime-calls'
 

@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import type { GitDiffResult } from '../../../shared/git/diff/git-diff-compare-types'
 import type { GitStatusResult } from '../../../shared/git/status/git-status-types'
 import { invokeNative, isTauriNativeHost } from './tauri-native-host'

@@ -1,4 +1,3 @@
-import { clearGoogleCookiesForRuntimeProfile } from '../../../browser/cookies/browser-google-cookie-clear'
 import { browserCookieImportFailure } from '../../../../shared/browser/cookies/browser-cookie-import-failure-copy'
 import type {
   BrowserDetectProfilesResult,
@@ -12,16 +11,12 @@ import type {
   BrowserProfileImportFromBrowserResult
 } from '../../../../shared/browser/runtime/runtime-browser-contracts'
 import { BrowserError } from '../../../browser/browser-error'
-import { browserSessionRegistry } from '../../../browser/sessions/profiles/browser-session-registry'
-import { browserManager } from '../../../browser/guest-lifecycle/manager/browser-manager'
-import { randomUUID } from 'node:crypto'
-import { ipcMain } from 'electron'
-import { waitForTabRegistration } from '../../../ipc/browser/browser-tab-registration-wait'
+import { getRuntimeBrowserDesktopAdapter } from '../installation/runtime-browser-desktop-adapter'
 import {
-  detectInstalledBrowsers,
-  selectBrowserProfile
-} from '../../../browser/cookies/sources/browser-cookie-detection'
-import { importCookiesFromBrowser } from '../../../browser/cookies/browser-cookie-import'
+  getRuntimeDesktopSurface,
+  type RuntimeDesktopIpcEvent
+} from '../../construction/runtime-desktop-surface'
+import { randomUUID } from 'node:crypto'
 import type {
   BrowserCommandTargetParams,
   RuntimeBrowserCommandHost
@@ -56,9 +51,10 @@ export class RuntimeBrowserProfiles {
       profileId: string
     } & BrowserCommandTargetParams
   ): Promise<BrowserTabSetProfileResult> {
+    const desktop = getRuntimeBrowserDesktopAdapter()
     const profile =
-      browserSessionRegistry.getProfile(params.profileId) ??
-      (params.profileId === 'default' ? browserSessionRegistry.getDefaultProfile() : null)
+      desktop.getProfile(params.profileId) ??
+      (params.profileId === 'default' ? desktop.getDefaultProfile() : null)
     if (!profile) {
       throw new BrowserError(
         'invalid_argument',
@@ -112,7 +108,7 @@ export class RuntimeBrowserProfiles {
     }
 
     // No-op switches must not tear down/remount the webview.
-    const currentProfileId = browserManager.getSessionProfileIdForTab(browserPageId) ?? 'default'
+    const currentProfileId = desktop.getSessionProfileIdForTab(browserPageId) ?? 'default'
     if (currentProfileId === profile.id) {
       return {
         browserPageId,
@@ -125,26 +121,26 @@ export class RuntimeBrowserProfiles {
     const requestId = randomUUID()
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
-        ipcMain.removeListener('browser:tabSetProfileReply', handler)
+        getRuntimeDesktopSurface().removeIpcListener('browser:tabSetProfileReply', handler)
         reject(new Error('Tab profile update timed out'))
       }, 10_000)
 
       const handler = (
-        _event: Electron.IpcMainEvent,
+        _event: RuntimeDesktopIpcEvent,
         reply: { requestId: string; error?: string }
       ): void => {
         if (reply.requestId !== requestId) {
           return
         }
         clearTimeout(timer)
-        ipcMain.removeListener('browser:tabSetProfileReply', handler)
+        getRuntimeDesktopSurface().removeIpcListener('browser:tabSetProfileReply', handler)
         if (reply.error) {
           reject(new Error(reply.error))
         } else {
           resolve()
         }
       }
-      ipcMain.on('browser:tabSetProfileReply', handler)
+      getRuntimeDesktopSurface().onIpc('browser:tabSetProfileReply', handler)
       win.webContents.send('browser:requestTabSetProfile', {
         requestId,
         browserPageId,
@@ -155,7 +151,7 @@ export class RuntimeBrowserProfiles {
 
     // Profile changes remount the guest; wait until follow-up commands can use it.
     try {
-      await waitForTabRegistration(browserPageId)
+      await desktop.waitForTabRegistration(browserPageId)
     } catch {
       // Hidden worktrees may register only on their next mount.
     }
@@ -200,7 +196,7 @@ export class RuntimeBrowserProfiles {
 
   async browserProfileList(): Promise<BrowserProfileListResult> {
     return {
-      profiles: browserSessionRegistry.listProfiles(),
+      profiles: getRuntimeBrowserDesktopAdapter().listProfiles(),
       executorRuntimeId: this.host.getRuntimeId()
     }
   }
@@ -210,13 +206,13 @@ export class RuntimeBrowserProfiles {
     scope: 'isolated' | 'imported'
   }): Promise<BrowserProfileCreateResult> {
     return {
-      profile: await browserSessionRegistry.createProfile(params.scope, params.label)
+      profile: await getRuntimeBrowserDesktopAdapter().createProfile(params.scope, params.label)
     }
   }
 
   async browserProfileDelete(params: { profileId: string }): Promise<BrowserProfileDeleteResult> {
     return {
-      deleted: await browserSessionRegistry.deleteProfile(params.profileId),
+      deleted: await getRuntimeBrowserDesktopAdapter().deleteProfile(params.profileId),
       profileId: params.profileId
     }
   }
@@ -224,12 +220,14 @@ export class RuntimeBrowserProfiles {
   async browserProfileDetectBrowsers(): Promise<BrowserDetectProfilesResult> {
     return {
       // Expose display metadata only; retain paths/keychain identifiers on the server.
-      browsers: detectInstalledBrowsers().map((browser) => ({
-        family: browser.family,
-        label: browser.label,
-        profiles: browser.profiles,
-        selectedProfile: browser.selectedProfile
-      }))
+      browsers: getRuntimeBrowserDesktopAdapter()
+        .detectInstalledBrowsers()
+        .map((browser) => ({
+          family: browser.family,
+          label: browser.label,
+          profiles: browser.profiles,
+          selectedProfile: browser.selectedProfile
+        }))
     }
   }
 
@@ -239,7 +237,8 @@ export class RuntimeBrowserProfiles {
     browserProfile?: string
     supportsPartitionSkippedCookies?: true
   }): Promise<BrowserProfileImportFromBrowserResult> {
-    const profile = browserSessionRegistry.getProfile(params.profileId)
+    const desktop = getRuntimeBrowserDesktopAdapter()
+    const profile = desktop.getProfile(params.profileId)
     if (!profile) {
       return browserCookieImportFailure('profileNotFound')
     }
@@ -250,14 +249,14 @@ export class RuntimeBrowserProfiles {
       return browserCookieImportFailure('invalidBrowserProfile')
     }
 
-    const browsers = detectInstalledBrowsers()
+    const browsers = desktop.detectInstalledBrowsers()
     let browser = browsers.find((candidate) => candidate.family === params.browserFamily)
     if (!browser) {
       return browserCookieImportFailure('browserNotFound')
     }
 
     if (params.browserProfile && params.browserProfile !== browser.selectedProfile) {
-      const reselected = selectBrowserProfile(browser, params.browserProfile)
+      const reselected = desktop.selectBrowserProfile(browser, params.browserProfile)
       if (!reselected) {
         return browserCookieImportFailure('browserProfileDatabaseMissing', {
           profile: params.browserProfile
@@ -266,7 +265,7 @@ export class RuntimeBrowserProfiles {
       browser = reselected
     }
 
-    const result = await importCookiesFromBrowser(browser, profile.partition, {
+    const result = await desktop.importCookiesFromBrowser(browser, profile.partition, {
       canReportPartitionSkippedCookies: params.supportsPartitionSkippedCookies === true
     })
     if (!result.ok) {
@@ -276,7 +275,7 @@ export class RuntimeBrowserProfiles {
     const profileName =
       browser.profiles.find((candidate) => candidate.directory === browser.selectedProfile)?.name ??
       browser.selectedProfile
-    browserSessionRegistry.updateProfileSource(params.profileId, {
+    desktop.updateProfileSource(params.profileId, {
       browserFamily: browser.family,
       profileName,
       importedAt: Date.now()
@@ -285,10 +284,13 @@ export class RuntimeBrowserProfiles {
   }
 
   async browserProfileClearGoogleCookies(params: { profileId: string; executorRuntimeId: string }) {
-    return clearGoogleCookiesForRuntimeProfile(params, this.host.getRuntimeId())
+    return getRuntimeBrowserDesktopAdapter().clearGoogleCookiesForRuntimeProfile(
+      params,
+      this.host.getRuntimeId()
+    )
   }
 
   async browserProfileClearDefaultCookies(): Promise<BrowserProfileClearDefaultCookiesResult> {
-    return { cleared: await browserSessionRegistry.clearDefaultSessionCookies() }
+    return { cleared: await getRuntimeBrowserDesktopAdapter().clearDefaultSessionCookies() }
   }
 }

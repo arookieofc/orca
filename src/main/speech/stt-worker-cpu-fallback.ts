@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
-import type { MessagePortMain } from 'electron'
 import { OFFLINE_DECODE_CHUNK_SECONDS } from './stt-offline-audio-chunker'
+import type { SpeechWorkerAudioPort } from './stt-worker-parent-port'
 import type { SttWorkerProcess, SttWorkerRequest } from './stt-worker-process'
 
 export type SpawnSttChild = (options: { cpuOnly: boolean }) => SttWorkerProcess
@@ -79,7 +79,7 @@ class SttCpuFallbackWorker extends EventEmitter implements SttWorkerProcess {
   }
 
   /** A GPU process keeps audio on IPC, where this wrapper can hold it for a CPU replay. */
-  attachAudioPort(streamId: string, port: MessagePortMain): boolean {
+  attachAudioPort(streamId: string, port: SpeechWorkerAudioPort): boolean {
     return !this.canFallBack() && this.child.attachAudioPort(streamId, port)
   }
 

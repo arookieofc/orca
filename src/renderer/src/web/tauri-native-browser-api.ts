@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import { buildBrowserAnnotationViewportBridgeScript } from '../../../shared/browser/annotations/browser-annotation-viewport-bridge'
 import type {
   BrowserCertificateProceedResult,
@@ -12,12 +12,12 @@ import type {
   BrowserExtractHoverResult,
   BrowserSetGrabModeResult
 } from '../../../shared/browser/element-grab/browser-grab-types'
-import { clampGrabPayload } from '../../../main/browser/element-grab/browser-grab-payload'
+import { clampGrabPayload } from '../../../shared/browser/element-grab/clamp-grab-payload'
 import { buildGuestOverlayScript } from '../../../main/browser/element-grab/grab-guest-script'
 import {
   HIDE_BROWSER_GRAB_OVERLAY_SCRIPT,
   RESTORE_BROWSER_GRAB_OVERLAY_SCRIPT
-} from '../../../main/browser/element-grab/browser-grab-screenshot'
+} from '../../../shared/browser/element-grab/browser-grab-overlay-scripts'
 import { invokeNative, listenNative } from './tauri-native-host'
 import { createTauriNativeBrowserEventsApi } from './tauri-native-browser-events'
 import { createTauriNativeBrowserSessionApi } from './tauri-native-browser-session'

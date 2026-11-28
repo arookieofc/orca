@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { issueBrowserGuestNavigation } from '../host-guest/metadata/browser-guest-metadata-cache'
 import type { BrowserPage as BrowserPageState } from '../../../../../shared/browser/workspaces/browser-workspace-types'
 import '../../../../../shared/orca-profiles/constants'
@@ -31,7 +32,7 @@ export function getOpenableExternalUrl(currentUrl: string): string | null {
 }
 
 export function retryBrowserTabLoad(
-  webview: Electron.WebviewTag | null,
+  webview: BrowserWebviewElement | null,
   browserTab: BrowserPageState,
   onUpdatePageState: (tabId: string, updates: BrowserTabPageState) => void
 ): void {

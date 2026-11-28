@@ -3,7 +3,7 @@ import { savePastedTextAsWebAgentSessionAttachment } from '../agents/web-pasted-
 import { createWebExplorerRootSync } from '../workspaces/web-explorer-root-sync'
 import { createWebJiraFilterStateApi } from '../jira/web-jira-filter-state-api'
 import { WEB_PENDING_LINK_API } from './web-pending-link-api'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { assertClipboardTextWithinLimitWithYield } from '../../../../../shared/clipboard/clipboard-text'
 import type { ReadClipboardTextOptions } from '../../../../../shared/clipboard/clipboard-text'
 import { normalizeFeatureInteractions } from '../../../../../shared/feature-education/interactions/feature-interactions'

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { PreloadApi } from '../../../../preload/api-types'
+import type { PreloadApi } from '../../../../shared/desktop-api/api-types'
 import type { SecretAtRestProtection } from '../../../../shared/secure-storage/secret-at-rest-protection'
 import type {
   SpeechErrorEvent,

@@ -546,14 +546,20 @@ fn create_hidden_import_webview(
         "orca-browser-source-import-{}",
         NEXT_ID.fetch_add(1, Ordering::Relaxed)
     );
+    let mut builder = WebviewBuilder::new(
+        label,
+        WebviewUrl::External(Url::parse("about:blank").map_err(|error| error.to_string())?),
+    )
+    .focused(false)
+    .data_store_identifier(store_identifier(partition));
+    #[cfg(windows)]
+    {
+        let profile_dir = crate::browser_partition_dir::resolve_browser_partition_dir(app, partition)?;
+        builder = builder.data_directory(profile_dir);
+    }
     let webview = window
         .add_child(
-            WebviewBuilder::new(
-                label,
-                WebviewUrl::External(Url::parse("about:blank").map_err(|error| error.to_string())?),
-            )
-            .focused(false)
-            .data_store_identifier(store_identifier(partition)),
+            builder,
             tauri::LogicalPosition::new(0.0, 0.0),
             tauri::LogicalSize::new(1.0, 1.0),
         )

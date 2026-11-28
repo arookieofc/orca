@@ -1,5 +1,5 @@
 import { isTerminalInputPaused } from '../../../runtime/terminal/input/terminal-input-admission'
-import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
+import type { RuntimeDesktopIpcEvent } from '../../../runtime/construction/runtime-desktop-surface'
 import type { PtyRendererDelivery } from '../session'
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
 import type { IPtyProvider } from '../../../providers/pty/provider-contract'
@@ -19,7 +19,7 @@ import {
 } from '../../../../shared/terminal/pty/lifecycle/pty-write-settlement'
 
 export function isMainWindowPtyIpcEvent(
-  event: IpcMainEvent | IpcMainInvokeEvent,
+  event: RuntimeDesktopIpcEvent,
   mainWindow: PtyRendererDelivery | undefined
 ): boolean {
   const mainWebContents = mainWindow?.webContents
@@ -50,7 +50,7 @@ export function createPtyWriteInput(deps: {
   writePtyInputAccepted: (args: PtyWritePayload) => boolean | Promise<boolean>
   isPtyWritePayload: (value: unknown) => value is PtyWritePayload
   isPtyViewportClaimPayload: (value: unknown) => value is PtyViewportClaimPayload
-  isPtyWriteEventFromMainWindow: (event: IpcMainEvent | IpcMainInvokeEvent) => boolean
+  isPtyWriteEventFromMainWindow: (event: RuntimeDesktopIpcEvent) => boolean
 } {
   const { mainWindow, runtime } = deps
 
@@ -218,7 +218,7 @@ export function createPtyWriteInput(deps: {
     (value as { cols: number }).cols > 0 &&
     (value as { rows: number }).rows > 0
 
-  const isPtyWriteEventFromMainWindow = (event: IpcMainEvent | IpcMainInvokeEvent): boolean =>
+  const isPtyWriteEventFromMainWindow = (event: RuntimeDesktopIpcEvent): boolean =>
     isMainWindowPtyIpcEvent(event, mainWindow)
 
   const noteRendererPtyInput = (args: PtyWritePayload): void => {

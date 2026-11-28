@@ -47,6 +47,7 @@ import { PLUGIN_VIEW_COMMAND_SPECS } from './plugin-view'
 import { PLUGIN_INSTALL_COMMAND_SPECS } from './plugin-install'
 import { WORKSPACE_CLEANUP_COMMAND_SPECS } from './workspace-cleanup'
 import { WEB_BOT_COMMAND_SPECS } from './web-bot'
+import { NODE_RELAY_COMMAND_SPECS } from './node-relay'
 
 export const COMMAND_SPECS: CommandSpec[] = [
   ...CORE_COMMAND_SPECS,
@@ -96,5 +97,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...PLUGIN_VIEW_COMMAND_SPECS,
   ...PLUGIN_INSTALL_COMMAND_SPECS,
   ...PAIR_COMMAND_SPECS,
-  ...WEB_BOT_COMMAND_SPECS
+  ...WEB_BOT_COMMAND_SPECS,
+  ...NODE_RELAY_COMMAND_SPECS
 ]

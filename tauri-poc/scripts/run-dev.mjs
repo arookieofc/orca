@@ -16,12 +16,19 @@ if (!existsSync(runtimeEntry)) {
 const manifest = resolve(root, 'tauri-poc/src-tauri/Cargo.toml')
 const viteEntry = resolve(root, 'node_modules/vite/bin/vite.js')
 const cargo = process.env.CARGO ?? 'cargo'
+const inheritedEnv = { ...process.env }
+if (!inheritedEnv.ORCA_TAURI_RUNTIME_PROFILE) {
+  delete inheritedEnv.ORCA_USER_DATA_PATH
+  delete inheritedEnv.ORCA_USER_DATA
+}
 const environment = {
-  ...process.env,
-  ORCA_BACKGROUND_LAUNCH: process.env.ORCA_BACKGROUND_LAUNCH ?? '0',
+  ...inheritedEnv,
+  ORCA_BACKGROUND_LAUNCH: inheritedEnv.ORCA_BACKGROUND_LAUNCH ?? '0',
   ORCA_DEV_REPO_ROOT: root,
   ORCA_TAURI_DEV_SUPERVISED: '1',
-  ORCA_TAURI_NODE: process.execPath
+  ORCA_TAURI_NODE: process.execPath,
+  ORCA_TAURI_RUNTIME_PROFILE:
+    inheritedEnv.ORCA_TAURI_RUNTIME_PROFILE ?? resolve(root, '.cache/tauri-orcad-profile')
 }
 
 const vite = spawnProcess({

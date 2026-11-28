@@ -1,13 +1,30 @@
 import type { BrowserScreencastResult } from '../../../../shared/browser/runtime/runtime-browser-contracts'
-import type {
-  BrowserScreencastFrameBudget,
-  BrowserScreencastSession,
-  BrowserScreencastViewport
-} from '../../../browser/cdp/screencast/browser-screencast-stream-types'
 import type { ScreencastSubscriberDeliveryState } from './browser-screencast-ghost-subscriber-eviction'
 import type { BrowserScreencastFrameCredit } from './browser-screencast-frame-credit'
 import type { RpcBinarySender } from '../../rpc/transports/rpc-binary-sender'
 import type { BrowserCommandTargetParams } from '../commands/browser-command-contracts'
+
+export type BrowserScreencastViewport = {
+  viewportWidth?: number
+  viewportHeight?: number
+  deviceScaleFactor?: number
+  mobile?: boolean
+}
+
+export type BrowserScreencastFrameBudget = {
+  quality: number
+  maxWidth: number
+  maxHeight: number
+  everyNthFrame: number
+  minFrameIntervalMs: number
+}
+
+export type BrowserScreencastSession = {
+  stop: () => void
+  done: Promise<void>
+  updateViewport: (viewport: BrowserScreencastViewport) => Promise<void>
+  updateFrameBudget: (budget: BrowserScreencastFrameBudget) => Promise<void>
+}
 
 export type BrowserScreencastParams = {
   format: 'jpeg' | 'png'

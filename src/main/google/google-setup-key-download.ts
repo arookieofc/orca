@@ -11,7 +11,14 @@ import {
   isGoogleClientsPage,
   type GoogleSetupRun
 } from '../../shared/google/google-setup-run'
-import type { StandingDownloadClaimResolver } from '../browser/guest-lifecycle/manager/downloads/browser-manager-download-creation'
+type StandingDownloadClaimResolver = (info: {
+  browserTabId: string
+  filename: string
+  documentUrl: string
+}) => {
+  savePath: string
+  finish: (event: BrowserDownloadFinishedEvent) => void
+} | null
 import { parseGoogleClientFile } from './google-client-file'
 import { GOOGLE_KEY_FILE_NAME } from './google-key-download-watch'
 

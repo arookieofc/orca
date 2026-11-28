@@ -48,8 +48,6 @@ export async function reclaimWorktreeSpace({
   let cleanupError
   try {
     const scripts = [
-      'reclaim-electron-dists.mjs',
-      'reclaim-dev-electron-bundles.mjs',
       'reclaim-vite-caches.mjs',
       'reclaim-vitest-module-caches.mjs',
       'reclaim-worktree-generated-files.mjs',

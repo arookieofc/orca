@@ -175,8 +175,8 @@ export function registerPtyHandlers(
       load: resetRendererPtyDeliveryGateState,
       gone: resetRendererPtyDeliveryGateState
     })
-    mainWindow.webContents.on('did-finish-load', resetRendererPtyDeliveryGateState)
-    mainWindow.webContents.on('render-process-gone', resetRendererPtyDeliveryGateState)
+    mainWindow.webContents.on?.('did-finish-load', resetRendererPtyDeliveryGateState)
+    mainWindow.webContents.on?.('render-process-gone', resetRendererPtyDeliveryGateState)
   }
 
   // Only in-process PTYs are reload orphans; daemon sessions intentionally survive.
@@ -186,14 +186,17 @@ export function registerPtyHandlers(
     const finishLoadHandler = () => {
       // Keep generations monotonic but skip recovery sweeps until restore re-adopts live PTYs (#5787).
       const generation = lp.advanceGeneration()
-      if (options?.isRecoveryReloadInFlight?.(mainWindow.webContents.id)) {
+      if (
+        typeof mainWindow.webContents.id === 'number' &&
+        options?.isRecoveryReloadInFlight?.(mainWindow.webContents.id)
+      ) {
         return
       }
       // The retained onExit callback releases ownership only after physical process exit.
       lp.killOrphanedPtys(generation - 1)
     }
     setDidFinishLoadHandler(finishLoadHandler, mainWindow.webContents)
-    mainWindow.webContents.on('did-finish-load', finishLoadHandler)
+    mainWindow.webContents.on?.('did-finish-load', finishLoadHandler)
   }
 
   const assertWorkspaceAcceptsNewPty = (

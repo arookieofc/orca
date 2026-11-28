@@ -11,3 +11,11 @@ declare const ORCA_DIAGNOSTICS_TOKEN_URL: string | null
 declare const ORCA_BUILD_COMMIT: string
 
 // ORCA_LAYOUT_OWNER is declared and read in one place: src/shared/workspace-layout/layout-owner-switch.ts.
+
+declare namespace NodeJS {
+  // Packaged runtimes set `resourcesPath` via native/distribution hosts rather than plain Node.
+  // oxlint-disable-next-line typescript/consistent-type-definitions -- Augmenting built-in @types/node interface requires interface merging.
+  interface Process {
+    readonly resourcesPath?: string
+  }
+}

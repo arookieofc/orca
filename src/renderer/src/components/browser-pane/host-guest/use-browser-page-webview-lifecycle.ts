@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import {
   useCallback,
   useEffect,
@@ -101,7 +102,7 @@ export function useBrowserPageWebviewLifecycle({
   pendingAnnotationPayload: BrowserGrabPayload | null
   inputLocked: boolean
   faviconUrl: string | null
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   lastKnownWebviewUrlRef: MutableRefObject<string | null>
   recoveryNavigationValidationRef: MutableRefObject<BrowserPageRecoveryNavigationValidation | null>
   activeLoadFailureRef: MutableRefObject<BrowserLoadError | null>

@@ -1,6 +1,6 @@
 import { callAbortableRuntimeEnvironment } from '../../../runtime/rpc/calls/abortable-runtime-environment-call'
 import { unwrapRuntimeRpcResult } from '../../../runtime/rpc/calls/runtime-rpc-result'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import type { SearchResult } from '../../../../../shared/file-search/code-search-types'
 import { assertFileMutationOwnershipCapability } from '../../../../../shared/file-write/file-mutation-ownership'
 import type { DirEntry } from '../../../../../shared/file-listing/directory-entry'

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
-import type { MessagePortMain } from 'electron'
 import type { WorkerRequestTransport } from '../worker-threads/worker-thread-transport'
 import type { SttRecognizerInit } from './stt-recognizer'
+import type { SpeechWorkerAudioPort } from './stt-worker-parent-port'
 
 /** Electron reports it as the utility process's name when it exits. */
 export const STT_UTILITY_PROCESS_NAME = 'Orca Speech'
@@ -19,7 +19,7 @@ export type SttWorkerRequest =
 
 export type SttWorkerProcess = Omit<WorkerRequestTransport, 'unref'> & {
   /** False when the process can't take a port (orcad's forked child), so audio stays on IPC. */
-  attachAudioPort(streamId: string, port: MessagePortMain): boolean
+  attachAudioPort(streamId: string, port: SpeechWorkerAudioPort): boolean
 }
 export type SpawnSttWorkerProcess = () => SttWorkerProcess
 
@@ -32,7 +32,7 @@ export class SttWorkerChildProcess extends EventEmitter implements SttWorkerProc
     private readonly child: {
       send(message: SttWorkerRequest): void
       kill(): void
-      sendPort?(message: SttWorkerRequest, port: MessagePortMain): void
+      sendPort?(message: SttWorkerRequest, port: SpeechWorkerAudioPort): void
     }
   ) {
     super()
@@ -44,7 +44,7 @@ export class SttWorkerChildProcess extends EventEmitter implements SttWorkerProc
     }
   }
 
-  attachAudioPort(streamId: string, port: MessagePortMain): boolean {
+  attachAudioPort(streamId: string, port: SpeechWorkerAudioPort): boolean {
     if (this.exited || !this.child.sendPort) {
       return false
     }

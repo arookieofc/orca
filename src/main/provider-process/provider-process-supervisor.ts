@@ -272,19 +272,15 @@ export function supervisedPosixLaunch(
 export function resolveProviderExecPath(platform: NodeJS.Platform = process.platform): string {
   const app = getAppEnvironment()
   if (!app.isPackaged()) {
-    return join(
-      app.getAppPath(),
-      'native/provider-exec/.build',
-      `${platform}-${process.arch}`,
-      'orca-provider-exec'
-    )
+    const target = `${platform}-${process.arch}`
+    return join(app.getAppPath(), 'native/provider-exec/.build', target, 'orca-provider-exec')
   }
-  if (process.resourcesPath) {
-    return platform === 'darwin'
-      ? join(process.resourcesPath, '..', 'MacOS', 'orca-provider-exec')
-      : join(process.resourcesPath, 'bin', 'orca-provider-exec')
-  }
-  return join(app.getAppPath(), 'bin', 'orca-provider-exec')
+  const resourcesPath = Reflect.get(process, 'resourcesPath')
+  const root =
+    typeof resourcesPath === 'string' && resourcesPath
+      ? join(resourcesPath, ...(platform === 'darwin' ? ['..', 'MacOS'] : ['bin']))
+      : join(app.getAppPath(), 'bin')
+  return join(root, 'orca-provider-exec')
 }
 
 export function createProviderSpawnSpec(

@@ -8,7 +8,7 @@ import type {
   ReactErrorBoundaryReportResult,
   UncapturedCrashReportContext
 } from '../../../shared/crash-reporting/crash-reporting'
-import type { CrashReportsApi } from '../../../preload/api/diagnostics/crash-report-api'
+import type { CrashReportsApi } from '../../../shared/desktop-api/api/diagnostics/crash-report-api'
 import {
   formatCrashReportText,
   formatUncapturedCrashReportText

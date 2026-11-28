@@ -1,4 +1,4 @@
-import type { FilesystemApi } from '../../../preload/api/filesystem/filesystem-api'
+import type { FilesystemApi } from '../../../shared/desktop-api/api/filesystem/filesystem-api'
 import type {
   ImportItemResult,
   ResolveDroppedPathsResult

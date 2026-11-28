@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { useClientHostedPageInitialization } from '../../navigate/use-client-hosted-page-initialization'
 import type { BrowserGuestMetadata } from '../../../../../../shared/browser/guest-lifecycle/browser-guest-metadata'
 import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
@@ -49,21 +50,12 @@ import { BrowserDevToolsDock } from '../../devtools-dock/BrowserDevToolsDock'
 import { useBrowserDevToolsDockPageFlex } from '../../devtools-dock/browser-devtools-docked-pages'
 
 export function ClientHostedBrowserPagePane(props: Props) {
-  const {
-    browserTab,
-    workspaceId,
-    runtimeEnvironmentId,
-    worktreeId,
-    placement,
-    isActive,
-    chromeShortcutScope,
-    onUpdatePageState,
-    onSetUrl
-  } = props
+  const { browserTab, workspaceId, runtimeEnvironmentId, worktreeId } = props
+  const { placement, isActive, chromeShortcutScope, onUpdatePageState, onSetUrl } = props
   const viewportPresetId = browserTab.viewportPresetId ?? null
   const pageBox = useClientHostedBrowserPageViewport(browserTab.id, viewportPresetId)
   const devToolsPageFlex = useBrowserDevToolsDockPageFlex(browserTab.id)
-  const webviewRef = useRef<Electron.WebviewTag | null>(null)
+  const webviewRef = useRef<BrowserWebviewElement | null>(null)
   const addressBarInputRef = useRef<HTMLInputElement | null>(null)
   const viewportContainerRef = useRef<HTMLDivElement | null>(null)
   const dismissAddressBarSuggestionsRef = useRef<(() => void) | null>(null)

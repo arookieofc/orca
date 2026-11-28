@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import type { BrowserPageInitializationAction } from '../../../../../shared/browser/client-hosting/browser-page-initialization-action'
 import { issueBrowserGuestNavigation } from '../host-guest/metadata/browser-guest-metadata-cache'
 import { useCallback } from 'react'
@@ -15,7 +16,7 @@ export function useClientHostedPageUrlSubmission(params: {
   onInitializationAction?: (action: BrowserPageInitializationAction) => void
   browserTabId: string
   worktreeId: string
-  webviewRef: RefObject<Electron.WebviewTag | null>
+  webviewRef: RefObject<BrowserWebviewElement | null>
   activeLoadFailureRef: MutableRefObject<BrowserLoadError | null>
   onSetUrl: BrowserPageUrlSetter
   onUpdatePageState: (pageId: string, updates: Partial<BrowserTabPageState>) => void

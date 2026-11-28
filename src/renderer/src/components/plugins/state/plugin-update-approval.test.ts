@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { PluginMarketplaceHostInstallPreview } from '../../../../../preload/api/plugins/plugin-host-api'
+import type { PluginMarketplaceHostInstallPreview } from '../../../../../shared/desktop-api/api/plugins/plugin-host-api'
 import {
   pluginManifestSchema,
   type PluginManifest

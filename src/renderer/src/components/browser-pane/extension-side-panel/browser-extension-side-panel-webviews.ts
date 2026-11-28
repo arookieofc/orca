@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import type { BrowserExtensionSidePanel } from '../../../../../shared/browser/extensions/browser-extension-side-panel-types'
 import { BROWSER_GUEST_WINDOW_CLOSE_CHANNEL } from '../../../../../shared/browser/guest-lifecycle/browser-guest-window-close'
 import { ORCA_BROWSER_PAGE_GUEST_WEB_PREFERENCES_ATTRIBUTE } from '../../../../../shared/browser/guest-lifecycle/browser-guest-web-preferences'
@@ -14,7 +15,7 @@ export type BrowserExtensionSidePanelHost = {
   guests: HTMLDivElement
 }
 
-type PanelWebview = { webview: Electron.WebviewTag; host: HTMLDivElement; dispose: () => void }
+type PanelWebview = { webview: BrowserWebviewElement; host: HTMLDivElement; dispose: () => void }
 
 // Why module state, not effects: Electron destroys a guest whose <webview> leaves the DOM, and
 // main closes a panel whose guest is destroyed, so only a closed panel may lose its element.
@@ -52,7 +53,7 @@ export function ensureBrowserExtensionSidePanelHost(
   return host
 }
 
-function setPointerPassthrough(webview: Electron.WebviewTag, passthrough: boolean): void {
+function setPointerPassthrough(webview: BrowserWebviewElement, passthrough: boolean): void {
   webview.style.pointerEvents = passthrough ? 'none' : 'auto'
 }
 

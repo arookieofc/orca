@@ -32,6 +32,7 @@ export type WorktreeNavHistorySimpleViewEntry =
   | 'skills'
   | 'rooms'
   | 'web-bots'
+  | 'node-relay'
 const SIMPLE_VIEW_ENTRIES: readonly WorktreeNavHistorySimpleViewEntry[] = [
   'tasks',
   'automations',
@@ -39,7 +40,8 @@ const SIMPLE_VIEW_ENTRIES: readonly WorktreeNavHistorySimpleViewEntry[] = [
   'workbench',
   'skills',
   'rooms',
-  'web-bots'
+  'web-bots',
+  'node-relay'
 ]
 export type WorktreeNavHistoryTaskDetailEntry =
   | {

@@ -5,7 +5,7 @@ import {
   type WebRuntimeSubscriptionRegistration
 } from './web-runtime-crew-subscription'
 const pendingSubscriptions = new Map<string, WebRuntimeSubscriptionRegistration>()
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { parseHostAccessLink } from '../../../../../shared/remote-runtime/pairing/remote-pairing-address'
 import { verifyRemotePairingRuntimeStatus } from '../../../../../shared/remote-runtime/pairing/remote-pairing-verification'
 import type { RuntimeRpcResponse } from '../../../../../shared/remote-runtime/rpc/runtime-rpc-envelope'

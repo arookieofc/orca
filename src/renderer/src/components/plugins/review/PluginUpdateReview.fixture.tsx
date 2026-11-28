@@ -1,5 +1,5 @@
 import { XIcon } from 'lucide-react'
-import type { PluginMarketplaceHostInstallPreview } from '../../../../../preload/api/plugins/plugin-host-api'
+import type { PluginMarketplaceHostInstallPreview } from '../../../../../shared/desktop-api/api/plugins/plugin-host-api'
 import type { PluginUpdateAccessGrowth } from '../../../../../shared/plugins/approval/plugin-update-access-growth'
 import {
   pluginManifestSchema,

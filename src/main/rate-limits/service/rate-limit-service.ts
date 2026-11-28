@@ -2,7 +2,7 @@ import {
   localAccountRuntimeTargetKey,
   type LocalAccountRuntimeTarget
 } from '../../../shared/agent-accounts/local-account-runtime'
-import type { BrowserWindow } from 'electron'
+import type { RateLimitDesktopWindow } from './service-state'
 import { hasMiniMaxSessionCookie } from '../../minimax/minimax-cookie-store'
 import { hasMiniMaxApiKey } from '../../minimax/minimax-api-key-store'
 import { hasZcodePlanApiKey } from '../../zcode/zcode-plan-api-key-store'
@@ -135,7 +135,7 @@ export class RateLimitService extends RateLimitServiceAccountRefresh {
     this.inactiveCodexAccountsGeneration += 1
     this.pruneInactiveCodexState()
   }
-  attach(mainWindow: BrowserWindow): void {
+  attach(mainWindow: RateLimitDesktopWindow): void {
     this.detachWindowListeners?.()
     this.mainWindow = mainWindow
     const refreshOnResume = (): void => {

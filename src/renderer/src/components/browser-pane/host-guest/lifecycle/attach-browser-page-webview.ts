@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import type { Dispatch, DragEvent, MutableRefObject, RefObject, SetStateAction } from 'react'
 import {
   normalizeBrowserNavigationUrl,
@@ -33,7 +34,7 @@ export type AttachBrowserPageWebviewArgs = {
   isActive: boolean
   isPaintable: boolean
   inputLockedRef: MutableRefObject<boolean>
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   handleInternalFileDragOverRef: MutableRefObject<(event: DragEvent<HTMLDivElement>) => void>
   handleInternalFileDropRef: MutableRefObject<(event: DragEvent<HTMLDivElement>) => void>
   dismissAddressBarSuggestionsRef: MutableRefObject<(() => void) | null>

@@ -1,4 +1,4 @@
-import type { AgentBrowserBridge } from '../../../browser/agent-browser/agent-browser-bridge'
+import type { RuntimeAgentBrowserBridge as AgentBrowserBridge } from '../commands/runtime-agent-browser-bridge'
 import type { RuntimeBrowserPageRegistry } from '../client-pages/runtime-browser-page-registry'
 import {
   navigationTargetsHost,

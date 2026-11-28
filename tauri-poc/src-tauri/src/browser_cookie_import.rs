@@ -106,10 +106,15 @@ fn create_hidden_import_webview(
     let id = NEXT_IMPORT_WEBVIEW_ID.fetch_add(1, Ordering::Relaxed);
     let label = format!("orca-browser-cookie-import-{id}");
     let url = Url::parse("about:blank").map_err(|error| error.to_string())?;
-    let builder = WebviewBuilder::new(label, WebviewUrl::External(url))
+    let mut builder = WebviewBuilder::new(label, WebviewUrl::External(url))
         .focused(false)
         .transparent(false)
         .data_store_identifier(store_identifier(partition));
+    #[cfg(windows)]
+    {
+        let profile_dir = crate::browser_partition_dir::resolve_browser_partition_dir(app, partition)?;
+        builder = builder.data_directory(profile_dir);
+    }
     let webview = main_window
         .add_child(
             builder,

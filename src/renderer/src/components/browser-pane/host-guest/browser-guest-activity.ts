@@ -1,7 +1,8 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import type { BrowserGuestDiscardProtectionChange } from '../../../../../shared/browser/guest-lifecycle/browser-guest-discard-protection'
 
 export type BrowserGuestActivity = {
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   visible: boolean | null
   visibilityGeneration: number
   revision: number
@@ -36,7 +37,7 @@ export function touchBrowserGuestActivity(pageId: string): void {
   invalidateBrowserGuestActivity(pageId)
 }
 
-export function registerBrowserGuestActivity(pageId: string, webview: Electron.WebviewTag): void {
+export function registerBrowserGuestActivity(pageId: string, webview: BrowserWebviewElement): void {
   browserGuestActivity.set(pageId, {
     webview,
     visible: null,

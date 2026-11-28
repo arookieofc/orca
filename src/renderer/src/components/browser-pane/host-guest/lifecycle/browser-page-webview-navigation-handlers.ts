@@ -1,3 +1,8 @@
+import type {
+  BrowserWebviewElement,
+  BrowserWebviewDidStartNavigationEvent,
+  BrowserWebviewDidRedirectNavigationEvent
+} from '../../../../../../shared/desktop-api/browser-webview-element'
 import { cachedBrowserGuestMetadata } from '../metadata/browser-guest-metadata-cache'
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react'
 import {
@@ -27,7 +32,7 @@ import type {
 } from '../../describe-page/browser-page-types'
 
 export type BrowserPageWebviewNavigationHandlersArgs = {
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   browserTabId: string
   browserTabUrl: string
   invalidateBrowserAnnotationDocumentRef: MutableRefObject<() => void>
@@ -47,8 +52,8 @@ export type BrowserPageWebviewNavigationHandlersArgs = {
 }
 
 export type BrowserPageWebviewNavigationHandlers = {
-  handleDidStartNavigation: (event: Electron.DidStartNavigationEvent) => void
-  handleDidRedirectNavigation: (event: Electron.DidRedirectNavigationEvent) => void
+  handleDidStartNavigation: (event: BrowserWebviewDidStartNavigationEvent) => void
+  handleDidRedirectNavigation: (event: BrowserWebviewDidRedirectNavigationEvent) => void
   handleFullDidNavigate: (event: BrowserPageNavigateEvent) => void
   handleDidNavigateInPage: (event: BrowserPageNavigateEvent) => void
   handleTitleUpdate: (event: { title?: string }) => void
@@ -82,7 +87,7 @@ export function createBrowserPageWebviewNavigationHandlers({
   setBrowserOverlayViewport
 }: BrowserPageWebviewNavigationHandlersArgs): BrowserPageWebviewNavigationHandlers {
   const clearFaviconIfOriginChanges = (
-    event: Electron.DidStartNavigationEvent | Electron.DidRedirectNavigationEvent
+    event: BrowserWebviewDidStartNavigationEvent | BrowserWebviewDidRedirectNavigationEvent
   ): void => {
     if (!event.isMainFrame || event.isInPlace || !event.url) {
       return
@@ -97,7 +102,7 @@ export function createBrowserPageWebviewNavigationHandlers({
     }
   }
 
-  const handleDidStartNavigation = (event: Electron.DidStartNavigationEvent): void => {
+  const handleDidStartNavigation = (event: BrowserWebviewDidStartNavigationEvent): void => {
     if (!isPageDocumentNavigationStart(event) || !event.url) {
       return
     }
@@ -114,7 +119,7 @@ export function createBrowserPageWebviewNavigationHandlers({
     clearFaviconIfOriginChanges(event)
   }
 
-  const handleDidRedirectNavigation = (event: Electron.DidRedirectNavigationEvent): void => {
+  const handleDidRedirectNavigation = (event: BrowserWebviewDidRedirectNavigationEvent): void => {
     clearFaviconIfOriginChanges(event)
   }
 

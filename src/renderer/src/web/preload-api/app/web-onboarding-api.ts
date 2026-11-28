@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import {
   ONBOARDING_FLOW_VERSION,
   getDefaultOnboardingState

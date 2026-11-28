@@ -1,5 +1,5 @@
 import type { ConfirmationDialogContextValue } from '@/components/dismiss/confirmation/confirmation-dialog-context'
-import type { DocPreviewGrantOwner } from '../../../../../preload/api/document-preview/doc-preview-api'
+import type { DocPreviewGrantOwner } from '../../../../../shared/desktop-api/api/document-preview/doc-preview-api'
 import {
   captureHttpLinkIntent,
   openOwnedHttpLink

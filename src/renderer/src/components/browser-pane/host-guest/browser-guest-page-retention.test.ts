@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { afterEach, expect, it, vi } from 'vitest'
 import {
   browserGuestActivity,
@@ -41,7 +42,7 @@ function fixture() {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the policy bridge reads only this native guest identity.
     registerBrowserGuestActivity(`page-${id}`, {
       getWebContentsId: () => id
-    } as Electron.WebviewTag)
+    } as BrowserWebviewElement)
   }
   const request = (id: number): BrowserGuestIdleDiscardRequest => ({
     browserPageId: `page-${id}`,

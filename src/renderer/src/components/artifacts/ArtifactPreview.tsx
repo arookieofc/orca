@@ -1,3 +1,7 @@
+import type {
+  BrowserWebviewElement,
+  BrowserWebviewDidFailLoadEvent
+} from '../../../../shared/desktop-api/browser-webview-element'
 import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { ORCA_BROWSER_GUEST_WEB_PREFERENCES_ATTRIBUTE } from '../../../../shared/browser/guest-lifecycle/browser-guest-web-preferences'
@@ -32,9 +36,9 @@ function attachArtifactWebview({
   shareUrl: string
   onLoadStarted: () => void
   onLoadStopped: () => void
-  onLoadFailed: (event: Electron.DidFailLoadEvent) => void
+  onLoadFailed: (event: BrowserWebviewDidFailLoadEvent) => void
 }): () => void {
-  const webview = document.createElement('webview') as Electron.WebviewTag
+  const webview = document.createElement('webview') as BrowserWebviewElement
   webview.setAttribute('partition', partition)
   webview.setAttribute('webpreferences', ORCA_BROWSER_GUEST_WEB_PREFERENCES_ATTRIBUTE)
   webview.setAttribute(
@@ -93,7 +97,7 @@ export function ArtifactPreview({ shareUrl }: { shareUrl: string }): React.JSX.E
         setState('ready')
       }
     }
-    const onLoadFailed = (event: Electron.DidFailLoadEvent): void => {
+    const onLoadFailed = (event: BrowserWebviewDidFailLoadEvent): void => {
       if (!event.isMainFrame || event.errorCode === -3) {
         return
       }

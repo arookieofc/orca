@@ -1,5 +1,12 @@
 import { defineMethod } from '../../core'
-import type { PluginViewDesktop } from '../../../../plugins/view/plugin-view-desktop'
+
+export type PluginViewDesktopSurface = {
+  open(params: unknown): Promise<unknown>
+  shot(params: unknown): Promise<unknown>
+  shotEditor(params: unknown): Promise<unknown>
+  shotChrome(params: unknown): Promise<unknown>
+  shotReplay(params: unknown): Promise<unknown>
+}
 import {
   PluginOpenParams,
   PluginShotChromeParams,
@@ -9,13 +16,13 @@ import {
 } from '../../../../../shared/rpc-contract/plugins/plugins-params'
 
 // Desktop only: a headless `orca serve` has no window to show or capture a plugin in.
-let pluginViewForRpc: PluginViewDesktop | null = null
+let pluginViewForRpc: PluginViewDesktopSurface | null = null
 
-export function setPluginViewForRpc(view: PluginViewDesktop | null): void {
+export function setPluginViewForRpc(view: PluginViewDesktopSurface | null): void {
   pluginViewForRpc = view
 }
 
-function requirePluginView(): PluginViewDesktop {
+function requirePluginView(): PluginViewDesktopSurface {
   if (!pluginViewForRpc) {
     throw new Error('Showing plugin panels is only available in the Orca desktop app')
   }

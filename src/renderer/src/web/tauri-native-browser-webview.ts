@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../shared/desktop-api/browser-webview-element'
 import { invokeNative, isTauriNativeHost, listenNative } from './tauri-native-host'
 import { buildTauriBrowserWebviewTag } from './tauri-native-browser-webview-tag'
 import type { TauriBrowserPageEvent as BrowserPageEvent } from './tauri-native-browser-events'
@@ -204,7 +205,7 @@ export function createTauriNativeBrowserWebview({
   partition: string
   visible: boolean
   appendToContainer?: boolean
-}): Electron.WebviewTag {
+}): BrowserWebviewElement {
   ensurePageEventListener()
   const element = document.createElement('div')
   const removeElement = element.remove.bind(element)

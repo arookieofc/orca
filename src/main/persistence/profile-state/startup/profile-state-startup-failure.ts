@@ -1,5 +1,9 @@
 import { profileStateSectionLabels } from '../recovery/profile-state-section-labels'
-import type { ProfileStateDialogTranslate } from './profile-state-startup-recovery-dialog'
+export type ProfileStateDialogTranslate = (
+  key: string,
+  fallback: string,
+  options?: Record<string, string>
+) => string
 
 // Logs keep English; dialogs pass translateMain.
 const english: ProfileStateDialogTranslate = (_key, fallback, options) =>

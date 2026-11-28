@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import {
   DEFAULT_LOCAL_ORCA_PROFILE_ID,
   createDefaultLocalOrcaProfile

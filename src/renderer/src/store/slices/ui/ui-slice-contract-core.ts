@@ -142,6 +142,7 @@ export type UiViewHistory =
   | 'mobile'
   | 'rooms'
   | 'web-bots'
+  | 'node-relay'
 
 export type UISliceCore = {
   sidebarOpen: boolean
@@ -188,6 +189,7 @@ export type UISliceCore = {
   previousViewBeforeWorkbench: Exclude<UiViewHistory, 'workbench'>
   previousViewBeforeRooms: Exclude<UiViewHistory, 'rooms'>
   previousViewBeforeWebBots: Exclude<UiViewHistory, 'web-bots'>
+  previousViewBeforeNodeRelay: Exclude<UiViewHistory, 'node-relay'>
   setActiveView: (view: UISliceCore['activeView']) => void
   taskPageData: TaskPageData
   taskResumeState: TaskResumeState | undefined
@@ -245,6 +247,8 @@ export type UISliceCore = {
   closeRoomsPage: () => void
   openWebBotsPage: () => void
   closeWebBotsPage: () => void
+  openNodeRelayPage: () => void
+  closeNodeRelayPage: () => void
   openMobilePage: () => void
   closeMobilePage: () => void
   setNewWorkspaceDraft: (draft: NonNullable<UISliceCore['newWorkspaceDraft']>) => void

@@ -1,10 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { guardedSafeStorage as safeStorage } from '../../host/safe-storage-availability'
-import {
-  assessSecretProtection,
-  type SecretProtectionAssessment
-} from '../../host/electron-secret-store'
+import { getSecretStore, hasSecretStore } from '../../../shared/secure-storage/secret-store'
 import { isUnreadableError, writeSecureFile } from '../../../shared/secure-storage/secure-file'
 import {
   PLUGIN_STORAGE_KEY_LIMIT,
@@ -24,9 +20,34 @@ export type PluginSecretsResult<T> = { ok: true; value: T } | { ok: false; error
 
 const UNREADABLE_VAULT_ERROR = 'secret vault exists but could not be read; refusing to overwrite it'
 
+export type SecretProtectionLevel = 'os' | 'obfuscated' | 'unavailable'
+
+export type SecretProtectionAssessment = {
+  level: SecretProtectionLevel
+  gap: string | null
+}
+
 /** At-rest protection plugin secrets get; backs the `secrets.protection` host method. */
 export function pluginSecretsProtection(): SecretProtectionAssessment {
-  return assessSecretProtection()
+  if (!hasSecretStore()) {
+    return { level: 'unavailable', gap: 'OS-backed encryption is unavailable' }
+  }
+  const store = getSecretStore()
+  if (!store.isEncryptionAvailable()) {
+    return {
+      level: 'unavailable',
+      gap: store.describeProtectionGap() ?? 'OS-backed encryption is unavailable'
+    }
+  }
+  const sealing = store.describeSealing?.()
+  if (sealing?.kind === 'none') {
+    return { level: 'unavailable', gap: sealing.reason }
+  }
+  const gap = store.describeProtectionGap()
+  if (gap !== null && sealing?.kind !== 'host-key') {
+    return { level: 'obfuscated', gap }
+  }
+  return { level: 'os', gap: null }
 }
 
 export class PluginSecretsStore {
@@ -80,18 +101,18 @@ export class PluginSecretsStore {
     if (typeof ciphertext !== 'string') {
       return { ok: true, value: null }
     }
-    if (!safeStorage.isEncryptionAvailable()) {
+    if (!hasSecretStore() || !getSecretStore().isEncryptionAvailable()) {
       return { ok: false, error: 'OS-backed encryption is unavailable' }
     }
     try {
-      return { ok: true, value: safeStorage.decryptString(Buffer.from(ciphertext, 'base64')) }
+      return { ok: true, value: getSecretStore().decryptString(Buffer.from(ciphertext, 'base64')) }
     } catch {
       return { ok: false, error: 'failed to decrypt stored secret' }
     }
   }
 
   set(key: string, value: string): PluginSecretsResult<true> {
-    if (!safeStorage.isEncryptionAvailable()) {
+    if (!hasSecretStore() || !getSecretStore().isEncryptionAvailable()) {
       return { ok: false, error: 'OS-backed encryption is unavailable; secret not stored' }
     }
     const protection = pluginSecretsProtection()
@@ -111,7 +132,7 @@ export class PluginSecretsStore {
     ) {
       return { ok: false, error: `secret vault exceeds the ${PLUGIN_STORAGE_KEY_LIMIT}-key limit` }
     }
-    file.ciphertexts[key] = safeStorage.encryptString(value).toString('base64')
+    file.ciphertexts[key] = getSecretStore().encryptString(value).toString('base64')
     const nextFile = JSON.stringify(file, null, 2)
     if (Buffer.byteLength(nextFile, 'utf8') > PLUGIN_STORAGE_TOTAL_MAX_BYTES) {
       return { ok: false, error: `secret vault exceeds ${PLUGIN_STORAGE_TOTAL_MAX_BYTES} bytes` }

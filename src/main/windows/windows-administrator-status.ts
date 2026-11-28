@@ -16,7 +16,9 @@ export function getWindowsAdministratorStatus(): Promise<boolean | null> {
 async function readStatus(): Promise<boolean | null> {
   const environment = getAppEnvironment()
   const launcher = environment.isPackaged()
-    ? getBundledLauncherPath('win32', process.resourcesPath)
+    ? process.resourcesPath
+      ? getBundledLauncherPath('win32', process.resourcesPath)
+      : null
     : join(environment.getAppPath(), 'native', 'windows-cli-launcher', '.build', 'orca.exe')
   if (!launcher) {
     return null

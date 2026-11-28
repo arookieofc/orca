@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import type { RefObject } from 'react'
 import type { BrowserPage } from '../../../../../../shared/browser/workspaces/browser-workspace-types'
 import { issueBrowserGuestNavigation } from '../../host-guest/metadata/browser-guest-metadata-cache'
@@ -42,7 +43,7 @@ export function ClientHostedBrowserPageToolbar({
   runtimeEnvironmentId: string
   isActive: boolean
   loading: boolean
-  webviewRef: RefObject<Electron.WebviewTag | null>
+  webviewRef: RefObject<BrowserWebviewElement | null>
   reload: ReturnType<typeof useBrowserPageReloadActions>
   addressBarValue: string
   setAddressBarValue: (value: string) => void

@@ -30,7 +30,6 @@ const LOCALES = 'src/renderer/src/i18n/'
 const MAIN_BLOCKING_GRAPH_INPUTS = [
   'src/main/',
   'src/shared/',
-  'src/preload/',
   'src/packages/',
   'src/cli/',
   'config/build-plugins/',
@@ -42,7 +41,6 @@ const MAIN_BLOCKING_GRAPH_INPUTS = [
 // Ratchets default to SOURCE_ROOTS; list narrower inputs only where a scan is clearly scoped.
 const RATCHET_INPUTS = {
   'check-daemon-blocking-call-ratchet.mjs': ['src/main/'],
-  'check-e2e-typecheck-ratchet.mjs': ['tests/', 'config/tsconfig.e2e.json'],
   'check-focus-read-ratchet.mjs': ['src/renderer/src/', 'src/shared/'],
   'check-host-list-render-ratchet.mjs': ['src/renderer/src/'],
   'check-id-only-store-write-ratchet.mjs': ['src/main/persistence/'],
@@ -53,7 +51,6 @@ const RATCHET_INPUTS = {
   'check-main-sync-spawn-ratchet.mjs': [
     'src/main/',
     'src/shared/',
-    'src/preload/',
     'config/main-blocking-worker-entries.json',
     'config/scripts/static-analysis/process-boundaries/main-blocking-source-paths.mjs'
   ],
@@ -222,7 +219,6 @@ export const VERIFY_CHECKS = [
     args: ['config/scripts/ci/unit-selection/check-test-file-runners.mjs'],
     inputs: [
       'config/scripts/ci/unit-selection/dependency-graph/ci-unit-files.mjs',
-      'tests/playwright.config.ts',
       'mobile/vitest.config.ts'
     ],
     matches: (files) =>
@@ -244,7 +240,7 @@ export const VERIFY_CHECKS = [
     // Compiles Tailwind (~1.5s), so it runs only for inputs that can change the emitted CSS.
     name: 'compiled :has() restyle scope',
     args: ['config/scripts/static-analysis/renderer-styles/check-has-restyle-scope.mjs'],
-    inputs: ['electron.vite.config.ts'],
+    inputs: ['vite.web.config.ts'],
     matches: (files) =>
       files.some((file) => /^src\/(?:renderer\/.*\.(?:css|tsx?)|shared\/.*\.css)$/.test(file))
   },
@@ -265,19 +261,11 @@ export const VERIFY_CHECKS = [
 const TYPECHECK_INPUTS = [
   {
     config: 'config/tsconfig.node.json',
-    inputs: [
-      'src/main/',
-      'src/preload/',
-      'src/shared/',
-      'src/renderer/',
-      'src/cli/',
-      'src/wsl-guest/',
-      'config/'
-    ]
+    inputs: ['src/main/', 'src/shared/', 'src/renderer/', 'src/cli/', 'src/wsl-guest/', 'config/']
   },
   {
     config: 'config/tsconfig.tc.web.json',
-    inputs: ['src/renderer/', 'src/preload/', 'src/shared/', 'src/main/']
+    inputs: ['src/renderer/', 'src/shared/', 'src/main/']
   },
   { config: 'config/tsconfig.tc.cli.json', inputs: ['src/cli/', 'src/shared/', 'src/main/'] },
   {

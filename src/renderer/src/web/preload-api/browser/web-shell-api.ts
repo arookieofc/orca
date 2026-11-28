@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { holdBrowserAttachmentFiles } from '@/lib/files/drop/browser-attachment-files'
 import { resolveRuntimeFilePath } from '../workspaces/web-runtime-worktree-catalog'
 

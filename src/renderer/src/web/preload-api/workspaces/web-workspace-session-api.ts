@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { getDefaultWorkspaceSession } from '../../../../../shared/orca-profiles/constants'
 import {
   LOCAL_EXECUTION_HOST_ID,

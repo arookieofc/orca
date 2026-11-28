@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { issueBrowserGuestNavigation } from '../metadata/browser-guest-metadata-cache'
 export const BROWSER_GUEST_RECOVERY_ERROR_CODE = -10_000
 export const BROWSER_GUEST_RECOVERY_TIMEOUT_MS = 8_000
@@ -6,7 +7,7 @@ export const BROWSER_GUEST_VALIDATION_TIMEOUT_MS = 3_000
 export const BROWSER_GUEST_VALIDATION_MAX_ATTEMPTS = 3
 
 type BrowserPageGuestRecoveryOptions = {
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   browserPageExists: () => boolean
   shouldValidate: () => boolean
   isCurrentWebview: () => boolean

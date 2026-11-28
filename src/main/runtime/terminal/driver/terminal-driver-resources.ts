@@ -9,7 +9,7 @@ import type { ExecutionHostId } from '../../../../shared/execution-host/executio
 import type { WorkspaceSessionState } from '../../../../shared/workspace-session/workspace-session-state-types'
 import type { RuntimeAccountController } from '../../agent-session/environment/runtime-account-controller'
 import type { BrowserNetworkExecutionHost } from '../../../../shared/browser/client-hosting/browser-network-execution-host'
-import type { BrowserWindow } from 'electron'
+import type { RuntimeDesktopWindow } from '../../construction/runtime-desktop-surface'
 import type { BrowserSessionTabSelectionOptions } from '../../browser/tabs/browser-tab-create-publication'
 import type { RuntimeStore } from '../../construction/runtime-store-contract'
 import type { PtyLivenessVerdict } from '../../../../shared/terminal/pty/lifecycle/pty-liveness-verdict'
@@ -72,8 +72,8 @@ export abstract class OrcaRuntimeWithTerminalDrivers extends OrcaRuntimeWithFitO
     repoId?: string
     hostId?: ExecutionHostId
   }): BrowserNetworkExecutionHost | Promise<BrowserNetworkExecutionHost>
-  abstract getAuthoritativeWindow(missingWindowMessage?: string): BrowserWindow
-  protected abstract getAvailableAuthoritativeWindow(): BrowserWindow | null
+  abstract getAuthoritativeWindow(missingWindowMessage?: string): RuntimeDesktopWindow
+  protected abstract getAvailableAuthoritativeWindow(): RuntimeDesktopWindow | null
   protected abstract markHeadlessBrowserSessionTabActive(
     worktreeId: string | undefined,
     browserPageId: string,

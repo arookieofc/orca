@@ -1,3 +1,8 @@
+import type {
+  BrowserWebviewElement,
+  BrowserWebviewDidStartNavigationEvent,
+  BrowserWebviewDidRedirectNavigationEvent
+} from '../../../../../../shared/desktop-api/browser-webview-element'
 import {
   browserNavigationLeavesFaviconOrigin,
   pickDisplayableFaviconUrl,
@@ -7,11 +12,11 @@ import { cachedBrowserGuestMetadata } from '../../host-guest/metadata/browser-gu
 import type { BrowserTabPageState } from '../../describe-page/browser-page-types'
 
 // The retained guest outlives its pane, so remember which document each guest's icon came from.
-const faviconDocumentUrlByGuest = new WeakMap<Electron.WebviewTag, string>()
+const faviconDocumentUrlByGuest = new WeakMap<BrowserWebviewElement, string>()
 
 /** The favicon, address-bar dismissal and viewport preset a local page binds, for a desktop-hosted guest. */
 export function bindBrowserClientPageChromeListeners(
-  webview: Electron.WebviewTag,
+  webview: BrowserWebviewElement,
   {
     browserPageId,
     updatePageState,
@@ -46,7 +51,7 @@ export function bindBrowserClientPageChromeListeners(
   }
   // Chromium sends no icon update for an icon-less page, so a cross-origin leave clears the old one.
   const onLeaveDocument = (
-    event: Electron.DidStartNavigationEvent | Electron.DidRedirectNavigationEvent
+    event: BrowserWebviewDidStartNavigationEvent | BrowserWebviewDidRedirectNavigationEvent
   ): void => {
     if (
       event.isMainFrame &&

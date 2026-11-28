@@ -2799,9 +2799,16 @@ pub async fn poc_browser_create(
     let page_id_for_permission = page_id.clone();
     let app_for_download = app.clone();
     let page_id_for_download = page_id.clone();
+    let partition = args.partition.as_deref().unwrap_or("orca-browser-default");
     let mut builder = WebviewBuilder::new(label.clone(), WebviewUrl::External(initial_url));
     if let Some(user_agent) = browser_user_agent(app.state::<BrowserIdentityState>().inner()) {
         builder = builder.user_agent(&user_agent);
+    }
+    #[cfg(windows)]
+    {
+        let profile_dir =
+            crate::browser_partition_dir::resolve_browser_partition_dir(&app, partition)?;
+        builder = builder.data_directory(profile_dir);
     }
     let builder = builder
         .focused(false)
@@ -2809,9 +2816,7 @@ pub async fn poc_browser_create(
         .zoom_hotkeys_enabled(false)
         .initialization_script(browser_context_menu_script())
         .initialization_script(browser_guest_shortcut_script())
-        .data_store_identifier(store_identifier(
-            args.partition.as_deref().unwrap_or("orca-browser-default"),
-        ))
+        .data_store_identifier(store_identifier(partition))
         .on_navigation(move |url| {
             let state = app_for_context_menu.state::<BrowserWebviewState>();
             begin_browser_navigation(

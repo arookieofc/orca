@@ -44,7 +44,7 @@ export function ensureLinuxTerminalOrcaCliShimDir(
     ? (options.appImagePath ?? null)
     : (runtimeIdentity?.appImagePath ?? null)
   if (appImagePath) {
-    return ensureAppImageShim(options, resourcesPath, appImagePath)
+    return ensureAppImageShim(options, resourcesPath ?? null, appImagePath)
   }
 
   if (!resourcesPath) {

@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { toRuntimeWorktreeSelector } from '../../../runtime/rpc/targets/runtime-worktree-selector'
 import { resolveRuntimeWorktreeByPath } from '../workspaces/web-runtime-worktree-catalog'
 import { callRuntimeResult } from '../../runtime/client/web-runtime-calls'

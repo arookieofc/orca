@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { legacyBaseRefSearchResult } from '../../../../../shared/worktree/base-refs/base-ref-search-result'
 import type { CloneTargetCheck } from '../../../../../shared/git/clone/clone-target-check'
 import type { Repo } from '../../../../../shared/repository/repo-types'

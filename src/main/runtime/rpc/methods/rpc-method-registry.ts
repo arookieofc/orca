@@ -29,6 +29,7 @@ import { USAGE_ANALYTICS_METHODS } from './host-management/usage-analytics'
 import { DIAGNOSTICS_METHODS } from './host-management/diagnostics'
 import { TERMINAL_DAEMON_METHODS } from './terminal/terminal-daemon'
 import { ACCOUNT_METHODS } from './accounts/accounts'
+import { CODEX_CONFIG_SYNC_METHODS } from './accounts/codex-config-sync-methods'
 import { ANTIGRAVITY_ACCOUNT_METHODS } from './accounts/antigravity-accounts'
 import { ORCA_ACCOUNT_METHODS } from './orca-account'
 import { GOOGLE_METHODS } from './google'
@@ -75,6 +76,7 @@ import { MOBILE_PROJECT_SECTIONS_METHODS } from './mobile-delivery/mobile-projec
 import { UPDATER_METHODS } from './updater/updater'
 import { AUTOMATIC_WORK_METHODS } from './automations/automatic-work'
 import { WEB_BOTS_METHODS } from './web-bots/web-bots-methods'
+import { NODE_RELAY_METHODS } from './node-relay/node-relay-methods'
 import { AGENT_SESSION_METHODS } from './terminal/agent-session'
 import { STRUCTURED_AGENT_SESSION_METHODS } from './structured-sessions/structured-agent-session'
 import { STRUCTURED_AGENT_SESSION_ATTACHMENT_METHODS } from './structured-sessions/attachments/structured-agent-session-attachments'
@@ -203,6 +205,7 @@ const SERVICE_RPC_METHODS = [
   ...DIAGNOSTICS_METHODS,
   ...TERMINAL_DAEMON_METHODS,
   ...ACCOUNT_METHODS,
+  ...CODEX_CONFIG_SYNC_METHODS,
   ...ANTIGRAVITY_ACCOUNT_METHODS,
   ...ORCA_ACCOUNT_METHODS,
   ...GOOGLE_METHODS,
@@ -253,7 +256,8 @@ const SERVICE_RPC_METHODS = [
   ...(ORCA_SIDEBAR_INPUTS_IS_MAIN ? SIDEBAR_INPUT_METHODS : []),
   ...UPDATER_METHODS,
   ...AUTOMATIC_WORK_METHODS,
-  ...WEB_BOTS_METHODS
+  ...WEB_BOTS_METHODS,
+  ...NODE_RELAY_METHODS
 ] as const
 
 type ConcatMethods<A extends readonly unknown[], B extends readonly unknown[]> = readonly [

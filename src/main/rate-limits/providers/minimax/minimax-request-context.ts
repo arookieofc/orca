@@ -1,6 +1,9 @@
-import type { Session } from 'electron'
 import type { MiniMaxEndpoint } from '../../../../shared/settings/global-settings-types'
-import { getMainHttpClient, requirePartitionSession } from '../../../network/http-client'
+import {
+  getMainHttpClient,
+  requirePartitionSession,
+  type HttpClientSession
+} from '../../../network/http-client'
 
 const MINIMAX_USAGE_PATH = '/v1/api/openplatform/coding_plan/remains'
 const MINIMAX_OVERSEAS_BASE = 'https://platform.minimax.io'
@@ -133,7 +136,7 @@ export function makeMiniMaxRequestHeaders(
 }
 
 async function clearMiniMaxSessionCookieJarForSession(
-  miniMaxSession: Session,
+  miniMaxSession: HttpClientSession,
   origin: string
 ): Promise<void> {
   await miniMaxSession.clearStorageData({ origin, storages: ['cookies'] })

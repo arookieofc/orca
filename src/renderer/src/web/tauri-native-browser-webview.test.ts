@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../shared/desktop-api/browser-webview-element'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createTauriNativeBrowserWebview,
@@ -173,7 +174,7 @@ describe('Tauri browser webview removal', () => {
       }
     }
 
-    function collectEvents(webview: Electron.WebviewTag, name: string) {
+    function collectEvents(webview: BrowserWebviewElement, name: string) {
       const seen: unknown[] = []
       webview.addEventListener(name, (event: Event) => {
         seen.push(event)

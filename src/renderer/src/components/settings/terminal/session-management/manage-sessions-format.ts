@@ -1,4 +1,4 @@
-import type { PtyManagementSession } from '../../../../../../preload/api/terminal/pty-management-api'
+import type { PtyManagementSession } from '../../../../../../shared/desktop-api/api/terminal/pty-management-api'
 import { splitWorktreeIdForFilesystem } from '../../../../../../shared/worktree/id'
 
 export function shortCwd(cwd: string): string {

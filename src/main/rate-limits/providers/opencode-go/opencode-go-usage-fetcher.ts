@@ -1,4 +1,4 @@
-import type { Session } from 'electron'
+import type { HttpClientSession } from '../../../network/http-client'
 import { randomUUID } from 'node:crypto'
 import type { NetworkProxySettings } from '../../../../shared/network/network-proxy'
 import type {
@@ -110,7 +110,7 @@ export async function fetchOpenCodeGoRateLimits(
   }
 
   // Chromium may reject manual Cookie headers on Windows; use an isolated jar for normal auth attachment.
-  let openCodeSession: Session
+  let openCodeSession: HttpClientSession
   try {
     openCodeSession = await createOpenCodeRequestSession(authCookies, networkProxySettings)
   } catch (error) {
@@ -126,7 +126,7 @@ export async function fetchOpenCodeGoRateLimits(
   }
 }
 
-function startOptionalBillingFetch(openCodeSession: Session, workspaceId: string) {
+function startOptionalBillingFetch(openCodeSession: HttpClientSession, workspaceId: string) {
   const abortController = new AbortController()
   const promise = (async (): Promise<ExtraUsageBalance> => {
     const timeout = setTimeout(() => abortController.abort(), OPTIONAL_BILLING_TIMEOUT_MS)
@@ -173,7 +173,7 @@ function makeOpenCodeError(
 }
 
 async function fetchOpenCodeGoRateLimitsWithSession(
-  openCodeSession: Session,
+  openCodeSession: HttpClientSession,
   workspaceIdOverride?: string
 ): Promise<ProviderRateLimits> {
   let ids: string[] = []

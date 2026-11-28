@@ -1,5 +1,12 @@
-import type { OffscreenBrowserTabOpenRequest } from '../../../browser/guest-lifecycle/manager/browser-manager-state'
 import type { RuntimeBrowserTabCreation } from '../tabs/browser-tab-creation'
+
+export type OffscreenBrowserTabOpenRequest = {
+  worktreeId: string
+  profileId?: string | null
+  url: string
+  activate: boolean
+  pairedDeviceId?: string | null
+}
 
 /** Opens a windowless host's page link as a tab; only the client whose click opened it in front moves to it. */
 export function openOffscreenBrowserPageLink(

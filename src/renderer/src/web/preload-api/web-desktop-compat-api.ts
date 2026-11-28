@@ -1,10 +1,10 @@
-import type { PreloadApi } from '../../../../preload/api-types'
-import type { WslHostsPreloadApi } from '../../../../preload/api/wsl/wsl-hosts-api'
+import type { PreloadApi } from '../../../../shared/desktop-api/api-types'
+import type { WslHostsPreloadApi } from '../../../../shared/desktop-api/api/wsl/wsl-hosts-api'
 import type {
   DocPreviewCacheFileRequest,
   DocPreviewGrantRequest,
   DocPreviewResourceRequest
-} from '../../../../preload/api/document-preview/doc-preview-api'
+} from '../../../../shared/desktop-api/api/document-preview/doc-preview-api'
 import type { DocPreviewFailure } from '../../../../shared/document-preview/doc-preview-scheme'
 import type {
   WorkspaceSpaceAnalysis,

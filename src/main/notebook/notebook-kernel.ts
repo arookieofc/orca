@@ -1,5 +1,7 @@
-import bridgePath from '../../../resources/notebook/kernel-bridge.py?asset&asarUnpack'
+import { join } from 'node:path'
 import { spawnProcess } from '@orca/process-host'
+
+const bridgePath = join(import.meta.dirname, '../../../resources/notebook/kernel-bridge.py')
 import { forceTerminateProcessTree } from '@orca/process-host/process-tree-termination'
 import { createNdjsonParser } from '../../shared/json-stream/main-process-ndjson-framer'
 import {

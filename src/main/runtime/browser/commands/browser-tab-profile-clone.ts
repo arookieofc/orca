@@ -1,12 +1,11 @@
 import type { BrowserTabProfileCloneResult } from '../../../../shared/browser/runtime/runtime-browser-contracts'
 import { BrowserError } from '../../../browser/browser-error'
-import { browserSessionRegistry } from '../../../browser/sessions/profiles/browser-session-registry'
+import { getRuntimeBrowserDesktopAdapter } from '../installation/runtime-browser-desktop-adapter'
 import type { BrowserClientPageOpeningHost } from '../client-pages/browser-client-page-opening'
 import { cloneBrowserClientPage } from '../client-pages/browser-client-page-clone'
 import type { RuntimeBrowserTabCatalog } from '../tabs/browser-tab-catalog'
 import type { RuntimeBrowserTabCreation } from '../tabs/browser-tab-creation'
 import { createBrowserTabInRenderer } from '../tabs/browser-tab-renderer-create'
-import { waitForTabRegistration } from '../../../ipc/browser/browser-tab-registration-wait'
 import type {
   BrowserCommandTargetParams,
   RuntimeBrowserCommandHost
@@ -29,7 +28,7 @@ export async function cloneBrowserTabToProfile(
   dependencies: BrowserTabProfileCloneDependencies,
   params: { profileId: string } & BrowserCommandTargetParams
 ): Promise<BrowserTabProfileCloneResult> {
-  const profile = browserSessionRegistry.getProfile(params.profileId)
+  const profile = getRuntimeBrowserDesktopAdapter().getProfile(params.profileId)
   if (!profile) {
     throw new BrowserError('invalid_argument', `Browser profile ${params.profileId} was not found`)
   }
@@ -76,7 +75,7 @@ async function createBesideEnginePage(
   )
   // Do not return an inoperable clone before its webview registers.
   try {
-    await waitForTabRegistration(created.browserPageId)
+    await getRuntimeBrowserDesktopAdapter().waitForTabRegistration(created.browserPageId)
   } catch {}
   return { browserPageId: created.browserPageId, sourceBrowserPageId }
 }

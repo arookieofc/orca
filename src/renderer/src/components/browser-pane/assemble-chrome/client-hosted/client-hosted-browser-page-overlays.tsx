@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import type { RefObject } from 'react'
 import {
   BrowserPageFeedbackBadge,
@@ -21,7 +22,7 @@ export function ClientHostedBrowserPageOverlays({
   browserPageId: string
   isActive: boolean
   containerRef: RefObject<HTMLDivElement | null>
-  webviewRef: RefObject<Electron.WebviewTag | null>
+  webviewRef: RefObject<BrowserWebviewElement | null>
   feedbackBadgeRef: RefObject<BrowserPageFeedbackBadgeHandle | null>
   findOpen: boolean
   onCloseFind: () => void

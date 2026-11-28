@@ -7,10 +7,7 @@ import type {
   BrowserTabSwitchResult
 } from '../../../../shared/browser/runtime/runtime-browser-contracts'
 import type { BrowserCertificateProceedResult } from '../../../../shared/browser/workspaces/browser-workspace-types'
-import {
-  browserCertificateTrustController,
-  browserManager
-} from '../../../browser/guest-lifecycle/manager/browser-manager'
+import { getRuntimeBrowserDesktopAdapter } from '../installation/runtime-browser-desktop-adapter'
 import { BrowserError } from '../../../browser/browser-error'
 import { publishSwitchedBrowserSessionTab } from './browser-tab-create-publication'
 import type {
@@ -67,7 +64,10 @@ export class RuntimeBrowserTabQueries {
     if (!target.browserPageId) {
       return { ok: false, reason: 'missing' }
     }
-    return browserCertificateTrustController.proceed(target.browserPageId, params.challengeId)
+    return getRuntimeBrowserDesktopAdapter().proceedCertificate(
+      target.browserPageId,
+      params.challengeId
+    )
   }
 
   async browserTabShow(params: { page: string; worktree?: string }): Promise<BrowserTabShowResult> {
@@ -157,7 +157,9 @@ export class RuntimeBrowserTabQueries {
     this.host.getRuntimeBrowserPageRegistry().yieldSelection(worktreeId)
     // Scope focus to the owning worktree; never switch the user's workspace.
     const focusWorktreeId =
-      worktreeId ?? browserManager.getWorktreeIdForTab(result.browserPageId) ?? undefined
+      worktreeId ??
+      getRuntimeBrowserDesktopAdapter().getWorktreeIdForTab(result.browserPageId) ??
+      undefined
     await publishSwitchedBrowserSessionTab(this.host, {
       placementKind: 'bridge',
       browserPageId: result.browserPageId,

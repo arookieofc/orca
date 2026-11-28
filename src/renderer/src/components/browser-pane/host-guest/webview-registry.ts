@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import type { BrowserGuestIdleDiscardToken } from '../../../../../shared/browser/guest-lifecycle/browser-guest-discard-protection'
 import { clearLiveBrowserUrl } from '../describe-page/live-browser-url-registry'
 import { retireBrowserGuestMetadata } from './metadata/browser-guest-metadata-cache'
@@ -13,7 +14,7 @@ import {
 } from './drag/webview-drag-passthrough'
 
 // Keep guest coordination outside React to break the store/slices → components → store cleanup cycle.
-export const webviewRegistry = new Map<string, Electron.WebviewTag>()
+export const webviewRegistry = new Map<string, BrowserWebviewElement>()
 export const registeredWebContentsIds = new Map<string, number>()
 
 export type BrowserWebviewMemoryProfile = {
@@ -26,12 +27,12 @@ let dragListenersAttached = false
 // Retained client-page hosts are not registry webviews but still need native drags to pass through them.
 let dragListenerRetainers = 0
 let nativeDragPassthroughRelease: (() => void) | null = null
-const dragPassthroughPreviousPointerEvents = new Map<Electron.WebviewTag, string>()
+const dragPassthroughPreviousPointerEvents = new Map<BrowserWebviewElement, string>()
 const rendererRecoveryPendingPageIds = new Set<string>()
 const webviewLifecycleListeners = new Map<
   string,
   {
-    webview: Electron.WebviewTag
+    webview: BrowserWebviewElement
     onRendererGone: EventListener
     onRendererReady: EventListener
     onGuestDestroyed: EventListener
@@ -140,7 +141,7 @@ export function setWebviewsDragPassthrough(passthrough: boolean): void {
   nativeDragPassthroughRelease = null
 }
 
-function applyCurrentDragPassthroughToWebview(webview: Electron.WebviewTag): void {
+function applyCurrentDragPassthroughToWebview(webview: BrowserWebviewElement): void {
   if (!isWebviewDragPassthroughActive()) {
     return
   }
@@ -152,7 +153,7 @@ function applyCurrentDragPassthroughToWebview(webview: Electron.WebviewTag): voi
 
 export function registerPersistentWebview(
   browserTabId: string,
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
 ): void {
   const previousListeners = webviewLifecycleListeners.get(browserTabId)
   if (previousListeners) {
@@ -237,7 +238,7 @@ export function isBrowserPageRendererRecoveryPending(browserTabId: string): bool
   return rendererRecoveryPendingPageIds.has(browserTabId)
 }
 
-function moveFocusToRendererIfWebviewOwnsFocus(webview: Electron.WebviewTag): boolean {
+function moveFocusToRendererIfWebviewOwnsFocus(webview: BrowserWebviewElement): boolean {
   if (typeof document === 'undefined' || typeof window === 'undefined') {
     return false
   }
@@ -262,14 +263,14 @@ export function moveFocusToRendererBeforeFocusedWebviewHidden(): void {
   }
 }
 
-export function moveFocusToRendererBeforeWebviewDetach(webview: Electron.WebviewTag): void {
+export function moveFocusToRendererBeforeWebviewDetach(webview: BrowserWebviewElement): void {
   moveFocusToRendererIfWebviewOwnsFocus(webview)
 }
 
 /** Main has reserved this exact guest; no await may separate reservation from removal. */
 export function discardPersistentWebview(
   browserTabId: string,
-  webview: Electron.WebviewTag,
+  webview: BrowserWebviewElement,
   webContentsId: number,
   policyToken?: BrowserGuestIdleDiscardToken
 ): boolean {

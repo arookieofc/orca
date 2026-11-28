@@ -1,4 +1,5 @@
 import { getBrowserPageIdleDiscard } from './browser-page-idle-discard'
+import type { BrowserGuestWebContents } from './browser-guest-surface-types'
 import { BrowserError } from '../browser-error'
 import { isAgentRpcCaller } from '../../runtime/rpc/callers/rpc-caller-identity'
 import { getActiveRpcCaller } from '../../runtime/rpc/callers/active-call'
@@ -25,7 +26,7 @@ import { noteBrowserPageClosed } from './browser-page-partition-presence'
 
 export function bindBrowserPageMemoryInvalidation(
   pageId: string,
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   rendererId: number,
   changed: () => void
 ): void {
@@ -56,7 +57,7 @@ export function clearBrowserPageMemoryInvalidation(pageId: string, guestId: numb
 
 export function readBrowserMemoryPageDiscardProtection(
   pageId: string,
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   rendererId: number | undefined
 ): ReturnType<typeof readBrowserGuestDiscardProtection> {
   const protection = readBrowserGuestDiscardProtection(guest)
@@ -128,7 +129,7 @@ export function claimBrowserMemoryPage(
 
 export function retainBrowserMemoryPageForAgent(
   pageId: string,
-  creator?: Electron.WebContents
+  creator?: { id?: number; isDestroyed(): boolean }
 ): void {
   if (!isAgentRpcCaller(getActiveRpcCaller()) || creator?.isDestroyed()) {
     return
@@ -166,7 +167,7 @@ export function isRetiredBrowserGuest(pageId: string, guestId: number): boolean 
   return pages.get(pageId)?.retired.has(guestId) === true
 }
 
-export function reserveBrowserPageDiscard(pageId: string, guest: Electron.WebContents): boolean {
+export function reserveBrowserPageDiscard(pageId: string, guest: BrowserGuestWebContents): boolean {
   const page = pages.get(pageId)
   if (
     !page ||
@@ -221,7 +222,7 @@ export function reserveBrowserPageDiscard(pageId: string, guest: Electron.WebCon
 
 export async function acknowledgeBrowserPageRemoval(
   pageId: string,
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   rendererId: number
 ): Promise<boolean> {
   const page = pages.get(pageId)
@@ -273,7 +274,7 @@ export function browserMemoryGeneration(pageId: string): number | undefined {
 
 export async function waitForBrowserPageReady(
   pageId: string,
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   recoverFromLoadError = false
 ): Promise<void> {
   if (isRetiredBrowserGuest(pageId, guest.id)) {

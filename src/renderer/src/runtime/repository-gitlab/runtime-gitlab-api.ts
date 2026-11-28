@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../preload/api-types'
+import type { PreloadApi } from '../../../../shared/desktop-api/api-types'
 import {
   GITLAB_MR_INVOLVEMENT_RUNTIME_CAPABILITY,
   GITLAB_MR_INVOLVEMENT_UPDATE_REQUIRED_MESSAGE,

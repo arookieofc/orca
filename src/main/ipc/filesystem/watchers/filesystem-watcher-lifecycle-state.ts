@@ -1,9 +1,11 @@
-import type { WebContents } from 'electron'
+import type { RuntimeDesktopWebContents } from '../../../runtime/construction/runtime-desktop-surface'
 import type { WatchedRoot } from './filesystem-watcher-wsl'
+
+type WatcherWebContents = RuntimeDesktopWebContents & { id: number }
 
 export type LocalWatcherInstallToken = {
   cancelled: boolean
-  listeners: Map<number, WebContents>
+  listeners: Map<number, WatcherWebContents>
   abortController: AbortController
 }
 
@@ -11,7 +13,7 @@ export type LocalWatcherInstallToken = {
 export type LocalWatcherInstallResult = 'installed' | 'unavailable' | 'capacity' | 'cancelled'
 
 export type LocalWatcherCapacityRetry = {
-  listeners: Map<number, WebContents>
+  listeners: Map<number, WatcherWebContents>
   cancelWait: () => void
 }
 
@@ -21,7 +23,7 @@ export const UNWATCHABLE_ROOT_CACHE_MAX = 256
 export const WATCHER_TEARDOWN_GRACE_MS = 30_000
 
 // Cancelled-install waiters need separate ownership while absent from listener maps.
-export type CancelledInstallWaiter = { token: symbol; sender: WebContents }
+export type CancelledInstallWaiter = { token: symbol; sender: WatcherWebContents }
 export type CancelledInstallWaiters = Map<string, Map<number, CancelledInstallWaiter>>
 
 export const watcherLifecycleState = {
@@ -35,7 +37,7 @@ export const watcherLifecycleState = {
   pendingLocalUnsubscribesByRoot: new Map<string, Set<Promise<void>>>(),
   suspendedLocalWatcherListeners: new Map<
     string,
-    { worktreePath: string; listeners: Map<number, WebContents> }
+    { worktreePath: string; listeners: Map<number, WatcherWebContents> }
   >(),
   // Generation fencing prevents reopened subsystems from reviving retired waiters.
   localWatchersClosed: false,

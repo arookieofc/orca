@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PluginMarketplaceHostListing } from '../../../../preload/api/plugins/plugin-host-api'
+import type { PluginMarketplaceHostListing } from '../../../../shared/desktop-api/api/plugins/plugin-host-api'
 import { pluginExecutionProfile } from '../../../../shared/plugins/contributions/plugin-execution-profile'
 import { isUsablePluginLanguagePack } from '../../../../shared/plugins/languages/plugin-language-pack-coverage'
 import { useTranslate } from '@/i18n/use-translate'

@@ -1,16 +1,41 @@
 import type {
   BrowserScreencastFrameBudget,
   BrowserScreencastSession,
-  BrowserScreencastViewport
-} from '../../../browser/cdp/screencast/browser-screencast-stream-types'
-import {
-  browserScreencastFrameBudgetsEqual,
-  mergeBrowserScreencastFrameBudgets
-} from '../../../browser/cdp/screencast/browser-screencast-frame-budget'
-import type {
+  BrowserScreencastViewport,
   BrowserScreencastParams,
   ActiveBrowserScreencastPage
 } from './browser-screencast-contracts'
+
+function mergeBrowserScreencastFrameBudgets(
+  budgets: readonly BrowserScreencastFrameBudget[]
+): BrowserScreencastFrameBudget | null {
+  let merged: BrowserScreencastFrameBudget | null = null
+  for (const budget of budgets) {
+    merged = merged
+      ? {
+          quality: Math.min(merged.quality, budget.quality),
+          maxWidth: Math.min(merged.maxWidth, budget.maxWidth),
+          maxHeight: Math.min(merged.maxHeight, budget.maxHeight),
+          everyNthFrame: Math.min(merged.everyNthFrame, budget.everyNthFrame),
+          minFrameIntervalMs: Math.max(merged.minFrameIntervalMs, budget.minFrameIntervalMs)
+        }
+      : { ...budget }
+  }
+  return merged
+}
+
+function browserScreencastFrameBudgetsEqual(
+  a: BrowserScreencastFrameBudget,
+  b: BrowserScreencastFrameBudget
+): boolean {
+  return (
+    a.quality === b.quality &&
+    a.maxWidth === b.maxWidth &&
+    a.maxHeight === b.maxHeight &&
+    a.everyNthFrame === b.everyNthFrame &&
+    a.minFrameIntervalMs === b.minFrameIntervalMs
+  )
+}
 
 export async function applySharedScreencastFrameBudget(
   active: Pick<ActiveBrowserScreencastPage, 'subscribers' | 'appliedBudget'>,

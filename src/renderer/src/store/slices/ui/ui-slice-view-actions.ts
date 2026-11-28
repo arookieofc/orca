@@ -166,6 +166,19 @@ export function createUiViewActions(set: UISliceSet, get: UISliceGet): Partial<U
         activeView: state.previousViewBeforeWebBots,
         worktreeNavHistoryIndex: rewindHistoryIndexPastView(state, 'web-bots')
       })),
+    openNodeRelayPage: () => {
+      get().recordViewVisit('node-relay')
+      set((state) => ({
+        activeView: 'node-relay',
+        previousViewBeforeNodeRelay:
+          state.activeView === 'node-relay' ? state.previousViewBeforeNodeRelay : state.activeView
+      }))
+    },
+    closeNodeRelayPage: () =>
+      set((state) => ({
+        activeView: state.previousViewBeforeNodeRelay,
+        worktreeNavHistoryIndex: rewindHistoryIndexPastView(state, 'node-relay')
+      })),
     openMobilePage: () =>
       set((state) => ({
         activeView: 'mobile',

@@ -5,7 +5,7 @@ import {
   type PublicKnownRuntimeEnvironment
 } from '../../../../../../shared/remote-runtime/host-catalog/runtime-environments'
 import type { SshTarget } from '../../../../../../shared/remote-runtime/ssh/ssh-types'
-import type { ManagedOrcadPreloadApi } from '../../../../../../preload/api/runtime/managed-orcad-api'
+import type { ManagedOrcadPreloadApi } from '../../../../../../shared/desktop-api/api/runtime/managed-orcad-api'
 import type { RemoteServerUpdateEntry } from '@/runtime/hosts/updates/remote-server-update-coordinator'
 import type { UpdateCheckOptions } from '../../../../../../shared/updater/update-status-types'
 import { getRuntimeServerProblemLine, getRuntimeServerRoute } from './runtime-server-row-meta'

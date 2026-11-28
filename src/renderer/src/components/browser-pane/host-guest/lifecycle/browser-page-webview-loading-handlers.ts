@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { cachedBrowserGuestMetadata } from '../metadata/browser-guest-metadata-cache'
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react'
 import {
@@ -27,7 +28,7 @@ import type {
 } from '../../describe-page/browser-page-types'
 
 export type BrowserPageWebviewLoadingHandlersArgs = {
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   browserTabId: string
   faviconUrlRef: MutableRefObject<string | null>
   browserTabUrlRef: MutableRefObject<string>

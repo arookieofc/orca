@@ -1,9 +1,9 @@
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import type {
   BrowserCookieImportResult,
   BrowserSessionProfile
 } from '../../../shared/browser/workspaces/browser-workspace-types'
-import type { DetectedBrowserInfo } from '../../../preload/api/browser/browser-api'
+import type { DetectedBrowserInfo } from '../../../shared/desktop-api/api/browser/browser-api'
 import type {
   BrowserIdentityModeSetResult,
   BrowserIdentityModeStatus,

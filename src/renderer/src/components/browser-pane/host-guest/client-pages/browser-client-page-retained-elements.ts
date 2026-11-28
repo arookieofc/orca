@@ -1,3 +1,8 @@
+import type {
+  BrowserWebviewElement,
+  BrowserWebviewLoadCommitEvent,
+  BrowserWebviewIpcMessageEvent
+} from '../../../../../../shared/desktop-api/browser-webview-element'
 import { ORCA_BROWSER_PAGE_GUEST_WEB_PREFERENCES_ATTRIBUTE } from '../../../../../../shared/browser/guest-lifecycle/browser-guest-web-preferences'
 import { isBlankBrowserUrl } from '@/lib/browser/palette/browser-palette-search'
 
@@ -33,7 +38,7 @@ export function createBrowserClientPageRetainedHost(
 /** Hide host paint and hit testing on blank guests so the New Tab page beneath remains usable. */
 export function hideRetainedHostWhileGuestIsBlank(
   host: HTMLDivElement
-): (event: Electron.LoadCommitEvent) => void {
+): (event: BrowserWebviewLoadCommitEvent) => void {
   return (event) => {
     if (event.isMainFrame) {
       const blank = isBlankBrowserUrl(event.url)
@@ -45,8 +50,8 @@ export function hideRetainedHostWhileGuestIsBlank(
 
 type BrowserClientPageGuestMessageHandler = (
   browserPageId: string,
-  webview: Electron.WebviewTag,
-  event: Electron.IpcMessageEvent
+  webview: BrowserWebviewElement,
+  event: BrowserWebviewIpcMessageEvent
 ) => void
 
 let guestMessageHandler: BrowserClientPageGuestMessageHandler | null = null
@@ -59,13 +64,13 @@ export function registerBrowserClientPageGuestMessageHandler(
 }
 
 export function createBrowserClientPageWebview(options: {
-  createWebview?: (identity: { browserPageId: string; partition: string }) => Electron.WebviewTag
+  createWebview?: (identity: { browserPageId: string; partition: string }) => BrowserWebviewElement
   document: Document
   identity: { browserPageId: string; partition: string }
-}): Electron.WebviewTag {
+}): BrowserWebviewElement {
   const webview =
     options.createWebview?.(options.identity) ??
-    (options.document.createElement('webview') as Electron.WebviewTag)
+    (options.document.createElement('webview') as BrowserWebviewElement)
   webview.setAttribute('partition', options.identity.partition)
   webview.setAttribute('allowpopups', '')
   webview.setAttribute('webpreferences', ORCA_BROWSER_PAGE_GUEST_WEB_PREFERENCES_ATTRIBUTE)
@@ -77,7 +82,9 @@ export function createBrowserClientPageWebview(options: {
   return webview
 }
 
-export function readBrowserClientPageAttachedGuestId(webview: Electron.WebviewTag): number | null {
+export function readBrowserClientPageAttachedGuestId(
+  webview: BrowserWebviewElement
+): number | null {
   try {
     const webContentsId = webview.getWebContentsId()
     return Number.isInteger(webContentsId) && webContentsId > 0 ? webContentsId : null
@@ -86,6 +93,6 @@ export function readBrowserClientPageAttachedGuestId(webview: Electron.WebviewTa
   }
 }
 
-export function hasBrowserClientPageAttachedGuest(webview: Electron.WebviewTag): boolean {
+export function hasBrowserClientPageAttachedGuest(webview: BrowserWebviewElement): boolean {
   return readBrowserClientPageAttachedGuestId(webview) !== null
 }

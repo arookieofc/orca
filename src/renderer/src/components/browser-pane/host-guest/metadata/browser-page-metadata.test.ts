@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserGuestMetadata } from '../../../../../../shared/browser/guest-lifecycle/browser-guest-metadata'
 import type {
@@ -111,7 +112,7 @@ function mount(state: BrowserGuestMetadata) {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: DOM guest with the native identity used by production cache, no synchronous metadata methods.
   const webview = Object.assign(document.createElement('webview'), {
     getWebContentsId: () => 42
-  }) as Electron.WebviewTag
+  }) as BrowserWebviewElement
   webviewRegistry.set('page-a', webview)
   const container = document.createElement('div')
   container.append(webview)

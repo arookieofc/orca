@@ -4,20 +4,15 @@ import {
   waitForBrowserPageReady
 } from '../../../browser/guest-lifecycle/browser-page-memory'
 import type { BrowserSnapshotOptions } from '../../../../shared/rpc-contract/browser/browser-observation-params'
-import type { AgentBrowserBridge } from '../../../browser/agent-browser/agent-browser-bridge'
 import { BrowserError } from '../../../browser/browser-error'
 import { browserPopupPageWebContentsId } from '../../../browser/guest-lifecycle/popups/browser-popup-page-id'
-import { webContents } from 'electron'
-import {
-  waitForTabFirstLoad,
-  waitForTabRegistration,
-  waitForWorktreeTabRegistration
-} from '../../../ipc/browser/browser-tab-registration-wait'
-import { whenBrowserMainWindowReady } from '../../../browser/guest-lifecycle/browser-main-window-readiness'
+import { getRuntimeDesktopSurface } from '../../construction/runtime-desktop-surface'
+import { getRuntimeBrowserDesktopAdapter } from '../installation/runtime-browser-desktop-adapter'
 import type { BrowserSnapshotResult } from '../../../../shared/browser/runtime/runtime-browser-contracts'
 import type {
   BrowserCommandTargetParams,
   BrowserAnswerAdmission,
+  RuntimeAgentBrowserBridge as AgentBrowserBridge,
   RuntimeBrowserCommandHost,
   ResolvedBrowserCommandTarget,
   ResolvedBrowserPageWebContents
@@ -119,8 +114,9 @@ export class RuntimeBrowserCommandTargets {
     bridge: AgentBrowserBridge,
     worktreeId: string | undefined
   ): boolean {
+    const surface = getRuntimeDesktopSurface()
     for (const [, webContentsId] of bridge.getRegisteredTabs(worktreeId)) {
-      const guest = webContents.fromId(webContentsId)
+      const guest = surface.findWebContentsById?.(webContentsId) ?? null
       if (guest && !guest.isDestroyed()) {
         return true
       }
@@ -137,7 +133,7 @@ export class RuntimeBrowserCommandTargets {
     if (webContentsId == null) {
       return false
     }
-    const guest = webContents.fromId(webContentsId)
+    const guest = getRuntimeDesktopSurface().findWebContentsById?.(webContentsId) ?? null
     return Boolean(guest && !guest.isDestroyed())
   }
 
@@ -230,7 +226,7 @@ export class RuntimeBrowserCommandTargets {
         `Browser page ${resolvedPageId} was not found${scope}`
       )
     }
-    const guest = webContents.fromId(webContentsId)
+    const guest = getRuntimeDesktopSurface().findWebContentsById?.(webContentsId) ?? null
     if (!guest || guest.isDestroyed()) {
       throw new BrowserError(
         'browser_tab_not_found',
@@ -251,7 +247,7 @@ export class RuntimeBrowserCommandTargets {
     }
     await this.sendActivateView(worktreeId ? { worktreeId } : {})
     // Await registerGuest rather than guessing a fixed mount delay.
-    await waitForWorktreeTabRegistration(worktreeId)
+    await getRuntimeBrowserDesktopAdapter().waitForWorktreeTabRegistration(worktreeId)
   }
 
   async ensureBrowserPageActive(
@@ -277,14 +273,15 @@ export class RuntimeBrowserCommandTargets {
       throw notFound()
     }
     try {
+      const desktop = getRuntimeBrowserDesktopAdapter()
       const startedSavedPage = await this.host.serveBrowserTabs?.start(worktreeId, browserPageId)
       if (!startedSavedPage) {
         await this.sendActivateView(worktreeId ? { worktreeId, browserPageId } : { browserPageId })
-        await waitForTabRegistration(browserPageId)
+        await desktop.waitForTabRegistration(browserPageId)
       }
       // A switched-to tab or a woken serve page should read like one open all along; streaming panes must not wait.
       if (options.waitForFirstLoad ?? startedSavedPage === true) {
-        await waitForTabFirstLoad(browserPageId)
+        await desktop.waitForTabFirstLoad(browserPageId)
       }
     } catch {
       throw notFound()
@@ -297,7 +294,7 @@ export class RuntimeBrowserCommandTargets {
     browserPageId?: string
   }): Promise<void> {
     const win = this.host.getAuthoritativeWindow()
-    await whenBrowserMainWindowReady(MAIN_WINDOW_READY_WAIT_MS)
+    await getRuntimeBrowserDesktopAdapter().whenMainWindowReady(MAIN_WINDOW_READY_WAIT_MS)
     win.webContents.send('browser:activateView', payload)
   }
 

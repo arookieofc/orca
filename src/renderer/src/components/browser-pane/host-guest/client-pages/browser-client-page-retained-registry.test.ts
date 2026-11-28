@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { BrowserClientPageRendererIdentity } from '../../../../../../shared/browser/client-hosting/browser-client-page-renderer-protocol'
 
@@ -19,13 +20,13 @@ function createRig(
     maxPagesPerPartition?: number
   } = {}
 ) {
-  const webviews: Electron.WebviewTag[] = []
+  const webviews: BrowserWebviewElement[] = []
   let nextId = 40
   const registry = new BrowserClientPageRetainedRegistry({
     document,
     ...options,
     createWebview: () => {
-      const webview = document.createElement('webview') as Electron.WebviewTag
+      const webview = document.createElement('webview') as BrowserWebviewElement
       Object.defineProperty(webview, 'getWebContentsId', {
         configurable: true,
         value: vi.fn(() => {

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../shared/desktop-api/browser-webview-element'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   BrowserClientPageRendererOutcome,
@@ -76,7 +77,7 @@ describe('Tauri retained browser pages', () => {
   })
 
   it('passes page identity to the factory and syncs bounds only after insertion', async () => {
-    const created: Electron.WebviewTag[] = []
+    const created: BrowserWebviewElement[] = []
     const createWebview = vi.fn(() => {
       const webview = createTauriNativeBrowserWebview({
         ...PAGE,

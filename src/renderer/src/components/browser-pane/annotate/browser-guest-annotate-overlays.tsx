@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { createPortal } from 'react-dom'
 import type { MutableRefObject, RefObject } from 'react'
 import { Copy, Image } from 'lucide-react'
@@ -44,7 +45,7 @@ export function BrowserGuestAnnotateOverlays({
   containerRef: RefObject<HTMLDivElement | null>
   markupPortalContainer?: HTMLDivElement | null
   markupControlsContainer?: HTMLDivElement | null
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   browserOverlayViewport: BrowserOverlayViewport
   worktreeId: string
   currentUrl?: string

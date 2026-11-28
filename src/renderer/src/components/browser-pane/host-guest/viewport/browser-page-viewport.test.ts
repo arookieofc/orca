@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserGuestMetadata } from '../../../../../../shared/browser/guest-lifecycle/browser-guest-metadata'
 import {
@@ -63,7 +64,7 @@ describe('local guest metadata disposal', () => {
         }
         return 41
       }
-    }) as Electron.WebviewTag
+    }) as BrowserWebviewElement
     const remove = webview.remove.bind(webview)
     webview.remove = () => {
       readable = false
@@ -118,7 +119,7 @@ describe('local guest metadata disposal', () => {
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: DOM tag with the only native method used by the cache.
       const replacement = Object.assign(document.createElement('webview'), {
         getWebContentsId: () => 42
-      }) as Electron.WebviewTag
+      }) as BrowserWebviewElement
       const receive = vi.fn()
       const detach = subscribeBrowserGuestMetadata('page-1', replacement, receive)
       acceptBrowserGuestMetadata({

@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { GITHUB_CACHE_STORAGE_KEY, readJson, writeJson } from '../web-storage'
 
 export function createWebGithubCacheApi(): Partial<PreloadApi> {

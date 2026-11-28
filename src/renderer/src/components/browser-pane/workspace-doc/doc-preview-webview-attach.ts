@@ -1,3 +1,8 @@
+import type {
+  BrowserWebviewElement,
+  BrowserWebviewDidFailLoadEvent,
+  BrowserWebviewPageTitleUpdatedEvent
+} from '../../../../../shared/desktop-api/browser-webview-element'
 import { DOC_PREVIEW_PARTITION } from '../../../../../shared/document-preview/doc-preview-scheme'
 import { publishNativeChatVisualGuestTheme } from '@/components/native-chat/media/visuals/NativeChatVisualGuestThemePublisher'
 import { ORCA_BROWSER_PAGE_GUEST_WEB_PREFERENCES_ATTRIBUTE } from '../../../../../shared/browser/guest-lifecycle/browser-guest-web-preferences'
@@ -26,12 +31,12 @@ export function attachDocPreviewWebview({
   ariaLabel: string
   onLoadStarted: () => void
   onLoadStopped: () => void
-  onLoadFailed: (event: Electron.DidFailLoadEvent) => void
+  onLoadFailed: (event: BrowserWebviewDidFailLoadEvent) => void
   onNavigated: () => void
-  onTitleUpdated: (event: Electron.PageTitleUpdatedEvent) => void
+  onTitleUpdated: (event: BrowserWebviewPageTitleUpdatedEvent) => void
   onViewportMessage: (event: { message?: string }) => void
-}): { webview: Electron.WebviewTag; detach: () => void; reload: () => void } {
-  const webview = document.createElement('webview') as Electron.WebviewTag
+}): { webview: BrowserWebviewElement; detach: () => void; reload: () => void } {
+  const webview = document.createElement('webview') as BrowserWebviewElement
   // Trusted link clicks are intercepted by preload; target=_blank needs no popup permission.
   webview.setAttribute('partition', DOC_PREVIEW_PARTITION)
   // Why opaque: Chromium paints its dark canvas for dark-scheme documents (JSON, text) only then.

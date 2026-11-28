@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import type { MutableRefObject } from 'react'
 import { recordRendererCrashBreadcrumb } from '@/diagnostics/crash-reporting/crash-breadcrumb-recorder'
 
@@ -9,9 +10,9 @@ export type BrowserClientPageGuestLossReason = 'unreadable' | 'destroyed' | 'ren
  * spinning over a tag whose every method throws; a failed guest read is the same verdict.
  */
 export function watchBrowserClientPageGuestLoss(options: {
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   /** Released on loss and dispose: every chrome action null-checks it, so a dead tag is never driven. */
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   browserPageId: string
   pageHostGeneration: number
   onLost: () => void

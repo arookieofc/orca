@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { PreloadApi } from '../../../../preload/api-types'
+import type { PreloadApi } from '../../../../shared/desktop-api/api-types'
 
 export const TEST_COMMIT_OID = '0123456789abcdef0123456789abcdef01234567'
 

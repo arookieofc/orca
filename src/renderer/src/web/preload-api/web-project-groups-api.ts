@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../preload/api-types'
+import type { PreloadApi } from '../../../../shared/desktop-api/api-types'
 import type { NestedRepoScanResult } from '../../../../shared/project/groups/project-group-types'
 import { callRuntimeResult } from '../runtime/client/web-runtime-calls'
 import { noopUnsubscribe } from './web-storage'

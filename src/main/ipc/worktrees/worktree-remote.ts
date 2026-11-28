@@ -4,7 +4,7 @@ import { canCheckoutExistingLocalBranch } from '../../runtime/workspaces/creatio
 
 import { worktreeCreateGit } from '../../git/worktrees/creation/worktree-create-git-executor'
 import { getStoredRepoExecutionHostId } from '../../workspaces/execution-host/repo-execution-host'
-import type { BrowserWindow } from 'electron'
+import type { RuntimeDesktopWindow } from '../../runtime/construction/runtime-desktop-surface'
 import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../../persistence/loading-store/store'
@@ -947,7 +947,7 @@ export async function configureCreatedWorktreePushTarget(
   )
 }
 
-export function notifyWorktreesChanged(mainWindow: BrowserWindow, repoId: string): void {
+export function notifyWorktreesChanged(mainWindow: RuntimeDesktopWindow, repoId: string): void {
   // Invalidate before notifying so observer list requests see the changed catalog.
   runWorktreeChangeInvalidators(repoId)
   if (!mainWindow.isDestroyed()) {
@@ -956,7 +956,7 @@ export function notifyWorktreesChanged(mainWindow: BrowserWindow, repoId: string
 }
 
 export function notifyWorktreeGitStatusMetadataChanged(
-  mainWindow: BrowserWindow,
+  mainWindow: RuntimeDesktopWindow,
   repoId: string,
   worktreePaths: readonly string[] | null = null
 ): void {
@@ -970,7 +970,7 @@ export function notifyWorktreeGitStatusMetadataChanged(
 }
 
 export function notifyWorktreeHeadIdentitiesChanged(
-  mainWindow: BrowserWindow,
+  mainWindow: RuntimeDesktopWindow,
   repoId: string,
   identities: WorktreeHeadIdentity[]
 ): void {
@@ -982,7 +982,7 @@ export function notifyWorktreeHeadIdentitiesChanged(
 
 // Report fetching/creating separately; checkout carries Git progress and null marks completion.
 export function emitCreateWorktreeProgress(
-  mainWindow: BrowserWindow,
+  mainWindow: RuntimeDesktopWindow,
   phase: 'fetching' | 'creating',
   creationId?: string,
   detail?: Pick<CreateWorktreeProgressEvent, 'checkout' | 'worktreeId'>
@@ -997,7 +997,7 @@ export function createLocalWorktree(
   args: CreateWorktreeArgsWithSystemProvenance,
   repo: Repo,
   store: Store,
-  mainWindow: BrowserWindow,
+  mainWindow: RuntimeDesktopWindow,
   runtime: OrcaRuntimeService,
   timing: WorktreeCreateTimingRecorder = createWorktreeCreateTimingRecorder(),
   onWorkspaceCreated?: (worktreeId: string) => void
@@ -1031,7 +1031,7 @@ async function performLocalWorktreeCreate(
   args: CreateWorktreeArgsWithSystemProvenance,
   repo: Repo,
   store: Store,
-  mainWindow: BrowserWindow,
+  mainWindow: RuntimeDesktopWindow,
   rearm: PreparationRearmHolder,
   timing: WorktreeCreateTimingRecorder,
   runtime: OrcaRuntimeService,

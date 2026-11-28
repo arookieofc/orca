@@ -1,13 +1,18 @@
-import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
-import { getRuntimeDesktopSurface } from '../../runtime/construction/runtime-desktop-surface'
+import {
+  getRuntimeDesktopSurface,
+  type RuntimeDesktopIpcEvent,
+  type RuntimeDesktopWindow
+} from '../../runtime/construction/runtime-desktop-surface'
 import type { ResourceViewAdmission } from '../../../shared/diagnostics/resource-view-admission'
 
-export function isResourceWindowVisible(window: BrowserWindow | null): boolean {
-  return !!window && !window.isDestroyed() && window.isVisible() && !window.isMinimized()
+export function isResourceWindowVisible(window: RuntimeDesktopWindow | null): boolean {
+  return (
+    !!window && !window.isDestroyed() && Boolean(window.isVisible?.()) && !window.isMinimized?.()
+  )
 }
 
 export function assertResourceViewVisible(
-  event: IpcMainInvokeEvent,
+  event: RuntimeDesktopIpcEvent,
   admission?: ResourceViewAdmission
 ): void {
   if (

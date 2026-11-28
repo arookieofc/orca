@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { useCallback, useRef, useState, type MutableRefObject } from 'react'
 
 export type DocPreviewHistory = {
@@ -13,7 +14,7 @@ export type DocPreviewHistory = {
 
 /** Track full and fragment navigations allowed within one grant as ordinary browser history. */
 export function useDocPreviewWebviewHistory(
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
 ): DocPreviewHistory {
   const [depth, setDepth] = useState({ canGoBack: false, canGoForward: false })
   // Compare against a ref so navigation events re-render only when history button availability changes.

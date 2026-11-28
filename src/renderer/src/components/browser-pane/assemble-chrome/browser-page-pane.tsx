@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/class-names'
@@ -97,7 +98,7 @@ export function BrowserPagePane({
     })
   }, [browserTab.id, pageViewportScroller])
   const chromeHeaderRef = useRef<HTMLDivElement | null>(null)
-  const webviewRef = useRef<Electron.WebviewTag | null>(null)
+  const webviewRef = useRef<BrowserWebviewElement | null>(null)
   const addressBarInputRef = useRef<HTMLInputElement | null>(null)
   const dismissAddressBarSuggestionsRef = useRef<(() => void) | null>(null)
   const addressBarValueRef = useRef(browserTab.url)

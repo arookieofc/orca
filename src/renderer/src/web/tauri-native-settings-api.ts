@@ -5,7 +5,7 @@
 // the authorized-external staging boundary, matching the containment Electron
 // applies implicitly as the main process.
 
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import { invokeNative, isTauriNativeHost } from './tauri-native-host'
 import { previewTauriGhosttyImport } from './tauri-native-ghostty-import'
 import { previewTauriWarpThemeImport } from './tauri-native-warp-theme-import'

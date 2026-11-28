@@ -53,7 +53,7 @@ export abstract class OrcaRuntimeWithBuildHeadlessMobileSessionBrowserTabs exten
           ].filter((tab) => !rendererPageIds.has(tab.browserPageId))
         : []
     const publishedServerTabs = serverTabs.map((tab) => {
-      const navigation = this.agentBrowserBridge?.getPageNavigationState(tab.browserPageId)
+      const navigation = this.agentBrowserBridge?.getPageNavigationState?.(tab.browserPageId)
       const persistedProps = this.getPersistedUnifiedSessionTabProps(
         worktreeId,
         this.serveBrowserTabs.unifiedTabId(worktreeId, tab.browserPageId)
@@ -70,7 +70,7 @@ export abstract class OrcaRuntimeWithBuildHeadlessMobileSessionBrowserTabs exten
         loading: navigation?.loading ?? false,
         canGoBack: navigation?.canGoBack ?? false,
         canGoForward: navigation?.canGoForward ?? false,
-        faviconUrl: this.agentBrowserBridge?.getRemoteTabFaviconUrl(tab.browserPageId) ?? null,
+        faviconUrl: this.agentBrowserBridge?.getRemoteTabFaviconUrl?.(tab.browserPageId) ?? null,
         loadError: tab.loadError ?? undefined,
         certificateFailure: tab.certificateFailure ?? undefined,
         ...(persistedProps ? { color: persistedProps.color } : {}),

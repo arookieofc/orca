@@ -8,6 +8,7 @@ import { REFERENCE_HANDLER_GROUP } from '../references/reference-handler-group'
 import { SERVE_PAIRING_HANDLER_GROUPS } from '../server/serve-pairing-handler-groups'
 import { PLUGIN_HANDLER_GROUPS } from '../plugins/plugin-handler-groups'
 import { HOST_HANDLER_GROUPS } from '../hosts/host-handler-groups'
+import { NODE_RELAY_HANDLER_GROUP } from '../node-relay/relay-handler-group'
 import { WORKTREE_HANDLER_GROUPS } from '../workspaces/worktree-handler-groups'
 
 export type HandlerGroup = {
@@ -291,5 +292,6 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'web-bot',
     keys: ['web-bot list', 'web-bot ask', 'web-bot cancel'],
     load: async () => (await import('../web-bots/web-bot-handlers.js')).WEB_BOT_HANDLERS
-  }
+  },
+  NODE_RELAY_HANDLER_GROUP
 ]

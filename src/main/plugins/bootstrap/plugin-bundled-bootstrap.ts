@@ -76,7 +76,7 @@ export function bundledPluginRootForApp(app: {
 }): string {
   return resolveBundledPluginRoot({
     isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath,
+    resourcesPath: process.resourcesPath ?? '',
     appPath: app.getAppPath()
   })
 }

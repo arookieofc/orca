@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { EMPTY_PTY_MAIN_DELIVERY_DIAGNOSTICS } from '../../../../../shared/terminal/pty/diagnostics/pty-delivery-diagnostics'
 import type {
   SshConnectionState,

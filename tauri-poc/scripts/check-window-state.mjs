@@ -14,11 +14,7 @@ import {
 // rectangle, and the start and end states are restored.
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const endpoint = process.env.ORCA_TAURI_CDP_ENDPOINT ?? 'http://127.0.0.1:9224'
-const stateFile = join(
-  process.env.APPDATA ?? '',
-  'com.stablyai.orca.tauri-poc',
-  'window-state.json'
-)
+const stateFile = join(process.env.APPDATA ?? '', 'com.stablyai.orca', 'window-state.json')
 const connections = new Set()
 let page
 

@@ -1,4 +1,4 @@
-import type { PluginMarketplaceHostInstallPreview } from '../../../../../preload/api/plugins/plugin-host-api'
+import type { PluginMarketplaceHostInstallPreview } from '../../../../../shared/desktop-api/api/plugins/plugin-host-api'
 import type { PluginManifest } from '../../../../../shared/plugins/manifest/plugin-manifest'
 import type { Translate } from '@/i18n/use-translate'
 import { pluginCapabilityDescription } from '../presentation/plugin-capability-presentation'

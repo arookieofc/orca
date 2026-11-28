@@ -40,6 +40,7 @@ const WorkspaceSpacePage = lazy(() => import('../components/workspace-space/Work
 const MobilePage = lazy(() => import('../components/mobile/MobilePage'))
 const RoomsPage = lazy(() => import('../components/rooms/RoomsPage'))
 const WebBotsPage = lazy(() => import('../components/web-bots/WebBotsPage'))
+const NodeRelayPage = lazy(() => import('../components/node-relay/NodeRelayPage'))
 const HandToBotFlow = lazy(() =>
   import('../components/bots/hand-to-bot/HandToBotFlow').then((module) => ({
     default: module.HandToBotFlow
@@ -151,6 +152,7 @@ function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element 
       {activeView === 'mobile' ? <MobilePage /> : null}
       {activeView === 'rooms' ? <RoomsPage /> : null}
       {activeView === 'web-bots' ? <WebBotsPage /> : null}
+      {activeView === 'node-relay' ? <NodeRelayPage /> : null}
       <BotShareReceiveMount />
       <BotTemplatesMount />
       <HandToBotMount />

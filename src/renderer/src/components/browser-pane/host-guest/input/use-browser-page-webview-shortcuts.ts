@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { issueBrowserGuestNavigation } from '../metadata/browser-guest-metadata-cache'
 import { useEffect, type MutableRefObject } from 'react'
 import { getShortcutPlatform } from '@/lib/keyboard/shortcut-platform'
@@ -29,7 +30,7 @@ export function useBrowserPageWebviewShortcuts({
   isActive: boolean
   chromeShortcutScope: BrowserChromeShortcutScope
   isActiveRef: MutableRefObject<boolean>
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   showBrowserZoomFeedback: (level: number) => void
   reloadWebviewOrRecoverGuest: (ignoreCache: boolean) => void
 }): void {

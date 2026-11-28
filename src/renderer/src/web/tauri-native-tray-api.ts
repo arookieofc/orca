@@ -1,5 +1,5 @@
 import { i18n, translate } from '@/i18n/i18n'
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import { getBrowserPlatform } from './preload-api/web-storage'
 import { invokeNative, isTauriNativeHost } from './tauri-native-host'
 

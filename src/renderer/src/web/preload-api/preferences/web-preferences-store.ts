@@ -1,5 +1,5 @@
 import * as chatSettings from './web-native-chat-settings'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { getDefaultSettings } from '../../../../../shared/orca-profiles/constants'
 import { normalizeWorktreeVisibilityDefaults } from '../../../../../shared/worktree/visibility/external-worktree-visibility'
 import type { GlobalSettings } from '../../../../../shared/settings/global-settings-types'

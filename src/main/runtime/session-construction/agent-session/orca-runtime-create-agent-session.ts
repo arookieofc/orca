@@ -1,4 +1,4 @@
-import type { BrowserWindow } from 'electron'
+import type { RuntimeDesktopWindow } from '../../construction/runtime-desktop-surface'
 import type { TerminalWorkspaceLaunchScope } from '../../orchestration/terminal-authority/structured-sessions/runtime-legacy-worker-terminal-recovery-types'
 import { OrcaRuntimeWithGetAgentSessionExecutionNamespace } from './get-agent-session-execution-namespace'
 import {
@@ -34,7 +34,7 @@ export abstract class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithG
     agentTeamsEnv?: Record<string, string>
   ): Record<string, string>
 
-  abstract getAuthoritativeWindow(missingWindowMessage?: string): BrowserWindow
+  abstract getAuthoritativeWindow(missingWindowMessage?: string): RuntimeDesktopWindow
 
   abstract waitForTerminalHandle(tabId: string, timeoutMs?: number): Promise<string>
 

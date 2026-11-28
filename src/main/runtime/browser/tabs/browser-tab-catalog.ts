@@ -1,9 +1,8 @@
 import type { RuntimeBrowserClientPage } from '../client-pages/runtime-browser-page-registry'
 import type { BrowserTabListResult } from '../../../../shared/browser/runtime/runtime-browser-contracts'
-import { browserSessionRegistry } from '../../../browser/sessions/profiles/browser-session-registry'
 import { mergeBrowserTabListing } from './browser-tab-listing'
 import { BrowserError } from '../../../browser/browser-error'
-import { browserManager } from '../../../browser/guest-lifecycle/manager/browser-manager'
+import { getRuntimeBrowserDesktopAdapter } from '../installation/runtime-browser-desktop-adapter'
 import type {
   BrowserCommandTargetParams,
   RuntimeBrowserCommandHost
@@ -35,10 +34,9 @@ export class RuntimeBrowserTabCatalog {
             active: clientPageActive ? false : tab.active
           }))
         : []
+    const desktop = getRuntimeBrowserDesktopAdapter()
     const clientTabs = clientPages.map((page) => {
-      const profile =
-        browserSessionRegistry.getProfile(page.browserProfileId) ??
-        browserSessionRegistry.getDefaultProfile()
+      const profile = desktop.getProfile(page.browserProfileId) ?? desktop.getDefaultProfile()
       return {
         browserPageId: page.browserPageId,
         index: 0,
@@ -57,7 +55,7 @@ export class RuntimeBrowserTabCatalog {
       ? (this.host.readBrowserTabBar?.(worktreeId) ?? []).map((entry) => ({
           ...entry,
           profileLabel: entry.profileId
-            ? (browserSessionRegistry.getProfile(entry.profileId)?.label ?? null)
+            ? (desktop.getProfile(entry.profileId)?.label ?? null)
             : null
         }))
       : []
@@ -123,7 +121,8 @@ export class RuntimeBrowserTabCatalog {
     browserPageId: string,
     explicitWorktreeId?: string
   ): BrowserTabListResult['tabs'][number] {
-    const worktreeId = explicitWorktreeId ?? browserManager.getWorktreeIdForTab(browserPageId)
+    const desktop = getRuntimeBrowserDesktopAdapter()
+    const worktreeId = explicitWorktreeId ?? desktop.getWorktreeIdForTab(browserPageId) ?? undefined
     const tab = this.targets
       .requireAgentBrowserBridge()
       .tabList(worktreeId)
@@ -146,13 +145,12 @@ export class RuntimeBrowserTabCatalog {
   private enrichBrowserTabInfo(
     tab: BrowserTabListResult['tabs'][number]
   ): BrowserTabListResult['tabs'][number] {
-    const rawProfileId = browserManager.getSessionProfileIdForTab(tab.browserPageId)
-    const profile =
-      browserSessionRegistry.getProfile(rawProfileId ?? 'default') ??
-      browserSessionRegistry.getDefaultProfile()
+    const desktop = getRuntimeBrowserDesktopAdapter()
+    const rawProfileId = desktop.getSessionProfileIdForTab(tab.browserPageId)
+    const profile = desktop.getProfile(rawProfileId ?? 'default') ?? desktop.getDefaultProfile()
     return {
       ...tab,
-      worktreeId: browserManager.getWorktreeIdForTab(tab.browserPageId) ?? null,
+      worktreeId: desktop.getWorktreeIdForTab(tab.browserPageId) ?? null,
       profileId: profile.id,
       profileLabel: profile.label
     }

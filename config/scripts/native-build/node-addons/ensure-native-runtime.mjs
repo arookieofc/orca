@@ -2,7 +2,7 @@
 
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 import {
   ensureWindowsProcessTreeCommandLinePatch,
@@ -55,48 +55,17 @@ if (process.argv.includes(CHILD_CHECK_FLAG)) {
   process.exit(0)
 }
 
-if ((runtime === 'node' || runtime === 'electron') && process.platform !== 'win32') {
+if (runtime === 'node' && process.platform !== 'win32') {
   buildHostProviderExec()
 }
 
 if (runtime === 'node') {
   ensureNodeRuntime()
-} else if (runtime === 'electron') {
-  ensureElectronRuntime()
-  if (process.platform === 'darwin') {
-    ensureMacMenuDeadKeyAddon()
-  }
 } else {
   console.error(
-    'Usage: node config/scripts/native-build/node-addons/ensure-native-runtime.mjs --runtime=node|electron'
+    'Usage: node config/scripts/native-build/node-addons/ensure-native-runtime.mjs --runtime=node'
   )
   process.exit(2)
-}
-
-// Why: `pnpm dev` runs this on every launch; skip the multi-second node-gyp rebuild while the
-// addon is current, and keep dev usable without it because the app only warns when it is missing.
-function ensureMacMenuDeadKeyAddon() {
-  const sourceDir = resolve(projectDir, 'native/macos-menu-dead-key')
-  const addon = resolve(projectDir, 'out/native/orca_menu_dead_key.node')
-  const expectedArch = process.arch === 'x64' ? 'x86_64' : process.arch
-  const sourcesChangedAt = Math.max(
-    ...['binding.gyp', 'menu-dead-key.m'].map((file) => statSync(resolve(sourceDir, file)).mtimeMs)
-  )
-  const current =
-    existsSync(addon) &&
-    statSync(addon).mtimeMs >= sourcesChangedAt &&
-    spawnSync('/usr/bin/lipo', [addon, '-verify_arch', expectedArch]).status === 0
-  if (current) {
-    return
-  }
-  try {
-    const {
-      buildMacNativeAddon
-    } = require('../../desktop-distribution/macos/build-macos-native-addon.cjs')
-    buildMacNativeAddon(dirname(addon), process.arch, 'macos-menu-dead-key', basename(addon))
-  } catch (error) {
-    console.warn('[native-runtime] Could not build the macOS menu dead-key guard:', error)
-  }
 }
 
 function readRuntimeArg() {
@@ -157,36 +126,6 @@ function verifyNodeRuntimeAfterRebuild() {
   }
 }
 
-function ensureElectronRuntime() {
-  const initial = runElectronCheck()
-  const patchedNodePtyRebuildReason = getPatchedNodePtyRebuildReason()
-  if (initial.ok && !patchedNodePtyRebuildReason) {
-    return
-  }
-
-  if (patchedNodePtyRebuildReason) {
-    console.warn(`[native-runtime] ${patchedNodePtyRebuildReason}`)
-    if (!initial.ok) {
-      printCheckError(initial)
-    }
-  } else {
-    console.warn(
-      `[native-runtime] ${formatRuntimeLabel('electron')} cannot load native modules; rebuilding native deps for Electron.`
-    )
-    printCheckError(initial)
-  }
-  runNodeScript(['config/scripts/native-build/node-addons/rebuild-native-deps.mjs'])
-
-  const final = runElectronCheck()
-  if (!final.ok) {
-    console.error(
-      `[native-runtime] Native modules still do not load for ${formatRuntimeLabel('electron')}.`
-    )
-    printCheckError(final)
-    process.exit(1)
-  }
-}
-
 function runNodeCheck() {
   // Failed addon loads can poison process state; verify rebuilt addons in a fresh Node process.
   const result = spawnSync(process.execPath, [scriptPath, CHILD_CHECK_FLAG], {
@@ -196,82 +135,6 @@ function runNodeCheck() {
   })
 
   return parseChildCheckResult(result)
-}
-
-function runElectronCheck() {
-  const electronExecutable = resolveInstalledElectronExecutable()
-  if (!electronExecutable.ok) {
-    return { ok: false, error: electronExecutable.error }
-  }
-
-  const result = spawnSync(electronExecutable.path, [scriptPath, CHILD_CHECK_FLAG], {
-    cwd: projectDir,
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: '1'
-    },
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe']
-  })
-
-  return parseChildCheckResult(result)
-}
-
-function resolveInstalledElectronExecutable() {
-  const electronPackageDir = resolve(projectDir, 'node_modules/electron')
-  try {
-    const electronVersion = JSON.parse(
-      readFileSync(resolve(electronPackageDir, 'package.json'), 'utf8')
-    ).version
-    const platformPath = getElectronPlatformPath()
-    const installedVersion = readFileSync(resolve(electronPackageDir, 'dist', 'version'), 'utf8')
-      .trim()
-      .replace(/^v/, '')
-    if (installedVersion !== electronVersion) {
-      return {
-        ok: false,
-        error: new Error(
-          `Electron package binary version ${installedVersion} does not match ${electronVersion}.`
-        )
-      }
-    }
-    const installedPlatformPath = readFileSync(resolve(electronPackageDir, 'path.txt'), 'utf8')
-    if (installedPlatformPath !== platformPath) {
-      return {
-        ok: false,
-        error: new Error(
-          `Electron package path.txt points at ${installedPlatformPath}, expected ${platformPath}.`
-        )
-      }
-    }
-    const electronPath = process.env.ELECTRON_OVERRIDE_DIST_PATH
-      ? resolve(process.env.ELECTRON_OVERRIDE_DIST_PATH, platformPath)
-      : resolve(electronPackageDir, 'dist', platformPath)
-    if (!existsSync(electronPath)) {
-      return { ok: false, error: new Error(`Electron executable is missing at ${electronPath}.`) }
-    }
-    return { ok: true, path: electronPath }
-  } catch (error) {
-    return { ok: false, error }
-  }
-}
-
-function getElectronPlatformPath() {
-  const targetPlatform =
-    process.env.ELECTRON_INSTALL_PLATFORM || process.env.npm_config_platform || process.platform
-  switch (targetPlatform) {
-    case 'mas':
-    case 'darwin':
-      return 'Electron.app/Contents/MacOS/Electron'
-    case 'freebsd':
-    case 'openbsd':
-    case 'linux':
-      return 'electron'
-    case 'win32':
-      return 'electron.exe'
-    default:
-      throw new Error(`Electron builds are not available on platform: ${targetPlatform}`)
-  }
 }
 
 function parseChildCheckResult(result) {

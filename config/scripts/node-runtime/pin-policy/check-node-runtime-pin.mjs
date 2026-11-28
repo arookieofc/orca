@@ -74,21 +74,6 @@ export function findNodeRuntimePinProblems({
   rootImporter
 }) {
   const problems = []
-  const declaredElectron =
-    packageJson.devDependencies?.electron ?? packageJson.dependencies?.electron
-  if (declaredElectron !== pin.electron) {
-    problems.push(
-      `package.json electron is ${declaredElectron}, but NODE_RUNTIME_PIN.electron is ${pin.electron}`
-    )
-  }
-  const lockedElectron = lockedVersion(
-    rootImporter.devDependencies?.electron ?? rootImporter.dependencies?.electron
-  )
-  if (lockedElectron !== pin.electron) {
-    problems.push(
-      `pnpm-lock.yaml resolves electron ${lockedElectron}, but NODE_RUNTIME_PIN.electron is ${pin.electron}`
-    )
-  }
   // Gate only major; Electron/Node pin divergence is design D1 (docs/reference/node-runtime-design.html).
   const engineMajor = majorOf(packageJson.engines?.node)
   if (majorOf(pin.version) !== engineMajor) {

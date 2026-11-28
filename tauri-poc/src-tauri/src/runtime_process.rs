@@ -234,11 +234,17 @@ fn launch_runtime(resource_root: Option<&Path>) -> Result<Child, String> {
     let mut command = Command::new(&node);
     command
         .args([&supervisor, &entry])
-        .current_dir(root)
+        .current_dir(&root)
         .env("ORCA_USER_DATA", &profile)
         .env("ORCA_BACKGROUND_LAUNCH", "1")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped());
+    if !cfg!(debug_assertions) {
+        let speech_modules = root.join("node_modules");
+        if speech_modules.is_dir() {
+            command.env("ORCA_SPEECH_RECOGNIZER_DIR", &speech_modules);
+        }
+    }
     let stderr_target = profile
         .join("orcad-supervisor-stderr.log")
         .into_os_string();

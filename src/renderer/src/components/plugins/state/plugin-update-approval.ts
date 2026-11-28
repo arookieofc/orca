@@ -1,6 +1,6 @@
 // @protected-copy
 import { toast } from 'sonner'
-import type { PluginMarketplaceHostInstallPreview } from '../../../../../preload/api/plugins/plugin-host-api'
+import type { PluginMarketplaceHostInstallPreview } from '../../../../../shared/desktop-api/api/plugins/plugin-host-api'
 import {
   satisfiesOrcaEngineRange,
   type PluginManifest

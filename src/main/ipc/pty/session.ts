@@ -1,4 +1,7 @@
-import type { BrowserWindow, WebContents } from 'electron'
+import type {
+  RuntimeDesktopWebContents,
+  RuntimeDesktopWindow
+} from '../../runtime/construction/runtime-desktop-surface'
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import type { Store } from '../../persistence/loading-store/store'
 import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
@@ -61,10 +64,12 @@ export type PtyIpcSessionOptions = {
 }
 
 export type PtyRendererDelivery = Pick<
-  BrowserWindow,
+  RuntimeDesktopWindow,
   'isDestroyed' | 'isFocused' | 'isVisible' | 'isMinimized'
 > & {
-  webContents: Pick<WebContents, 'id' | 'isDestroyed' | 'send' | 'on' | 'removeListener'>
+  webContents: Pick<RuntimeDesktopWebContents, 'isDestroyed' | 'send' | 'on' | 'removeListener'> & {
+    id: number
+  }
 }
 
 export type PtyIpcSession = {

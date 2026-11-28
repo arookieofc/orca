@@ -139,3 +139,4 @@ export type TopLevelView =
   | 'mobile'
   | 'rooms'
   | 'web-bots'
+  | 'node-relay'

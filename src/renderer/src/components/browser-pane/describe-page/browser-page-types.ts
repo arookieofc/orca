@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import type { RuntimeBrowserClientPlacement } from '../../../../../shared/browser/client-hosting/runtime-browser-placement'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import type {
@@ -67,7 +68,7 @@ export type BrowserPageGrabAnnotationsOptions = {
   containerRef: MutableRefObject<HTMLDivElement | null>
   trackingContainer?: HTMLDivElement | null
   trackingScroller?: HTMLDivElement | null
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   setBrowserOverlayViewport: Dispatch<SetStateAction<BrowserOverlayViewport>>
   browserAnnotationsLength: number
 }

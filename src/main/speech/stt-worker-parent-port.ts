@@ -1,22 +1,27 @@
-import type { MessagePortMain } from 'electron'
+export type SpeechWorkerAudioPort = {
+  on(event: 'message' | 'close', listener: (...args: never[]) => void): unknown
+  postMessage?(message: unknown): void
+  start(): void
+  close(): void
+}
 
 type UtilityParentPort = {
   on(
     event: 'message',
-    listener: (event: { data: unknown; ports: MessagePortMain[] }) => void
+    listener: (event: { data: unknown; ports: SpeechWorkerAudioPort[] }) => void
   ): unknown
   postMessage(message: unknown): void
 }
 
 export type SttWorkerParentPort = {
   post(message: unknown): void
-  onMessage(listener: (message: unknown, ports: readonly MessagePortMain[]) => void): void
+  onMessage(listener: (message: unknown, ports: readonly SpeechWorkerAudioPort[]) => void): void
 }
 
 /** Electron's utility process (desktop) or a forked child (orcad). */
 export function connectSttWorkerParentPort(): SttWorkerParentPort {
-  // Electron types it as always set, but only a utility process has one.
-  const utilityPort: UtilityParentPort | undefined = process.parentPort
+  // Read dynamically so Node-only builds never require Electron's Process.parentPort augmentation.
+  const utilityPort: UtilityParentPort | undefined = Reflect.get(process, 'parentPort')
   if (utilityPort) {
     return {
       post: (message) => utilityPort.postMessage(message),

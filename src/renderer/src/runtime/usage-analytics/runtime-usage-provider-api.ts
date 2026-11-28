@@ -1,5 +1,5 @@
-import { createUsageProviderApi } from '../../../../preload/usage/usage-provider-api'
-import type { PreloadApi } from '../../../../preload/api-types'
+import { createUsageProviderApi } from '../../../../shared/desktop-api/usage-provider-api'
+import type { PreloadApi } from '../../../../shared/desktop-api/api-types'
 
 type UsageProviderKey = 'claudeUsage' | 'codexUsage' | 'openCodeUsage' | 'museUsage'
 

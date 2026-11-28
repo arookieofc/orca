@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../preload/api-types'
+import type { PreloadApi } from '../../../../shared/desktop-api/api-types'
 import type { FolderWorkspace } from '../../../../shared/folder-workspaces/folder-workspace-types'
 import type {
   FolderWorkspacePathStatus,

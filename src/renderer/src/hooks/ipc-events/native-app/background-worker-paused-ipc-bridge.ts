@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
-import type { BackgroundWorkerApi } from '../../../../../preload/api/diagnostics/background-worker-api'
+import type { BackgroundWorkerApi } from '../../../../../shared/desktop-api/api/diagnostics/background-worker-api'
 
 const TOAST_ID = 'background-worker-paused'
 

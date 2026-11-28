@@ -1,4 +1,4 @@
-import type { BrowserWindow } from 'electron'
+import type { RuntimeDesktopWindow } from '../../runtime/construction/runtime-desktop-surface'
 import type { SavedPortForward } from '../../../shared/remote-runtime/ssh/ssh-types'
 import { getSshTargetRegistryStore } from '../../ssh/targets/ssh-target-registry'
 import { connectionManager, portForwardManager } from './ssh-ipc-context'
@@ -49,7 +49,7 @@ export function savedPortForwardsAllLive(targetId: string): boolean {
 
 export async function restorePortForwards(
   targetId: string,
-  getMainWindow: () => BrowserWindow | null
+  getMainWindow: () => RuntimeDesktopWindow | null
 ): Promise<void> {
   const target = getSshTargetRegistryStore()!.getTarget(targetId)
   if (!target?.portForwards?.length) {

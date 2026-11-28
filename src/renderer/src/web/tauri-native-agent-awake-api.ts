@@ -6,7 +6,7 @@
 // only its own local orcad, so `subscribe`'s active environment is always the
 // host whose agents this machine's blocker must track.
 
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import type { ComputerAwakeStatus } from '../../../shared/app-lifecycle/computer-awake-mode'
 import { invokeNative, isTauriNativeHost, listenNative } from './tauri-native-host'
 import { createWebRuntimeApi } from './preload-api/runtime/web-runtime-api'

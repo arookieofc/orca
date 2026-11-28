@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserLoadError } from '../../../../../shared/browser/workspaces/browser-workspace-types'
 import {
@@ -41,8 +42,8 @@ const unregister = vi.fn(async () => true)
 const notifyActiveTabChanged = vi.fn(async () => true)
 type RegistrationTestPage = {
   id: string
-  webview: Electron.WebviewTag
-  webviewRef: { current: Electron.WebviewTag | null }
+  webview: BrowserWebviewElement
+  webviewRef: { current: BrowserWebviewElement | null }
   session: BrowserPageWebviewGuestSession
   sync: ReturnType<typeof vi.fn>
   update: ReturnType<typeof vi.fn>
@@ -53,9 +54,9 @@ type RegistrationTestPage = {
 }
 const sessions: RegistrationTestPage[] = []
 
-function createWebview(): Electron.WebviewTag {
+function createWebview(): BrowserWebviewElement {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fixture installs the Electron webview methods exercised by guest registration and teardown on this DOM element.
-  return document.createElement('webview') as Electron.WebviewTag
+  return document.createElement('webview') as BrowserWebviewElement
 }
 
 function createSession(
@@ -77,7 +78,7 @@ function createSession(
     registerPersistentWebview(id, webview)
   }
   const ref = <T>(current: T) => ({ current })
-  const webviewRef = previous?.webviewRef ?? ref<Electron.WebviewTag | null>(webview)
+  const webviewRef = previous?.webviewRef ?? ref<BrowserWebviewElement | null>(webview)
   webviewRef.current = webview
   const sync = vi.fn()
   const update = vi.fn()
@@ -341,7 +342,7 @@ it('lets only the current guest settle a replacement admission', () => {
   const current = createSession('settlement', 2)
   admitBrowserPageMount(old.id)
   const ref = <T>(value: T) => ({ current: value })
-  const loading = (webview: Electron.WebviewTag) =>
+  const loading = (webview: BrowserWebviewElement) =>
     createBrowserPageWebviewLoadingHandlers({
       webview,
       browserTabId: old.id,

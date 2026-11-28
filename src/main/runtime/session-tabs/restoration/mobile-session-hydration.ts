@@ -5,7 +5,7 @@ import {
 import type { OrcaRuntimeWithBuildHeadlessMobileSessionBrowserTabs as BuildHeadlessMobileSessionBrowserTabsMethods } from '../../session-lifecycle/projection/build-headless-mobile-session-browser-tabs'
 import type { OrcaRuntimeWithStoredMobileSnapshotHasStalePreservedTab as StoredMobileSnapshotHasStalePreservedTabMethods } from './mobile-session-publication-preservation'
 import type { OrcaRuntimeWithReconcileHeadlessMobileSessionBrowserTabs as ReconcileHeadlessMobileSessionBrowserTabsMethods } from '../../session-lifecycle/projection/reconcile-headless-mobile-session-browser-tabs'
-import type { BrowserWindow } from 'electron'
+import type { RuntimeDesktopWindow } from '../../construction/runtime-desktop-surface'
 import { RuntimeSessionTabsInventoryPublication } from '../inventory/session-tabs-inventory-publication'
 import type { WorkspaceSessionState } from '../../../../shared/workspace-session/workspace-session-state-types'
 import { getRuntimeBrowserPageRegistry } from '../../browser/client-pages/runtime-browser-page-registry'
@@ -93,7 +93,7 @@ export abstract class OrcaRuntimeWithHydrateHeadlessMobileSessionTabsFromWorkspa
     ReconcileHeadlessMobileSessionBrowserTabsMethods['workspaceSessionWorktreeHasRuntimeOwnedPtyCandidate']
   >
 
-  protected abstract getAvailableAuthoritativeWindow(): BrowserWindow | null
+  protected abstract getAvailableAuthoritativeWindow(): RuntimeDesktopWindow | null
 
   /** A stored snapshot, or undefined when it is one this host built and left empty. */
   private readRebuildableMobileSessionSnapshot(

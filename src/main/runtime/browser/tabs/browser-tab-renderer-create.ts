@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { ipcMain } from 'electron'
+import {
+  getRuntimeDesktopSurface,
+  type RuntimeDesktopIpcEvent
+} from '../../construction/runtime-desktop-surface'
 import { captureActiveRpcCall } from '../../rpc/callers/active-call'
 import { retainBrowserMemoryPageForAgent } from '../../../browser/guest-lifecycle/browser-page-memory'
 import type { RuntimeBrowserCommandHost } from '../commands/browser-command-contracts'
@@ -24,19 +27,19 @@ export async function createBrowserTabInRenderer(
 
   const browserPageId = await new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => {
-      ipcMain.removeListener('browser:tabCreateReply', handler)
+      getRuntimeDesktopSurface().removeIpcListener('browser:tabCreateReply', handler)
       reject(new Error('Tab creation timed out'))
     }, 10_000)
 
     const handler = (
-      event: Electron.IpcMainEvent,
+      event: RuntimeDesktopIpcEvent,
       reply: { requestId: string; browserPageId?: string; error?: string }
     ): void => {
       if (event.sender !== rendererWebContents || reply.requestId !== requestId) {
         return
       }
       clearTimeout(timer)
-      ipcMain.removeListener('browser:tabCreateReply', handler)
+      getRuntimeDesktopSurface().removeIpcListener('browser:tabCreateReply', handler)
       if (reply.error) {
         reject(new Error(reply.error))
       } else {
@@ -44,7 +47,7 @@ export async function createBrowserTabInRenderer(
         resolve(reply.browserPageId!)
       }
     }
-    ipcMain.on('browser:tabCreateReply', handler)
+    getRuntimeDesktopSurface().onIpc('browser:tabCreateReply', handler)
     const request: BrowserTabCreateRequest = {
       requestId,
       url,

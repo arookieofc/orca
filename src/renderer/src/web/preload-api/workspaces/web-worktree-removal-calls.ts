@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import type { GitWorktreeInfo } from '../../../../../shared/worktree/types'
 import type { RemoveWorktreeResult } from '../../../../../shared/worktree/create-types'
 import { worktreeRemovalReplyTimeoutMs } from '../../../../../shared/worktree/removal/archive-hook-removal-gate'

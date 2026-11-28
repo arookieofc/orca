@@ -6,6 +6,11 @@ export {
   setBrowserGuestSemanticVisibility,
   registerBrowserSessionNotificationGrant
 } from './browser-guest-idle-protection'
+import type {
+  BrowserGuestEvent,
+  BrowserGuestIpcEvent,
+  BrowserGuestWebContents
+} from '../../browser-guest-surface-types'
 import { randomUUID } from 'node:crypto'
 import { observeBrowserGuestRequests } from '../../../sessions/requests/browser-session-web-request-observer'
 import {
@@ -27,8 +32,8 @@ type ProtectionOwner = {
   pdf: boolean | null
   changed: () => void
 }
-const owners = new WeakMap<Electron.WebContents, ProtectionOwner>()
-export function invalidateBrowserGuestDiscardProtection(guest: Electron.WebContents): void {
+const owners = new WeakMap<BrowserGuestWebContents, ProtectionOwner>()
+export function invalidateBrowserGuestDiscardProtection(guest: BrowserGuestWebContents): void {
   try {
     owners.get(guest)?.changed()
   } catch {
@@ -37,7 +42,7 @@ export function invalidateBrowserGuestDiscardProtection(guest: Electron.WebConte
 }
 
 export function readBrowserGuestDiscardProtection(
-  guest: Electron.WebContents
+  guest: BrowserGuestWebContents
 ): BrowserGuestDiscardProtection {
   const result = (
     protection: BrowserGuestDiscardProtection['protection'],
@@ -87,7 +92,7 @@ export function readBrowserGuestDiscardProtection(
   return result('discardable', 'clean')
 }
 
-function mayHaveChildFrames(guest: Electron.WebContents): boolean {
+function mayHaveChildFrames(guest: BrowserGuestWebContents): boolean {
   try {
     // Electron can omit or throw for the frame list of a disposed render frame.
     const frames: unknown = guest.mainFrame.frames
@@ -98,14 +103,14 @@ function mayHaveChildFrames(guest: Electron.WebContents): boolean {
 }
 
 export function readBrowserGuestDiscardAdmission(
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   proactive: boolean
 ): BrowserGuestDiscardProtection {
   return readBrowserGuestIdleProtection(guest, readBrowserGuestDiscardProtection(guest), proactive)
 }
 
 export function installBrowserGuestDiscardProtection(
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   changed: () => void
 ): () => void {
   const owner: ProtectionOwner = {
@@ -156,7 +161,7 @@ export function installBrowserGuestDiscardProtection(
       // Missing observers stay protected until a real readiness event rebinds them.
     }
   }
-  const report = (event: Electron.IpcMainEvent, channel: string, payload: unknown): void => {
+  const report = (event: BrowserGuestIpcEvent, channel: string, payload: unknown): void => {
     if (
       channel !== BROWSER_GUEST_PROTECTION_REPORT ||
       guest.isDestroyed() ||
@@ -208,9 +213,7 @@ export function installBrowserGuestDiscardProtection(
       pendingMethod = details.method
     }
   })
-  const navigation = (
-    details: Electron.Event<Electron.WebContentsDidStartNavigationEventParams>
-  ): void => {
+  const navigation = (details: BrowserGuestEvent): void => {
     if (details.isMainFrame && !details.isSameDocument) {
       pendingMethod = null
       owner.navigating = true
@@ -248,7 +251,11 @@ export function installBrowserGuestDiscardProtection(
     snapshot()
   }
   const frameCreated = (): void => publish()
-  const inPageNavigation = (_event: Electron.Event, _url: string, isMainFrame: boolean): void => {
+  const inPageNavigation = (
+    _event: BrowserGuestEvent,
+    _url: string,
+    isMainFrame: boolean
+  ): void => {
     if (isMainFrame) {
       publish()
     }
@@ -283,7 +290,7 @@ export function installBrowserGuestDiscardProtection(
   }
 }
 
-export function protectBrowserGuestMedia(guest: Electron.WebContents): void {
+export function protectBrowserGuestMedia(guest: BrowserGuestWebContents): void {
   const owner = owners.get(guest)
   if (owner) {
     owner.mediaGranted = true

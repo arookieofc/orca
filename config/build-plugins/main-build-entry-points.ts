@@ -4,13 +4,8 @@ import { CLI_MAIN_ENTRY_NAMES } from './cli-main-entry-names'
 
 /** Main-build Rollup inputs: output file name (without .js) to its source entry. */
 export const MAIN_BUILD_ENTRY_POINTS: Record<string, string> = {
-  index: resolve('src/main/index.ts'),
   'runtime-environment-store-worker-entry': resolve(
     'src/shared/remote-runtime/host-store/runtime-environment-store-worker-entry.ts'
-  ),
-  'backend-entry': resolve('src/main/backend/backend-entry.ts'),
-  'browser-extension-native-host-supervisor-entry': resolve(
-    'src/main/browser/extensions/native-messaging/browser-extension-native-host-supervisor-entry.ts'
   ),
   'daemon-entry': resolve('src/main/daemon/daemon-entry.ts'),
   'plugin-host-entry': resolve('src/main/plugins/workers/plugin-host-entry.ts'),
@@ -32,8 +27,6 @@ export const MAIN_BUILD_ENTRY_POINTS: Record<string, string> = {
   'journal-sql-reader-entry': resolve(
     'src/main/native-chat/agent-session-journal/journal-sql-reader-entry.ts'
   ),
-  // Chat reader threads run here so their heaps stay out of main's V8 cage.
-  'utility-worker-host-entry': resolve('src/main/utility-worker-host/utility-worker-host-entry.ts'),
   'journal-sql-worker-entry': resolve(
     'src/main/native-chat/agent-session-journal/journal-sql-worker-entry.ts'
   ),
@@ -87,10 +80,6 @@ export const MAIN_BUILD_ENTRY_POINTS: Record<string, string> = {
   // Why: `orca serve` runs it under ELECTRON_RUN_AS_NODE so the CLI never bundles orcad prep.
   [ORCAD_LOCAL_SERVE_SELECTION_ENTRY]: resolve(
     'src/main/orcad/orcad-local-serve-selection-entry.ts'
-  ),
-  // Worker survives macOS 26 AppKit main-thread deadlock without another Electron process.
-  'main-thread-hang-watchdog-entry': resolve(
-    'src/main/hang-watchdog/main-thread-hang-watchdog-entry.ts'
   ),
   ...Object.fromEntries(
     CLI_MAIN_ENTRY_NAMES.map((module) => [module, resolve(`src/main/${module}.ts`)])

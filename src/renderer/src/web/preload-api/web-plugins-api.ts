@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../preload/api-types'
+import type { PreloadApi } from '../../../../shared/desktop-api/api-types'
 import type { PluginConsentRequest } from '../../../../shared/plugins/approval/plugin-consent-request'
 import type { PluginHostListEntry } from '../../../../shared/plugins/plugin-list-entry'
 import { callRuntimeResult } from '../runtime/client/web-runtime-calls'

@@ -1,6 +1,6 @@
 // @protected-copy
 import { ExternalLink, TriangleAlert } from 'lucide-react'
-import type { PluginMarketplaceHostInstallPreview } from '../../../../../preload/api/plugins/plugin-host-api'
+import type { PluginMarketplaceHostInstallPreview } from '../../../../../shared/desktop-api/api/plugins/plugin-host-api'
 import { pluginExecutionProfile } from '../../../../../shared/plugins/contributions/plugin-execution-profile'
 import { splitQualifiedPluginKey } from '../../../../../shared/plugins/catalog/plugin-marketplace'
 import { useTranslate } from '@/i18n/use-translate'

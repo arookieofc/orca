@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../preload/api-types'
+import type { PreloadApi } from '../../../../shared/desktop-api/api-types'
 import { createFallbackProxy } from './web-fallback-api'
 import { callRuntimeResult } from '../runtime/client/web-runtime-calls'
 import { mapRepoPathArg } from '@/runtime/source-control/forge/runtime-repo-selector-params'

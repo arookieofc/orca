@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import type { BrowserGuestMetadata } from '../../../../../../shared/browser/guest-lifecycle/browser-guest-metadata'
 import {
   normalizeBrowserNavigationUrl,
@@ -15,7 +16,7 @@ type GuestMetadataEntry = {
 const guests = new Map<number, GuestMetadataEntry>()
 const listeners = new Map<number, Set<Listener>>()
 const initialReads = new Map<number, Promise<void>>()
-const guestRetirements = new WeakMap<Electron.WebviewTag, () => void>()
+const guestRetirements = new WeakMap<BrowserWebviewElement, () => void>()
 
 function notifyGuest(id: number, entry: GuestMetadataEntry, state: BrowserGuestMetadata): void {
   listeners.get(id)?.forEach((listener) => {
@@ -44,7 +45,7 @@ function retireGuest(id: number, expected?: GuestMetadataEntry): void {
 
 function observeGuestDeath(
   id: number,
-  webview: Electron.WebviewTag,
+  webview: BrowserWebviewElement,
   entry: GuestMetadataEntry
 ): void {
   if (entry.stopObserving) {
@@ -64,7 +65,7 @@ function observeGuestDeath(
 }
 
 export function retireBrowserGuestMetadata(
-  webview: Electron.WebviewTag,
+  webview: BrowserWebviewElement,
   knownId?: number | null
 ): void {
   const retire = guestRetirements.get(webview)
@@ -129,7 +130,7 @@ function refreshGuest(id: number, browserPageId: string): void {
 
 export function refreshBrowserGuestMetadata(
   browserPageId: string,
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
 ): void {
   const id = readBrowserGuestId(webview)
   if (id === null) {
@@ -170,16 +171,16 @@ export function acceptBrowserGuestMetadata(state: BrowserGuestMetadata): void {
 }
 
 export function issueBrowserGuestNavigation<T>(
-  webview: Electron.WebviewTag,
-  issue: (guest: Electron.WebviewTag) => T
+  webview: BrowserWebviewElement,
+  issue: (guest: BrowserWebviewElement) => T
 ): T
 export function issueBrowserGuestNavigation<T>(
-  webview: Electron.WebviewTag | null | undefined,
-  issue: (guest: Electron.WebviewTag) => T
+  webview: BrowserWebviewElement | null | undefined,
+  issue: (guest: BrowserWebviewElement) => T
 ): T | undefined
 export function issueBrowserGuestNavigation<T>(
-  webview: Electron.WebviewTag | null | undefined,
-  issue: (guest: Electron.WebviewTag) => T
+  webview: BrowserWebviewElement | null | undefined,
+  issue: (guest: BrowserWebviewElement) => T
 ): T | undefined {
   if (!webview) {
     return undefined
@@ -212,7 +213,7 @@ export function issueBrowserGuestNavigation<T>(
 }
 
 export function browserGuestPreservesRequestedDocument(
-  webview: Electron.WebviewTag,
+  webview: BrowserWebviewElement,
   observedUrl: string,
   requestedUrl: string
 ): boolean {
@@ -235,7 +236,7 @@ export function clearBrowserGuestMetadata(): void {
   initialReads.clear()
 }
 
-export function readBrowserGuestId(webview: Electron.WebviewTag): number | null {
+export function readBrowserGuestId(webview: BrowserWebviewElement): number | null {
   try {
     return webview.getWebContentsId()
   } catch {
@@ -244,7 +245,7 @@ export function readBrowserGuestId(webview: Electron.WebviewTag): number | null 
 }
 
 export function cachedBrowserGuestMetadata(
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
 ): BrowserGuestMetadata | undefined {
   const id = readBrowserGuestId(webview)
   return id === null ? undefined : guests.get(id)?.state
@@ -252,7 +253,7 @@ export function cachedBrowserGuestMetadata(
 
 export function subscribeBrowserGuestMetadata(
   browserPageId: string,
-  webview: Electron.WebviewTag,
+  webview: BrowserWebviewElement,
   listener: Listener
 ): () => void {
   let guestId: number | null = null
@@ -283,11 +284,8 @@ export function subscribeBrowserGuestMetadata(
         listener(state)
       }
     }
-    let subscribers = listeners.get(id)
-    if (!subscribers) {
-      subscribers = new Set()
-      listeners.set(id, subscribers)
-    }
+    const subscribers = listeners.get(id) ?? new Set<Listener>()
+    listeners.set(id, subscribers)
     subscribers.add(onState)
     unsubscribe = () => {
       subscribers.delete(onState)

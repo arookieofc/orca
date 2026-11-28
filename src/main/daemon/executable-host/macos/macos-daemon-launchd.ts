@@ -141,7 +141,9 @@ export async function launchMacDaemonFromStableBundle(
     return null
   }
   // Older Macs need the fork path because the helper’s Node cannot load there.
-  const systemVersion = process.getSystemVersion?.()
+  const getSystemVersion = Reflect.get(process, 'getSystemVersion')
+  const systemVersion =
+    typeof getSystemVersion === 'function' ? String(getSystemVersion.call(process)) : null
   if (!systemVersion || compareDottedVersions(systemVersion, NODE_RUNTIME_DARWIN_MINIMUM_OS) < 0) {
     setLastMacDaemonForkReason('os-too-old')
     return null

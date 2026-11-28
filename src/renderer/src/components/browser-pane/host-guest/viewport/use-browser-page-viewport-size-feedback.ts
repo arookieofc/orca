@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { useEffect } from 'react'
 import { getUIZoomFactor } from '@/app-shell/chrome/ui-zoom'
 import { browserPageZoomLevelToFactor } from '../../../../../../shared/browser/site-settings/browser-page-zoom'
@@ -24,7 +25,7 @@ export function toBrowserPageGuestViewportSize(
 }
 
 /** The guest's live zoom level, or null until it can be read. */
-function readGuestZoomLevel(webview: Electron.WebviewTag | null): number | null {
+function readGuestZoomLevel(webview: BrowserWebviewElement | null): number | null {
   try {
     // Why the live level: an embedder (UI) zoom change overwrites the guest's zoom behind Orca's back.
     return webview?.getZoomLevel() ?? null
@@ -38,7 +39,7 @@ function readGuestZoomLevel(webview: Electron.WebviewTag | null): number | null 
 export function useBrowserPageViewportSizeFeedback(
   content: HTMLDivElement | null,
   enabled: boolean,
-  webviewRef: React.RefObject<Electron.WebviewTag | null>,
+  webviewRef: React.RefObject<BrowserWebviewElement | null>,
   {
     showBrowserViewportSizeFeedback,
     hideBrowserFeedback

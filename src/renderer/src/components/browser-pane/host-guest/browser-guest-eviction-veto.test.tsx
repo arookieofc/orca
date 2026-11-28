@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -53,7 +54,7 @@ async function fixture() {
     webviews.set(id, webview)
     Object.defineProperty(webview, 'getWebContentsId', { value: () => id })
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: DOM fixture implements the native identity method and real removal/listener surface.
-    registerPersistentWebview(`page-${id}`, webview as unknown as Electron.WebviewTag)
+    registerPersistentWebview(`page-${id}`, webview as unknown as BrowserWebviewElement)
     setBrowserGuestVisible(`page-${id}`, false)
   }
   const render = async (): Promise<void> => {

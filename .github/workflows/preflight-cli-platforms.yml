@@ -40,7 +40,6 @@ jobs:
       - uses: ./.github/actions/install-node-dependencies
         with:
           native-runtime: node
-          cache-electron-package: 'true'
       - name: Check native CLI execution and shell PATH discovery
         run: >-
           pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=2

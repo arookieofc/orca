@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { useCallback, useEffect, useState, type MutableRefObject, type RefObject } from 'react'
 import { KeyRound } from 'lucide-react'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
@@ -59,7 +60,7 @@ export function BrowserPasswordFillDropdown({
   browserPageId: string
   isActive: boolean
   containerRef: RefObject<HTMLDivElement | null>
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
 }): React.JSX.Element | null {
   const { focusedField, focusedFieldShownAt } = useBrowserPasswordPageState(browserPageId)
   useEffect(() => {

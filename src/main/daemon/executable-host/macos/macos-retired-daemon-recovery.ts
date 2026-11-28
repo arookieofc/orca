@@ -112,7 +112,7 @@ export async function recoverRetiredMacDaemonJob(
 export async function recoverRetiredMacDaemonJobs(runtimeDir: string): Promise<void> {
   if (
     process.platform !== 'darwin' ||
-    process.type !== 'browser' ||
+    Reflect.get(process, 'type') !== 'browser' ||
     !getAppEnvironment().isPackaged()
   ) {
     return

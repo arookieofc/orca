@@ -1,4 +1,4 @@
-import type { PtyApi } from '../../../../preload/api/terminal/pty-api'
+import type { PtyApi } from '../../../../shared/desktop-api/api/terminal/pty-api'
 import type { RemoteRuntimeMultiplexedTerminalCallbacks } from '../../runtime/hosted-terminals/streams/remote-terminal-stream-contracts'
 
 type SnapshotMeta = Parameters<RemoteRuntimeMultiplexedTerminalCallbacks['onSnapshot']>[1]

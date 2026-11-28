@@ -23,14 +23,14 @@ Use `gh run watch <run-id> --compact --exit-status` or `gh pr checks --watch` to
 
 All UI work — layout, color, typography, spacing, component selection, UX behavior — must follow [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md). Use the tokens defined in `src/renderer/src/assets/main.css` (the canonical source) and the shadcn primitives in `src/renderer/src/components/ui/`. Don't invent new color values, font sizes, or shadow tiers when a documented one already covers the role.
 
-# Electron UI Validation
+# Tauri Desktop UI Validation
 
 - Always run tests and agent-launched apps in the background with `ORCA_BACKGROUND_LAUNCH=1`.
-- Never steal monitor focus or reveal test windows: no `show()`, `showInactive()`, `bringToFront()`, `app.focus()`, or OS activation. Use CDP screenshots of hidden renderers.
+- Never steal monitor focus or reveal test windows: no `show()`, `showInactive()`, `bringToFront()`, `app.focus()`, or OS activation. Use CDP screenshots of hidden WebView2/renderers.
 - Keep native-focus and visible-window tests paused on the user's desktop; run them on an isolated display or CI.
 - Rebuild modified launch-policy code before running an app (stale build wrappers are not safe).
-- Use the `$electron` skill and Playwright CDP for rendered Orca UI checks. Do not use computer-use for Orca UI validation.
-- Screenshot presentational components without Electron: `pnpm fixtures:shot <id>` ([fixtures](docs/agents-md-refs/component-fixtures.md)).
+- Use the Playwright CDP for rendered Tauri/Orca UI checks. Do not use computer-use for Orca UI validation.
+- Screenshot presentational components without opening the desktop app: `pnpm fixtures:shot <id>` ([fixtures](docs/agents-md-refs/component-fixtures.md)).
 
 # Code Style
 

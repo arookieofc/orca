@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../shared/desktop-api/browser-webview-element'
 import type { NativeBrowserPage } from './tauri-native-browser-webview'
 import type { PageFindOptions } from './tauri-native-browser-webview-find'
 import { runPageFind, stopPageFind } from './tauri-native-browser-webview-find'
@@ -22,23 +23,25 @@ function stableWebContentsId(browserPageId: string): number {
   return hash >>> 0
 }
 
-function asElectronWebview(element: HTMLDivElement): Electron.WebviewTag {
+function asBrowserWebviewElement(element: HTMLDivElement): BrowserWebviewElement {
   // SAFETY: the browser pane only consumes this proxy's EventTarget and WebviewTag methods;
   // the actual page is hosted by Tauri's child webview managed by the native bridge.
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only the shared browser-pane proxy surface is consumed by this compatibility adapter.
-  return element as unknown as Electron.WebviewTag
+  return element as unknown as BrowserWebviewElement
 }
 
 export function buildTauriBrowserWebviewTag(
   page: NativeBrowserPage,
   hooks: WebviewTagHooks
-): Electron.WebviewTag {
+): BrowserWebviewElement {
   const { element, browserPageId } = page
   Object.defineProperties(element, {
     src: {
       configurable: true,
       get: () => page.url,
-      set: (value: string) => hooks.queueNavigation(page, value)
+      set: (value: string) => {
+        hooks.queueNavigation(page, value)
+      }
     },
     getURL: { value: () => page.url },
     getTitle: { value: () => page.title },
@@ -103,5 +106,5 @@ export function buildTauriBrowserWebviewTag(
       }
     }
   })
-  return asElectronWebview(element)
+  return asBrowserWebviewElement(element)
 }

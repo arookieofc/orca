@@ -2,7 +2,7 @@
 // Static gate: a checked-in test file that no runner collects passes vacuously, so every one must be collected.
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
@@ -17,22 +17,10 @@ const TEST_FILE_NAME = /\.(?:test|spec|e2e|bench)\.[cm]?[jt]sx?$/
 // Mirror literals must appear in runner sources; list manual rows each run so their lack of CI remains visible.
 const NON_UNIT_TEST_RUNNERS = [
   {
-    name: 'Playwright e2e',
-    include: ['tests/e2e/**/*.spec.ts'],
-    sources: ['tests/playwright.config.ts'],
-    mirrors: ["testDir: './e2e'", "testMatch: '**/*.spec.ts'"]
-  },
-  {
     name: 'component fixtures Playwright',
     include: ['tests/component-fixtures/**/*.spec.ts'],
     sources: ['tests/component-fixtures/playwright.config.ts'],
     mirrors: ["testDir: '.'", "testMatch: '*.spec.ts'"]
-  },
-  {
-    name: 'computer-use e2e',
-    include: ['tests/e2e/desktop/computer-use/computer-*.e2e.ts'],
-    sources: ['tests/e2e/vitest.config.ts'],
-    mirrors: ["'tests/e2e/desktop/computer-use/computer-*.e2e.ts'"]
   },
   {
     name: 'bot automation eval (pnpm eval:bot-automations)',
@@ -281,7 +269,12 @@ function trackedCodeSources(root) {
   return new Map(
     stdout
       .split('\0')
-      .filter((file) => CODE_FILE.test(file) && !file.split('/').includes('node_modules'))
+      .filter(
+        (file) =>
+          CODE_FILE.test(file) &&
+          !file.split('/').includes('node_modules') &&
+          existsSync(path.join(root, file))
+      )
       .map((file) => [file, readFileSync(path.join(root, file), 'utf8')])
   )
 }

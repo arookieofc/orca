@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { reportBrowserGuestVisibility } from '../browser-guest-activity'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import { refreshBrowserGuestMetadata } from '../metadata/browser-guest-metadata-cache'
@@ -31,12 +32,12 @@ import type {
 } from '../../describe-page/browser-page-types'
 
 export type BrowserPageWebviewGuestSessionArgs = {
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   browserTabId: string
   workspaceId: string
   worktreeId: string
   sessionProfileId: string | null
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   isPaintableRef: MutableRefObject<boolean>
   guestRecoveryPendingRef: MutableRefObject<boolean>
   browserTabUrlRef: MutableRefObject<string>

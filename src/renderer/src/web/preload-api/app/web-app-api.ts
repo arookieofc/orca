@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { sanitizeWebRuntimeWorkspaceSession } from '../workspaces/web-workspace-session'
 import { sessionStorageKeyForHost } from '../workspaces/web-workspace-session-api'
 import { mergeWebUIState, readLocalWebUIState } from '../preferences/web-ui-state'

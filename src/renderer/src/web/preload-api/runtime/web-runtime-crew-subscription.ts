@@ -9,7 +9,7 @@ import {
   type RuntimeEnvironmentSetupFailure
 } from '../../../../../shared/remote-runtime/host-catalog/runtime-environment-subscription-setup'
 import type { WebRuntimeTransportSubscriptionHandle } from '../../runtime/client/web-runtime-subscription-contract'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { getPreferredWebRuntimeConnection } from '../../pairing/web-runtime-environment'
 import {
   manuallyDisconnectedEnvironmentIds,

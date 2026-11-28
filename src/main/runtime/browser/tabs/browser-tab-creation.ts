@@ -7,9 +7,8 @@ import {
   resolveBrowserTabCreateFocus,
   type BrowserTabCreateFocusResolution
 } from './browser-tab-create-publication'
-import { browserSessionRegistry } from '../../../browser/sessions/profiles/browser-session-registry'
+import { getRuntimeBrowserDesktopAdapter } from '../installation/runtime-browser-desktop-adapter'
 import { BrowserError } from '../../../browser/browser-error'
-import { waitForTabRegistration } from '../../../ipc/browser/browser-tab-registration-wait'
 import type { RuntimeBrowserCommandHost } from '../commands/browser-command-contracts'
 import type { RuntimeBrowserCommandTargets } from '../commands/browser-command-targets'
 import {
@@ -79,7 +78,8 @@ export class RuntimeBrowserTabCreation {
       ? await this.host.resolveBrowserWorkspace(params.worktree)
       : undefined
     const worktreeId = worktree?.id
-    const sessionPartition = browserSessionRegistry.resolveKnownPartition(params.profileId)
+    const desktop = getRuntimeBrowserDesktopAdapter()
+    const sessionPartition = desktop.resolveKnownPartition(params.profileId)
     if (!sessionPartition) {
       throw new BrowserError(
         'invalid_argument',
@@ -102,7 +102,7 @@ export class RuntimeBrowserTabCreation {
         { ...params, placement: params.placement },
         {
           worktree,
-          browserProfileId: params.profileId ?? browserSessionRegistry.getDefaultProfile().id,
+          browserProfileId: params.profileId ?? desktop.getDefaultProfile().id,
           caller
         }
       )
@@ -121,7 +121,7 @@ export class RuntimeBrowserTabCreation {
         return createBrowserPageOnPairedHost(
           this.host,
           params,
-          params.profileId ?? browserSessionRegistry.getDefaultProfile().id,
+          params.profileId ?? desktop.getDefaultProfile().id,
           offscreen ? createOffscreen : undefined,
           caller?.signal
         )
@@ -143,7 +143,7 @@ export class RuntimeBrowserTabCreation {
     // Wait for operability, but retain the created id if mounting times out.
     if (params.waitForRegistration !== false) {
       try {
-        await waitForTabRegistration(browserPageId)
+        await desktop.waitForTabRegistration(browserPageId)
       } catch {
         // Later commands report a clear error if the created tab never mounts.
       }

@@ -1,0 +1,47 @@
+name: Tauri Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (e.g. v1.4.214)
+        required: true
+        type: string
+
+jobs:
+  publish-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+          - os: macos-14
+            name: macos-arm64
+          - os: ubuntu-22.04
+            name: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - uses: ./.github/actions/install-mobile-dependencies
+      - run: pnpm run build:tauri
+        env:
+          ORCA_TAURI_UPDATER_PUBLIC_KEY: ${{ vars.ORCA_TAURI_UPDATER_PUBLIC_KEY }}
+          ORCA_TAURI_UPDATER_ENDPOINTS: ${{ vars.ORCA_TAURI_UPDATER_ENDPOINTS }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orca-tauri-${{ matrix.name }}
+          path: |
+            tauri-poc/src-tauri/target/release/bundle/**
+            !tauri-poc/src-tauri/target/release/bundle/**/intermediates/**

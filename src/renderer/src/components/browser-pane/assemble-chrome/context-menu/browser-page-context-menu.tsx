@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { windowDipToCssPx } from '@/app-shell/chrome/ui-zoom'
 import {
   useCallback,
@@ -30,7 +31,7 @@ export function BrowserPageContextMenu({
   worktreeId: string
   canGoBack: boolean
   canGoForward: boolean
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   onReload: () => void
 }): React.JSX.Element | null {
   const [contextMenu, setContextMenu] = useState<BrowserPageContextMenuState | null>(null)

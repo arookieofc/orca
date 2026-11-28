@@ -1,7 +1,6 @@
 import { lstat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { runProcess } from '@orca/process-host'
-import { isDevBundleInUse } from '../development/electron-bundle-cache/dev-electron-bundle-cache.mjs'
 
 async function git(worktree, args) {
   const result = await runProcess({
@@ -15,9 +14,9 @@ async function git(worktree, args) {
 }
 
 // Raw directory mtimes are useless: agent tooling rewrites dot-directories in every worktree.
-// Git-visible work and live processes are the signals that a test could be reading a checkout.
+// Git-visible work signals that a test or developer could still be reading a checkout.
 export async function worktreeActiveSince(worktree, sinceMs, processTable) {
-  if (processTable === null || isDevBundleInUse(worktree, processTable)) {
+  if (processTable === null) {
     return true
   }
   const headTime = await git(worktree, ['log', '-g', '-1', '--format=%ct', 'HEAD'])

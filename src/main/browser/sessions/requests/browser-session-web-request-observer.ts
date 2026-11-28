@@ -1,3 +1,8 @@
+import type {
+  BrowserGuestFrame,
+  BrowserGuestSession
+} from '../../guest-lifecycle/browser-guest-surface-types'
+
 /**
  * Electron allows one session.webRequest listener per event, and any listener at all turns off
  * extensions' own chrome.webRequest for the whole session (electron_browser_client.cc
@@ -21,7 +26,7 @@ export type ObservedWebRequestDetails = {
   url: string
   method: string
   webContentsId?: number
-  frame?: Electron.WebFrameMain | null
+  frame?: BrowserGuestFrame | null
   resourceType: string
   initiatorOrigin?: string
   timestamp: number
@@ -36,7 +41,7 @@ export type ObservedWebRequestDetails = {
 }
 
 type Observer = (
-  session: Electron.Session,
+  session: BrowserGuestSession,
   event: ObservedWebRequestEvent,
   details: ObservedWebRequestDetails
 ) => void
@@ -59,7 +64,7 @@ export function setBrowserSessionWebRequestObserver(next: Observer): void {
 
 /** Called by every Orca session.webRequest handler on browser sessions; must stay cheap. */
 export function reportBrowserSessionWebRequest(
-  session: Electron.Session,
+  session: BrowserGuestSession,
   event: ObservedWebRequestEvent,
   details: ObservedWebRequestDetails
 ): void {

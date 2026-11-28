@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { issueBrowserGuestNavigation } from '../host-guest/metadata/browser-guest-metadata-cache'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { ArtifactPublishButton } from '@/components/artifacts/ArtifactPublishButton'
@@ -99,7 +100,7 @@ export function BrowserPageToolbar({
   convertedTo?: BrowserPageConversionOrigin | null
   loading: boolean
   loadFailed: boolean
-  webviewRef: RefObject<Electron.WebviewTag | null>
+  webviewRef: RefObject<BrowserWebviewElement | null>
   reloadMenuOpen: boolean
   setReloadMenuOpen: Dispatch<SetStateAction<boolean>>
   reloadButtonLabel: string

@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { parseDocument } from 'yaml'
 import type { TerminalColorOverrides } from '../../shared/terminal-themes/terminal-color-overrides'
 import {
@@ -166,7 +165,9 @@ export function parseWarpThemeYaml(
     return { ok: false, reason: 'Theme file must contain a YAML object.' }
   }
 
-  const fallbackName = path.basename(fileLabel, path.extname(fileLabel))
+  const base = fileLabel.split(/[\\/]/).pop() ?? fileLabel
+  const dot = base.lastIndexOf('.')
+  const fallbackName = dot > 0 ? base.slice(0, dot) : base
   const name = normalizeTerminalThemeName(value.name, fallbackName)
   const terminal: TerminalColorOverrides = {}
   const background = readColor(value, 'background')

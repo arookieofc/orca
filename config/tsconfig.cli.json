@@ -1,5 +1,5 @@
 {
-  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "extends": "./tsconfig.base.json",
   // Why only roots: src/main files come in through imports. check-runtime-electron-ratchet.mjs
   // keeps Electron out of that graph.
   "include": [
@@ -7,6 +7,7 @@
     "../src/shared/**/*",
     "../src/shared/editor-language/monaco-language-associations.json",
     "../src/packages/process-host/src/__fixtures__/**/*",
+    "../src/types/**/*",
     // Loaded by path beside its launcher, so no import reaches it.
     "../src/main/persistence/profile-state/backup/profile-state-backup-worker-entry.ts"
   ],

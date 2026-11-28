@@ -45,10 +45,12 @@ pub fn poc_clipboard_read_file_paths() -> Vec<String> {
     {
         read_file_paths_from_linux_clipboard()
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
     {
-        // Reading copied files on macOS needs the NSPasteboard filenames
-        // plist — not yet wired on this port.
+        read_file_paths_from_macos_clipboard()
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+    {
         Vec::new()
     }
 }
@@ -84,6 +86,59 @@ fn read_file_paths_from_linux_clipboard() -> Vec<String> {
         }
     }
     Vec::new()
+}
+
+#[cfg(target_os = "macos")]
+fn read_file_paths_from_macos_clipboard() -> Vec<String> {
+    use std::process::{Command, Stdio};
+
+    let output = Command::new("/usr/bin/osascript")
+        .args([
+            "-e",
+            "try\nset f to (the clipboard as «class furl»)\nreturn POSIX path of f\non error\nreturn \"\"\nend try",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output();
+    let Ok(out) = output else {
+        return Vec::new();
+    };
+    if !out.status.success() {
+        return Vec::new();
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        Vec::new()
+    } else {
+        vec![trimmed.to_owned()]
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn write_file_to_macos_clipboard(path: &Path) -> ClipboardFileResult {
+    use std::process::{Command, Stdio};
+
+    let Some(path_str) = path.to_str() else {
+        return invalid_result("clipboard-write-failed");
+    };
+    let status = Command::new("/usr/bin/osascript")
+        .args([
+            "-e",
+            "on run argv\nset the clipboard to POSIX file (item 1 of argv)\nend run",
+            "--",
+            path_str,
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    match status {
+        Ok(exit) if exit.success() => ClipboardFileResult {
+            ok: true,
+            reason: None,
+        },
+        _ => invalid_result("clipboard-write-failed"),
+    }
 }
 
 /// Parses the `text/uri-list` payload into local paths. Any non-`file://`
@@ -183,11 +238,12 @@ pub fn poc_clipboard_write_file(args: ClipboardWriteFileArgs) -> ClipboardFileRe
     {
         write_file_to_linux_clipboard(&canonical)
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
     {
-        // Electron reaches this same `unsupported-platform` reason when the
-        // desktop offers no file-clipboard helper (macOS needs NSPasteboard,
-        // still unwired here).
+        write_file_to_macos_clipboard(&canonical)
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+    {
         invalid_result("unsupported-platform")
     }
 }

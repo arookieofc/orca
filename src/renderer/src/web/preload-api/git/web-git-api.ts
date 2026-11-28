@@ -1,6 +1,6 @@
 import { createGitCommitActionsApi } from './web-git-commit-actions-api'
 import { createGitHistoryApi } from './web-git-history-api'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { callAbortableRuntimeEnvironment } from '../../../runtime/rpc/calls/abortable-runtime-environment-call'
 import { toRuntimeWorktreeSelector } from '../../../runtime/rpc/targets/runtime-worktree-selector'
 import { translate } from '@/i18n/i18n'

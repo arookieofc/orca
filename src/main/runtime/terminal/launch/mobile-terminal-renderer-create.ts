@@ -6,7 +6,7 @@ import { OrcaRuntimeWithMobileChatForkCreate } from './mobile-terminal-chat-fork
 import type { RuntimeMobileSessionCreateTerminalResult } from '../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import { randomUUID } from 'node:crypto'
 import { getRuntimeDesktopSurface } from '../../construction/runtime-desktop-surface'
-import type { IpcMainEvent } from 'electron'
+import type { RuntimeDesktopIpcEvent } from '../../construction/runtime-desktop-surface'
 import {
   MOBILE_TERMINAL_READY_FALLBACK_MS,
   MOBILE_TERMINAL_SURFACE_TIMEOUT_MS
@@ -189,7 +189,7 @@ export abstract class OrcaRuntimeWithRunCreateMobileSessionTerminal extends Orca
         }
 
         const handler = (
-          event: IpcMainEvent,
+          event: RuntimeDesktopIpcEvent,
           r: { requestId: string; tabId?: string; title?: string; error?: string }
         ): void => {
           if (event.sender !== rendererWebContents || r.requestId !== requestId) {

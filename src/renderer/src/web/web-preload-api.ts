@@ -1,5 +1,6 @@
-import type { PreloadApi } from '../../../preload/api-types'
-import type { StatsSummary } from '../../../shared/diagnostics/process-stats-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
+import type { CodexConfigSyncStatus } from '../../../shared/agent-accounts/codex/codex-config-sync-types'
+import type { MemorySnapshot, StatsSummary } from '../../../shared/diagnostics/process-stats-types'
 import { createWebE2EApi } from './preload-api/app/web-e2e-api'
 import {
   createClaudeAccountsApi,
@@ -121,7 +122,10 @@ function createWebPreloadApi(): Omit<Partial<PreloadApi>, 'settings' | 'plugins'
         }))
     },
     memory: {
-      getSnapshot: () => Promise.resolve(createEmptyMemorySnapshot()),
+      getSnapshot: () =>
+        callRuntimeResult<MemorySnapshot>('diagnostics.memory').catch(() =>
+          createEmptyMemorySnapshot()
+        ),
       // Browser pages have no native-window veto; document visibility owns admission.
       resourceWindowVisible: () => Promise.resolve(true),
       onResourceWindowVisibility: () => () => {}
@@ -145,7 +149,9 @@ function createWebPreloadApi(): Omit<Partial<PreloadApi>, 'settings' | 'plugins'
     macosTccPrompts: createMacosTccPromptsApi(),
     codexConfigSync: {
       status: () =>
-        Promise.resolve({ state: 'synced', reason: null, systemConfigPath: '' } as const)
+        callRuntimeResult<CodexConfigSyncStatus>('codexConfigSync.status').catch(
+          () => ({ state: 'synced', reason: null, systemConfigPath: '' }) as const
+        )
     },
     developerPermissions: createDeveloperPermissionsApi(),
     computerUsePermissions: createComputerUsePermissionsApi(),

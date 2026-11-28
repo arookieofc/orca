@@ -1,5 +1,7 @@
-import type { BrowserWindow } from 'electron'
-import { getRuntimeDesktopSurface } from '../construction/runtime-desktop-surface'
+import {
+  getRuntimeDesktopSurface,
+  type RuntimeDesktopWindow
+} from '../construction/runtime-desktop-surface'
 import {
   getRepoExecutionHostId,
   getRepoSshConnectionId,
@@ -37,7 +39,9 @@ import {
 import type { ResolvedWorktree } from '../workspaces/catalog/runtime-worktree-path-identity'
 
 export abstract class OrcaRuntimeWithTransitionGraphReloadToTerminalState extends OrcaRuntimeWithHasTerminalsForWorktree {
-  getAuthoritativeWindow(missingWindowMessage = 'No renderer window available'): BrowserWindow {
+  getAuthoritativeWindow(
+    missingWindowMessage = 'No renderer window available'
+  ): RuntimeDesktopWindow {
     const win = this.getAvailableAuthoritativeWindow()
     if (!win || win.isDestroyed()) {
       throw new Error(missingWindowMessage)
@@ -45,7 +49,7 @@ export abstract class OrcaRuntimeWithTransitionGraphReloadToTerminalState extend
     return win
   }
 
-  protected getAvailableAuthoritativeWindow(): BrowserWindow | null {
+  protected getAvailableAuthoritativeWindow(): RuntimeDesktopWindow | null {
     if (this.authoritativeWindowId === null) {
       return null
     }

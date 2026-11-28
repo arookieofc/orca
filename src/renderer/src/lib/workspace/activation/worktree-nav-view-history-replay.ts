@@ -9,7 +9,8 @@ export function applyWorktreeNavViewEntry(entry: WorktreeNavHistoryViewEntry): v
     entry === 'workbench' ||
     entry === 'skills' ||
     entry === 'rooms' ||
-    entry === 'web-bots'
+    entry === 'web-bots' ||
+    entry === 'node-relay'
   ) {
     if (entry === 'automations') {
       // Why: Back/Forward is a user navigation; the page focuses its title once it settles.

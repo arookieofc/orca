@@ -33,16 +33,12 @@ on:
       - 'config/scripts/native-build/node-addons/ensure-native-runtime.mjs'
       - 'config/scripts/native-build/windows/initialize-windows-native-toolchain.mjs'
       - 'config/scripts/native-build/windows/capture-windows-native-environment.cmd'
-      - 'config/scripts/native-build/node-addons/rebuild-native-deps.mjs'
       - 'config/scripts/native-build/node-addons/node-pty-job-ownership.cjs'
       - 'config/scripts/native-build/windows/windows-pe-machine.cjs'
       - 'config/scripts/native-build/windows/windows-process-tree-gyp-rebuild.mjs'
       - 'config/scripts/native-build/windows/windows-process-tree-creation-time.cjs'
-      - 'config/scripts/electron-installation/platform-layout/install-electron-package-binary.mjs'
-      - 'config/scripts/electron-installation/platform-layout/electron-platform-path.mjs'
       - 'config/scripts/zip-extractor-command.mjs'
       - 'src/shared/archives/zip-extractor-command.ts'
-      - 'config/scripts/electron-installation/shared-dist-cache/shared-electron-dist-cache.mjs'
       - 'config/scripts/artifact-storage/reflink-copy/space-sharing-copy.mjs'
       - 'config/patches/**'
       - 'native/windows-notifications/**'
@@ -88,7 +84,6 @@ jobs:
         with:
           native-runtime: node
           node-version: '24'
-          cache-electron-package: 'true'
           # No hosted job restores the root store, so keep it out of GitHub's cache quota.
           cache-pnpm-store: ${{ startsWith(matrix.runner, 'blacksmith-') }}
           cache-pnpm-store-lookup-only: 'true'
@@ -96,9 +91,6 @@ jobs:
       - uses: ./.github/actions/prepare-headless-compiler
         with:
           seed: 'true'
-
-      - name: Populate shared Electron archive
-        run: node config/scripts/electron-installation/platform-layout/install-electron-package-binary.mjs
 
       - uses: ./.github/actions/prepare-git-compatibility
 

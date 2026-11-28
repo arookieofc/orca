@@ -1,4 +1,5 @@
 import { getBrowserPageIdleDiscard } from './browser-page-idle-discard'
+import type { BrowserGuestEvent, BrowserGuestWebContents } from './browser-guest-surface-types'
 import { randomUUID } from 'node:crypto'
 import { BrowserError } from '../browser-error'
 import { waitForBrowserGuestLoad } from './browser-guest-load'
@@ -13,7 +14,7 @@ import { noteBrowserPageClosed, noteBrowserPageOpened } from './browser-page-par
 
 type Attach = { pageId: string; page: Page; url: string; token: string; admitted: boolean }
 const attachments = new Map<string, Attach>()
-export const guestLoads = new WeakMap<Electron.WebContents, Promise<void>>()
+export const guestLoads = new WeakMap<BrowserGuestWebContents, Promise<void>>()
 let generation = 0
 const MARKER = 'data:text/html,orca-browser-attach-'
 let admittedAttach: Attach | null = null
@@ -103,7 +104,7 @@ export function isBrowserPageAttachMarker(src: string): boolean {
   return src.startsWith(MARKER)
 }
 /** Called before policy installation and any guest navigation. */
-export function associateBrowserPageAttach(guest: Electron.WebContents): boolean {
+export function associateBrowserPageAttach(guest: BrowserGuestWebContents): boolean {
   const attach = admittedAttach
   if (
     !attach ||
@@ -138,10 +139,10 @@ export function associateBrowserPageAttach(guest: Electron.WebContents): boolean
   pendingLoads.set(guest, attach)
   return true
 }
-const pendingLoads = new WeakMap<Electron.WebContents, Attach>()
+const pendingLoads = new WeakMap<BrowserGuestWebContents, Attach>()
 
 /** Route pages call this only after their existing main-owned navigation grant. */
-export function startBrowserPageAttach(guest: Electron.WebContents, url?: string): boolean {
+export function startBrowserPageAttach(guest: BrowserGuestWebContents, url?: string): boolean {
   const attach = pendingLoads.get(guest)
   if (!attach) {
     return false
@@ -166,9 +167,7 @@ export function startBrowserPageAttach(guest: Electron.WebContents, url?: string
       dispose()
       return false
     }
-    const started = (
-      details: Electron.Event<Electron.WebContentsDidStartNavigationEventParams>
-    ): void => {
+    const started = (details: BrowserGuestEvent): void => {
       if (isCurrent() && details.isMainFrame && !details.isSameDocument) {
         outcome = 'pending'
       }
@@ -179,7 +178,7 @@ export function startBrowserPageAttach(guest: Electron.WebContents, url?: string
       }
     }
     const failed = (
-      _event: Electron.Event,
+      _event: BrowserGuestEvent,
       code: number,
       _description: string,
       _url: string,
@@ -244,6 +243,6 @@ export function forgetBrowserPageAttach(page: Page): void {
   }
 }
 
-export function hasPendingBrowserPageAttach(guest: Electron.WebContents): boolean {
+export function hasPendingBrowserPageAttach(guest: BrowserGuestWebContents): boolean {
   return pendingLoads.has(guest)
 }

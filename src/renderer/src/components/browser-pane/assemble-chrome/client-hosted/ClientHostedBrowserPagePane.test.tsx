@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import {
   annotateBrowserPageHandles,
   markHydratedBrowserPageHandles
@@ -316,13 +317,13 @@ function page(): BrowserPage {
 }
 
 function createWebview(): {
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   focus: ReturnType<typeof vi.fn>
   blur: ReturnType<typeof vi.fn>
   setUrl(url: string): void
   setTitle(title: string): void
 } {
-  const webview = document.createElement('webview') as Electron.WebviewTag
+  const webview = document.createElement('webview') as BrowserWebviewElement
   let url = 'about:blank'
   let title = 'New Tab'
   // Why: a real <webview> becomes activeElement when focused; focus code checks for that.
@@ -360,7 +361,7 @@ function createWebview(): {
   }
 }
 
-function retainedAttachment(webview: Electron.WebviewTag, detach = vi.fn()) {
+function retainedAttachment(webview: BrowserWebviewElement, detach = vi.fn()) {
   let revision = 0
   return {
     webview,

@@ -1,10 +1,14 @@
+import type {
+  BrowserWebviewElement,
+  BrowserWebviewLoadCommitEvent
+} from '../../../../../../shared/desktop-api/browser-webview-element'
 import type { BrowserClientPageRendererIdentity } from '../../../../../../shared/browser/client-hosting/browser-client-page-renderer-protocol'
 
 export type BrowserClientRetainedRendererPage = {
   key: string
   identity: BrowserClientPageRendererIdentity
   host: HTMLDivElement
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   status: 'attaching' | 'attached' | 'retiring'
   webContentsId: number | null
   metadataRevision: number
@@ -18,7 +22,7 @@ export type BrowserClientRetainedRendererPage = {
   releasePreparation: () => void
   onDestroyed: EventListener
   onRendererGone: EventListener
-  onLoadCommit: (event: Electron.LoadCommitEvent) => void
+  onLoadCommit: (event: BrowserWebviewLoadCommitEvent) => void
   releaseDragPassthroughSurface: () => void
   releasePaintRetention: () => void
 }

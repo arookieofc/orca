@@ -1,4 +1,4 @@
-import type { MessagePortMain } from 'electron'
+import type { SpeechWorkerAudioPort } from './stt-worker-parent-port'
 import {
   dictationVocabulary,
   type DictationTerm
@@ -109,7 +109,7 @@ export class SttService {
   }
 
   /** Hands an active on-device session the renderer's port, so its audio skips this process. */
-  attachAudioPort(owner: string, port: MessagePortMain): boolean {
+  attachAudioPort(owner: string, port: SpeechWorkerAudioPort): boolean {
     const session = this.state.sessions.get(owner)
     if (session?.phase !== 'active' || !session.engine) {
       return false

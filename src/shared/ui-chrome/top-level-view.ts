@@ -13,7 +13,8 @@ const TOP_LEVEL_VIEW_LOOKUP: Record<TopLevelView, true> = {
   workbench: true,
   mobile: true,
   rooms: true,
-  'web-bots': true
+  'web-bots': true,
+  'node-relay': true
 }
 
 export function isTopLevelView(value: unknown): value is TopLevelView {

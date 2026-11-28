@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import type { BrowserGuestIdleDiscardToken } from '../../../../../shared/browser/guest-lifecycle/browser-guest-discard-protection'
 import { browserGuestActivity, reportBrowserGuestVisibility } from './browser-guest-activity'
 
@@ -6,7 +7,7 @@ export function installBrowserGuestPageRetention(args: {
   isBlocked: (pageId: string) => boolean
   discard: (
     pageId: string,
-    webview: Electron.WebviewTag,
+    webview: BrowserWebviewElement,
     webContentsId: number,
     policyToken: BrowserGuestIdleDiscardToken
   ) => boolean

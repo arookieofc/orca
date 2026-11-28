@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { noopUnsubscribe } from '../web-storage'
 
 export function createWebStarNagApi(): Partial<PreloadApi> {

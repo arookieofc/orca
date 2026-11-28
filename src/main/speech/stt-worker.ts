@@ -1,13 +1,12 @@
-import type { MessagePortMain } from 'electron'
 import type { SpeechAudioPortMessage } from '../../shared/speech/speech-types'
 import type { SttRecognizer, SttRecognizerInit, SttRecognizerPost } from './stt-recognizer'
 import { createTranscribeCppRecognizer } from './stt-transcribe-cpp-recognizer'
-import { connectSttWorkerParentPort } from './stt-worker-parent-port'
+import { connectSttWorkerParentPort, type SpeechWorkerAudioPort } from './stt-worker-parent-port'
 import type { SttWorkerRequest } from './stt-worker-process'
 
 // A desktop renderer's audio for one stream, posted straight here instead of through main.
 type AudioPortInput = {
-  port: MessagePortMain
+  port: SpeechWorkerAudioPort
   onEnded: (() => void) | null
   /** 'end' arrived; its frames may still wait behind a decode. */
   ending: boolean
@@ -49,7 +48,7 @@ async function handleFeed(msg: Extract<SttWorkerRequest, { type: 'feed' }>): Pro
   }
 }
 
-function attachAudioPort(streamId: string, port: MessagePortMain | undefined): void {
+function attachAudioPort(streamId: string, port: SpeechWorkerAudioPort | undefined): void {
   if (!port) {
     return
   }
@@ -130,7 +129,7 @@ function handleDiscard(streamId: string): void {
 
 function handleMessage(
   msg: SttWorkerRequest,
-  ports: readonly MessagePortMain[]
+  ports: readonly SpeechWorkerAudioPort[]
 ): void | Promise<void> {
   switch (msg.type) {
     case 'init':

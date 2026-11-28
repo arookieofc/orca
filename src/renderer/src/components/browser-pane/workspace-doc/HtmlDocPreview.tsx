@@ -1,3 +1,7 @@
+import type {
+  BrowserWebviewElement,
+  BrowserWebviewDidFailLoadEvent
+} from '../../../../../shared/desktop-api/browser-webview-element'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import type {
@@ -34,12 +38,10 @@ import { buildDocPreviewShareControl } from './doc-preview-artifact-share'
 import { useDocPreviewWebviewHistory } from './doc-preview-webview-history'
 import { useDocPreviewGuestFocus } from './use-doc-preview-guest-focus'
 import { useDocPreviewGuestTools } from './use-doc-preview-guest-tools'
-import { joinPath } from '@/lib/path'
 import {
-  cacheDirectSshFilePreview,
-  isDirectSshFileContext
-} from '@/runtime/runtime-direct-ssh-file-read'
-import { isTauriNativeHost } from '@/web/tauri-native-bridge'
+  cacheRemoteDocPreviewEntry,
+  subscribeRemoteDocPreviewResources
+} from './doc-preview-remote-resource-cache'
 import { useConfirmationDialog } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import { formatClipboardFilePath } from '@/lib/clipboard/clipboard-file-path'
 import { getOpenFileRevealOwner } from '@/lib/files/os-open/reveal-in-file-manager'
@@ -49,23 +51,15 @@ type PreviewState = 'loading' | 'ready' | 'unavailable'
 
 const MAX_ASSET_FAILURES = 50
 
-export function HtmlDocPreview({
-  previewId,
-  browserWorkspaceId,
-  filePath,
-  relativePath,
-  worktreeId,
-  holdsGuestFocus = false,
-  isActive = true,
-  runtimeEnvironmentId = null,
-  externalSshTargetId = null,
-  convertedFrom = null,
-  convertedTo = null
-}: HtmlDocPreviewProps): React.JSX.Element {
+export function HtmlDocPreview(props: HtmlDocPreviewProps): React.JSX.Element {
+  const { previewId, browserWorkspaceId, filePath, relativePath, worktreeId } = props
+  const { holdsGuestFocus = false, isActive = true } = props
+  const { runtimeEnvironmentId = null, externalSshTargetId = null } = props
+  const { convertedFrom = null, convertedTo = null } = props
   const t = useTranslate()
   const confirm = useConfirmationDialog()
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const webviewRef = useRef<Electron.WebviewTag | null>(null)
+  const webviewRef = useRef<BrowserWebviewElement | null>(null)
   const isActiveRef = useRef(isActive)
   useLayoutEffect(() => {
     isActiveRef.current = isActive
@@ -169,7 +163,7 @@ export function HtmlDocPreview({
         setState('ready')
       }
     }
-    const onLoadFailed = (event: Electron.DidFailLoadEvent): void => {
+    const onLoadFailed = (event: BrowserWebviewDidFailLoadEvent): void => {
       if (!event.isMainFrame || event.errorCode === -3) {
         return
       }
@@ -193,20 +187,6 @@ export function HtmlDocPreview({
     }
     // Subscribe before minting: entry failures arrive out-of-band while the guest paints the error body as text.
     let boundGrantId: string | null = null
-    const pendingRemoteResources = new Set<string>()
-    let reloadQueued = false
-    const queueRemoteResourceReload = (): void => {
-      if (reloadQueued) {
-        return
-      }
-      reloadQueued = true
-      window.setTimeout(() => {
-        reloadQueued = false
-        if (!disposed) {
-          reloadRef.current?.()
-        }
-      }, 0)
-    }
     const unsubscribeFailure = window.api.docPreview?.onLoadFailure?.((payload) => {
       if (disposed || payload.grantId !== boundGrantId) {
         return
@@ -231,37 +211,12 @@ export function HtmlDocPreview({
           : [...current, payload]
       )
     })
-    const unsubscribeResource = window.api.docPreview?.onResourceRequested?.((payload) => {
-      if (
-        disposed ||
-        request.owner.kind !== 'ssh' ||
-        boundGrantId !== payload.grantId ||
-        payload.browserPageId !== previewId ||
-        pendingRemoteResources.has(payload.relativePath)
-      ) {
-        return
-      }
-      const remoteContext = {
-        target: { kind: 'local' as const },
-        connectionId: request.owner.connectionId
-      }
-      if (!isDirectSshFileContext(remoteContext)) {
-        return
-      }
-      pendingRemoteResources.add(payload.relativePath)
-      void cacheDirectSshFilePreview(
-        remoteContext,
-        payload.grantId,
-        payload.relativePath,
-        joinPath(request.requestBase, payload.relativePath)
-      )
-        .then((cached) => {
-          if (cached) {
-            queueRemoteResourceReload()
-          }
-        })
-        .catch(() => {})
-        .finally(() => pendingRemoteResources.delete(payload.relativePath))
+    const unsubscribeResource = subscribeRemoteDocPreviewResources({
+      previewId,
+      request,
+      getBoundGrantId: () => boundGrantId,
+      isDisposed: () => disposed,
+      reload: () => reloadRef.current?.()
     })
     void ensureDocPreviewGrant(previewId, request)
       .then((handle) => {
@@ -269,27 +224,7 @@ export function HtmlDocPreview({
         if (disposed || !containerRef.current) {
           return null
         }
-        if (request.owner.kind === 'ssh' && isTauriNativeHost()) {
-          const remoteContext = {
-            target: { kind: 'local' as const },
-            connectionId: request.owner.connectionId
-          }
-          if (!isDirectSshFileContext(remoteContext)) {
-            throw new Error('SSH document preview is unavailable in this client.')
-          }
-          return cacheDirectSshFilePreview(
-            remoteContext,
-            handle.grantId,
-            request.entryRelativePath,
-            joinPath(request.requestBase, request.entryRelativePath)
-          ).then((cached) => {
-            if (!cached) {
-              throw new Error('SSH document preview entry could not be cached.')
-            }
-            return handle
-          })
-        }
-        return handle
+        return cacheRemoteDocPreviewEntry(request, handle.grantId).then(() => handle)
       })
       .then((handle) => {
         if (!handle || disposed || !containerRef.current) {

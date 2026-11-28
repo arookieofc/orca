@@ -1,5 +1,4 @@
-import type { Session } from 'electron'
-import { requirePartitionSession } from '../../../network/http-client'
+import { requirePartitionSession, type HttpClientSession } from '../../../network/http-client'
 import {
   getProxyBypassRulesFromEnvironment,
   getProxyUrlFromEnvironment,
@@ -11,14 +10,16 @@ import {
 export const OPENCODE_BASE_URL = 'https://opencode.ai'
 
 const OPENCODE_SESSION_PARTITION = 'orca-opencode-go-rate-limit-fetch'
-const appliedProxyKeys = new WeakMap<Session, string>()
+const appliedProxyKeys = new WeakMap<HttpClientSession, string>()
 
-export async function clearOpenCodeSessionCookies(openCodeSession: Session): Promise<void> {
+export async function clearOpenCodeSessionCookies(
+  openCodeSession: HttpClientSession
+): Promise<void> {
   await openCodeSession.clearStorageData({ origin: OPENCODE_BASE_URL, storages: ['cookies'] })
 }
 
 async function setOpenCodeSessionProxy(
-  openCodeSession: Session,
+  openCodeSession: HttpClientSession,
   proxyRules: string,
   proxyBypassRules: string,
   source: 'settings' | 'env'
@@ -36,7 +37,9 @@ async function setOpenCodeSessionProxy(
   appliedProxyKeys.set(openCodeSession, key)
 }
 
-async function ensureEnvironmentProxyForOpenCodeSession(openCodeSession: Session): Promise<void> {
+async function ensureEnvironmentProxyForOpenCodeSession(
+  openCodeSession: HttpClientSession
+): Promise<void> {
   const envProxy = getProxyUrlFromEnvironment(process.env)
   const proxyBypassRules = getProxyBypassRulesFromEnvironment(process.env)
   const envKey =
@@ -64,7 +67,7 @@ async function ensureEnvironmentProxyForOpenCodeSession(openCodeSession: Session
 }
 
 async function ensureProxyForOpenCodeSession(
-  openCodeSession: Session,
+  openCodeSession: HttpClientSession,
   networkProxySettings?: NetworkProxySettings
 ): Promise<void> {
   const configuredProxy = normalizeProxyUrl(networkProxySettings?.httpProxyUrl)
@@ -84,7 +87,7 @@ async function ensureProxyForOpenCodeSession(
 export async function createOpenCodeRequestSession(
   authCookies: { name: string; value: string }[],
   networkProxySettings?: NetworkProxySettings
-): Promise<Session> {
+): Promise<HttpClientSession> {
   const openCodeSession = requirePartitionSession(OPENCODE_SESSION_PARTITION, 'OpenCode Go')
   await clearOpenCodeSessionCookies(openCodeSession)
   // The isolated cookie jar must still honor Orca, environment, and system proxies.

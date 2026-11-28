@@ -1,5 +1,6 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 export function observeBrowserClientPageBootstrap(
-  webview: Electron.WebviewTag,
+  webview: BrowserWebviewElement,
   isAttaching: () => boolean,
   ready: () => void
 ): () => void {

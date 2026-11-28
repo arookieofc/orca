@@ -1,5 +1,5 @@
 import type { AgentSessionAttachmentClipboardTarget } from '../../../shared/agent-session/agent-session-attachments'
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import type { BrowserPageZoomCommand } from '../../../shared/browser/site-settings/browser-page-zoom'
 import {
   assertClipboardTextWithinLimitWithYield,

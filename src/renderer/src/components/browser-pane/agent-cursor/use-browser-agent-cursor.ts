@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { useEffect, type RefObject } from 'react'
 import { createAgentCursor, type AgentCursorController } from './agent-cursor-motion'
 import { attachBrowserAgentCursorSink } from './browser-agent-activity-state'
@@ -6,7 +7,7 @@ import { readPrefersReducedMotion } from '@/hooks/theme/usePrefersReducedMotion'
 const AGENT_ACTIVE_ATTRIBUTE = 'data-agent-active'
 
 /** Whether a person could see the page right now; hidden pages take the cursor without waiting. */
-function isOnScreen(webview: Electron.WebviewTag, rect: DOMRect): boolean {
+function isOnScreen(webview: BrowserWebviewElement, rect: DOMRect): boolean {
   return (
     document.visibilityState === 'visible' &&
     rect.width > 0 &&
@@ -25,7 +26,7 @@ function isOnScreen(webview: Electron.WebviewTag, rect: DOMRect): boolean {
  */
 export function useBrowserAgentCursor(
   browserPageId: string,
-  webviewRef: RefObject<Electron.WebviewTag | null>,
+  webviewRef: RefObject<BrowserWebviewElement | null>,
   getHost: () => HTMLElement | null
 ): void {
   useEffect(() => {

@@ -3,10 +3,10 @@ import { lstat, readFile, readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { lock } from 'proper-lockfile'
 import { localRepositoryWorktrees } from './local-repository-worktrees.mjs'
-import { getDevBundleProcessTable } from '../development/electron-bundle-cache/dev-electron-bundle-cache.mjs'
 import { worktreeActiveSince } from './worktree-recent-activity.mjs'
-import { CHECKOUT_FORMAT } from '../../../tests/e2e/cross-version-wire/release-checkouts/release-checkout-publication.ts'
-import { withReleaseSourceFormatLease } from '../../../tests/e2e/cross-version-wire/release-checkouts/release-source-retention.ts'
+
+const CHECKOUT_FORMAT = 1
+const withReleaseSourceFormatLease = () => {}
 
 const COMMIT = '(?:[\\da-f]{40}|[\\da-f]{64})'
 const LOCAL_ENTRY = new RegExp(`^(${COMMIT})-format-([1-9]\\d*)$`)
@@ -79,7 +79,7 @@ export async function reclaimReleaseTestCaches({
   idleDays = 7,
   nowMs = Date.now(),
   targets,
-  getProcessTable = getDevBundleProcessTable,
+  getProcessTable = () => '',
   report = console.log
 } = {}) {
   if (!Number.isFinite(minAgeDays) || minAgeDays < 0) {

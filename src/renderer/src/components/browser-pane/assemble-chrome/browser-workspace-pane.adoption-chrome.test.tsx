@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -169,8 +170,8 @@ function flushFrames(cycles = 8): void {
   }
 }
 
-function createWebview(): Electron.WebviewTag & { loadURL: ReturnType<typeof vi.fn> } {
-  const webview = document.createElement('webview') as Electron.WebviewTag & {
+function createWebview(): BrowserWebviewElement & { loadURL: ReturnType<typeof vi.fn> } {
+  const webview = document.createElement('webview') as unknown as BrowserWebviewElement & {
     loadURL: ReturnType<typeof vi.fn>
   }
   // Use real guest focus: a spy cannot expose whether the resumed address-bar latch defeats it.

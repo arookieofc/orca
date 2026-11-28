@@ -1,4 +1,4 @@
-import type { PtyApi } from '../../../../preload/api/terminal/pty-api'
+import type { PtyApi } from '../../../../shared/desktop-api/api/terminal/pty-api'
 import type { PtySessionListScope } from '../../../../shared/terminal/pty/lifecycle/pty-listed-session'
 import type { RuntimeTerminalListResult } from '../../../../shared/terminal/runtime/runtime-terminal-contracts'
 import { hostScopeCensusIsComplete } from '../../../../shared/execution-host/runtime-listing-host-scope'

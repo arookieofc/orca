@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { useEffect, type RefObject } from 'react'
 import type { RuntimeBrowserClientPlacement } from '../../../../../../shared/browser/client-hosting/runtime-browser-placement'
 import type { BrowserChromeMarkupTool } from '../../assemble-chrome/toolbar/browser-annotate-tool-button'
@@ -14,7 +15,7 @@ export function useClientHostedBrowserMarkup({
   showFailureOverlay,
   controlsContainer
 }: {
-  webviewRef: RefObject<Electron.WebviewTag | null>
+  webviewRef: RefObject<BrowserWebviewElement | null>
   browserPageId: string
   runtimeEnvironmentId: string
   placement: RuntimeBrowserClientPlacement | null

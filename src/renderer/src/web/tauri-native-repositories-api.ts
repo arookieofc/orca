@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import { createReposApi } from './preload-api/workspaces/web-repositories-api'
 import { invokePlugin, isTauriNativeHost } from './tauri-native-host'
 import { translate } from '../i18n/i18n'

@@ -1,5 +1,10 @@
 import type { LocalAccountRuntimeTarget } from '../../../shared/agent-accounts/local-account-runtime'
-import type { BrowserWindow } from 'electron'
+import type { RuntimeDesktopWindow } from '../../runtime/construction/runtime-desktop-surface'
+
+export type RateLimitDesktopWindow = RuntimeDesktopWindow & {
+  on(event: 'focus' | 'show' | 'restore' | 'closed', listener: () => void): unknown
+  removeListener(event: 'focus' | 'show' | 'restore' | 'closed', listener: () => void): unknown
+}
 import type {
   AntigravityAccountUsage,
   InactiveAccountUsage,
@@ -78,7 +83,7 @@ export abstract class RateLimitServiceState {
     zcode: 0,
     muse: 0
   }
-  protected mainWindow: BrowserWindow | null = null
+  protected mainWindow: RateLimitDesktopWindow | null = null
   /** Paired clients streaming usage (accounts.subscribe); headless hosts have no window to watch. */
   protected usageViewers = 0
   protected detachWindowListeners: (() => void) | null = null

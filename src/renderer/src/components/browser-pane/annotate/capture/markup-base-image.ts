@@ -1,6 +1,7 @@
 // Capture in the renderer from local webviews or streamed images so local and remote panes share markup delivery.
 
 // Reuse the frozen image as both overlay backdrop and compositor base.
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 export type MarkupBaseImage = {
   dataUrl: string
   width: number
@@ -8,7 +9,7 @@ export type MarkupBaseImage = {
 }
 
 export type MarkupCaptureSource =
-  | { kind: 'webview'; webview: Electron.WebviewTag }
+  | { kind: 'webview'; webview: BrowserWebviewElement }
   | { kind: 'image'; element: HTMLImageElement }
 
 export async function captureMarkupBaseImage(
@@ -20,7 +21,7 @@ export async function captureMarkupBaseImage(
   return captureFromImage(source.element)
 }
 
-async function captureFromWebview(webview: Electron.WebviewTag): Promise<MarkupBaseImage> {
+async function captureFromWebview(webview: BrowserWebviewElement): Promise<MarkupBaseImage> {
   const native = await webview.capturePage()
   if (native.isEmpty()) {
     throw new Error('markup: webview capturePage returned an empty image')

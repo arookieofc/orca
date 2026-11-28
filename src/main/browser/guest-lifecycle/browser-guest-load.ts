@@ -1,7 +1,8 @@
 import { BrowserError } from '../browser-error'
+import type { BrowserGuestEvent, BrowserGuestWebContents } from './browser-guest-surface-types'
 
 export function waitForBrowserGuestLoad(
-  guest: Electron.WebContents,
+  guest: BrowserGuestWebContents,
   start?: () => Promise<void>
 ): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -19,7 +20,7 @@ export function waitForBrowserGuestLoad(
     const loaded = (): void => finish()
     const destroyed = (): void => finish(new Error('The browser page closed while loading'))
     const failed = (
-      _event: Electron.Event,
+      _event: BrowserGuestEvent,
       code: number,
       description: string,
       _url: string,

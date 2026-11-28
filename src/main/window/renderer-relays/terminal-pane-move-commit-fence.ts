@@ -3,7 +3,7 @@ import type { TerminalLeafMoveResult } from '../../../shared/workspace-layout/te
 // Why its own module: the plain-Node runtime commits leaf moves too, so this must stay Electron-free.
 
 /** The renderer a move was asked of (its WebContents), compared by identity. */
-export type PaneMoveRenderer = { readonly id: number }
+export type PaneMoveRenderer = { readonly id?: number }
 
 /** A client's pane move its window is carrying out. */
 export type RelayedPaneMove = {

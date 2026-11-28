@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import {
   cachedBrowserGuestMetadata,
   issueBrowserGuestNavigation
@@ -43,7 +44,7 @@ export type BrowserPageWebviewReloadResult =
 
 /** getWebContentsId separates destroyed guests needing recovery from live pre-dom-ready guests already loading; reload throws for both. */
 export function reloadBrowserPageWebview(
-  webview: Electron.WebviewTag,
+  webview: BrowserWebviewElement,
   { ignoreCache }: { ignoreCache: boolean }
 ): BrowserPageWebviewReloadResult {
   try {

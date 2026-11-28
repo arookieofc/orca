@@ -1,13 +1,13 @@
-import type { AgentBrowserBridge } from '../../../browser/agent-browser/agent-browser-bridge'
-import type { BrowserDialogAnswer } from '../../../browser/agent-browser/commands/agent-browser-bridge-page-commands'
 import type {
   BrowserCommandTargetParams,
-  BrowserAnswerAdmission
+  BrowserAnswerAdmission,
+  BrowserDialogAnswer,
+  RuntimeAgentBrowserBridge
 } from './browser-command-contracts'
 import type { RuntimeBrowserCommandTargets } from './browser-command-targets'
 
 type BrowserDialogTargets = Pick<RuntimeBrowserCommandTargets, 'resolveBrowserCommandTarget'> & {
-  requireAgentBrowserBridge(): Pick<AgentBrowserBridge, 'dialogAccept' | 'dialogDismiss'>
+  requireAgentBrowserBridge(): Pick<RuntimeAgentBrowserBridge, 'dialogAccept' | 'dialogDismiss'>
 }
 
 export class RuntimeBrowserDialogs {

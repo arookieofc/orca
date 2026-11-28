@@ -5,7 +5,7 @@ import {
   retireRuntimeBrowserClientPage
 } from '../client-pages/browser-client-page-close'
 import { BrowserError } from '../../../browser/browser-error'
-import { browserManager } from '../../../browser/guest-lifecycle/manager/browser-manager'
+import { getRuntimeBrowserDesktopAdapter } from '../installation/runtime-browser-desktop-adapter'
 import { closeBrowserTabInRenderer } from './browser-tab-renderer-close'
 import type { RuntimeBrowserCommandHost } from '../commands/browser-command-contracts'
 import type { RuntimeBrowserCommandTargets } from '../commands/browser-command-targets'
@@ -103,7 +103,7 @@ export class RuntimeBrowserTabClose {
     if (
       popupPageId &&
       bridge.getRegisteredTabs(worktreeId).has(popupPageId) &&
-      (await browserManager.closePopupPage(popupPageId))
+      (await getRuntimeBrowserDesktopAdapter().closePopupPage(popupPageId))
     ) {
       return { closed: true }
     }

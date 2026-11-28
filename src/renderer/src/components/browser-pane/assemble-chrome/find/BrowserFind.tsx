@@ -1,3 +1,8 @@
+import type {
+  BrowserWebviewElement,
+  BrowserWebviewFindInPageOptions,
+  BrowserWebviewFoundInPageEvent
+} from '../../../../../../shared/desktop-api/browser-webview-element'
 import { ImeInput } from '@/lib/text-input/ime/ime-text-field'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronUp, ChevronDown, X } from 'lucide-react'
@@ -10,7 +15,7 @@ type BrowserFindProps = {
   browserPageId: string
   isOpen: boolean
   onClose: () => void
-  webviewRef: React.RefObject<Electron.WebviewTag | null>
+  webviewRef: React.RefObject<BrowserWebviewElement | null>
   /** Bumped whenever the pane swaps in a new guest under the same mount; rebinds the listener. */
   guestGeneration?: number | null
 }
@@ -28,7 +33,7 @@ export default function BrowserFind({
   const activeFindRef = useRef<{
     query: string
     guestGeneration: number | null
-    webview: Electron.WebviewTag
+    webview: BrowserWebviewElement
     requestId: number
   } | null>(null)
   const [query, setQuery] = useState('')
@@ -45,7 +50,7 @@ export default function BrowserFind({
   const totalMatches = currentResult?.totalMatches ?? 0
 
   const safeFindInPage = useCallback(
-    (text: string, opts?: Electron.FindInPageOptions): void => {
+    (text: string, opts?: BrowserWebviewFindInPageOptions): void => {
       const webview = webviewRef.current
       if (!webview || !text) {
         return
@@ -139,7 +144,7 @@ export default function BrowserFind({
     if (!webview || !isOpen) {
       return
     }
-    const handleFoundInPage = (event: Electron.FoundInPageEvent): void => {
+    const handleFoundInPage = (event: BrowserWebviewFoundInPageEvent): void => {
       const activeFind = activeFindRef.current
       if (
         !activeFind ||

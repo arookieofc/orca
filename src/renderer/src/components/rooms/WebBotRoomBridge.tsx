@@ -5,6 +5,7 @@ import {
   askWebBotMember,
   cancelWebBotMember,
   getWebBotsState,
+  runLocalWorkflowCommand,
   subscribeWebBotsState,
   type WebBotsSnapshot
 } from '@/web/tauri-native-web-bots'
@@ -38,6 +39,15 @@ type CliBridgeWork = {
     roomId?: string
     createdAt: number
   }[]
+}
+
+type LocalVerifyJob = {
+  jobId: string
+  workdir: string
+  command: string
+  shell: string | null
+  timeoutSecs: number
+  createdAt: number
 }
 
 export function triggerWebBotRoomTurnClaim(): void {
@@ -87,6 +97,7 @@ export function WebBotRoomBridge(): null {
     let alive = true
     const inFlightRooms = new Set<string>()
     const inFlightCli = new Set<string>()
+    const inFlightVerify = new Set<string>()
 
     const pushCatalog = async (snap?: WebBotsSnapshot) => {
       if (!alive) {
@@ -155,14 +166,43 @@ export function WebBotRoomBridge(): null {
       }
     }
 
+    const processVerifyJob = async (job: LocalVerifyJob) => {
+      try {
+        const res = await runLocalWorkflowCommand({
+          workdir: job.workdir,
+          command: job.command,
+          shell: job.shell,
+          timeoutSecs: job.timeoutSecs
+        })
+        await callRuntimeRpc(LOCAL, 'nodeRelay.localVerifyComplete', {
+          jobId: job.jobId,
+          passed: res.passed,
+          exitCode: res.exitCode,
+          output: res.output
+        })
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
+        await callRuntimeRpc(LOCAL, 'nodeRelay.localVerifyComplete', {
+          jobId: job.jobId,
+          passed: false,
+          exitCode: -1,
+          output: '',
+          error: msg
+        }).catch(() => {})
+      } finally {
+        inFlightVerify.delete(job.jobId)
+      }
+    }
+
     const poll = async () => {
       if (!alive) {
         return
       }
       try {
-        const [roomRes, bridgeWork] = await Promise.all([
+        const [roomRes, bridgeWork, verifyRes] = await Promise.all([
           callRuntimeRpc<{ turns: ClaimedTurn[] }>(LOCAL, 'orchestration.roomWebBotTurnsClaim', {}),
-          callRuntimeRpc<CliBridgeWork>(LOCAL, 'webBots.bridgePoll', {})
+          callRuntimeRpc<CliBridgeWork>(LOCAL, 'webBots.bridgePoll', {}),
+          callRuntimeRpc<{ jobs: LocalVerifyJob[] }>(LOCAL, 'nodeRelay.localVerifyPoll', {})
         ])
         for (const cancel of bridgeWork.memberCancels ?? []) {
           void cancelWebBotMember(cancel.providerId, cancel.uuid).catch(() => {})
@@ -173,6 +213,13 @@ export function WebBotRoomBridge(): null {
           }
           inFlightCli.add(req.requestId)
           void processCliRequest(req)
+        }
+        for (const job of verifyRes.jobs ?? []) {
+          if (inFlightVerify.has(job.jobId)) {
+            continue
+          }
+          inFlightVerify.add(job.jobId)
+          void processVerifyJob(job)
         }
         for (const turn of roomRes.turns ?? []) {
           if (inFlightRooms.has(turn.turnId)) {

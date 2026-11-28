@@ -2,7 +2,7 @@ import {
   createSessionSearchClient,
   unavailableSessionSearchStatus
 } from '../../../../../shared/ai-vault/search/ai-vault-search-client'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import type {
   AiVaultPrepareSessionResumeRequest,
   AiVaultPrepareSessionResumeResult

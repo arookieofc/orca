@@ -1,5 +1,5 @@
-import type { PreloadApi } from '../../../preload/api-types'
-import type { AppApi, PlatformApi } from '../../../preload/api/app-api'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
+import type { AppApi, PlatformApi } from '../../../shared/desktop-api/api/app-api'
 import type { RuntimeMobileSessionAgentTab } from '../../../shared/remote-runtime/session-graph/runtime-mobile-session-tab-contracts'
 import type { RuntimeMobileSessionTabsResult } from '../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import { createWebAppApi } from './preload-api/app/web-app-api'
@@ -13,7 +13,7 @@ import type {
 } from '../../../shared/terminal/diagnostics/terminal-render-desync-evidence'
 import { invokeNative, invokePlugin, isTauriNativeHost } from './tauri-native-host'
 import { translate } from '../i18n/i18n'
-import { prepareAndInvokeAppRestart } from '../../../preload/renderer/restart/renderer-restart-wiring'
+import { prepareAndInvokeAppRestart } from '../../../shared/desktop-api/renderer-restart-wiring'
 
 type TauriNativePlatformInfo = Awaited<ReturnType<PlatformApi['get']>>
 type TauriNativeAppIdentity = Awaited<ReturnType<AppApi['getIdentity']>>

@@ -1,4 +1,4 @@
-import type { PluginMarketplaceHostListing } from '../../../../preload/api/plugins/plugin-host-api'
+import type { PluginMarketplaceHostListing } from '../../../../shared/desktop-api/api/plugins/plugin-host-api'
 import type { PluginLanguagePackRegistration } from '../../../../shared/plugins/artifacts/plugin-language-pack-artifact'
 import { normalizeUiLocaleTag } from '../../../../shared/i18n/ui-locale'
 import { languageDisplayName } from '@/i18n/ui-intl-formatters'

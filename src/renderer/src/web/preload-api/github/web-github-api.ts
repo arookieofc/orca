@@ -2,7 +2,7 @@ import { callGitHubTargetOperation } from '@/lib/work-items/github/github-work-i
 import { requireActiveEnvironment } from '../../runtime/client/web-runtime-session'
 import { requireGitHubWorkItemTargetDetails } from '../../../../../shared/github/work-items/work-item-target'
 import { shouldAcceptMergedFallbackPR } from '../../../../../shared/github/pull-requests/refresh/pr-branch-fallback-rule'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import {
   GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY,
   GITHUB_MARK_PR_READY_UPDATE_REQUIRED_MESSAGE

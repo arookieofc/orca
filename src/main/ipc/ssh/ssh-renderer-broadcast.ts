@@ -1,4 +1,4 @@
-import type { BrowserWindow } from 'electron'
+import type { RuntimeDesktopWindow } from '../../runtime/construction/runtime-desktop-surface'
 import type { SshPortForwardManager } from '../../ssh/port-forwarding/ssh-port-forward'
 import type {
   DetectedPort,
@@ -29,7 +29,7 @@ import { requestDesktopBrowserBridgeReconcile } from '../browser/desktop-browser
 import { listUnrestoredPortForwards } from './ssh-port-forward-unrestored'
 
 export function broadcastSshState(
-  getMainWindow: () => BrowserWindow | null,
+  getMainWindow: () => RuntimeDesktopWindow | null,
   targetId: string,
   state: SshConnectionState
 ): void {
@@ -78,7 +78,7 @@ export function getPublicSshState(targetId: string): SshConnectionState | undefi
 
 /** Settings, CLI and paired-client removals all publish this so the renderer drops the target's live state once. */
 export function broadcastSshTargetRemoved(
-  getMainWindow: () => BrowserWindow | null,
+  getMainWindow: () => RuntimeDesktopWindow | null,
   targetId: string
 ): void {
   const win = getMainWindow()
@@ -88,7 +88,7 @@ export function broadcastSshTargetRemoved(
 }
 
 export function broadcastPortForwards(
-  getMainWindow: () => BrowserWindow | null,
+  getMainWindow: () => RuntimeDesktopWindow | null,
   targetId: string
 ): void {
   const win = getMainWindow()

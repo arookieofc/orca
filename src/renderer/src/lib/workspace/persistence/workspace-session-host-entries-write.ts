@@ -54,12 +54,12 @@ export function patchHostSlice(
   // Sent even when empty: main's unchanged-save handling still has to see this partition's save.
   return api.patchEntries(patch, target).then(
     (result) => {
-      if (result.status === 'skipped') {
+      if (result?.status === 'skipped') {
         acknowledged.forget(hostId)
         return
       }
       acknowledge()
-      if (result.normalizedFields?.length) {
+      if (result?.normalizedFields?.length) {
         acknowledged.forget(hostId, result.normalizedFields)
       }
     },

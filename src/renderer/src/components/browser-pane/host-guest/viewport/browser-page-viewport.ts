@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { setBrowserGuestVisible } from '../browser-guest-activity'
 import {
   getBrowserPageChromeInsetHeight,
@@ -42,7 +43,7 @@ const slotRootListeners = new Map<string, Set<() => void>>()
 export const BROWSER_SIDE_PANEL_WIDTH_VARIABLE = '--browser-side-panel-width'
 
 function retireViewportGuests(root: HTMLElement): void {
-  for (const webview of root.querySelectorAll<Electron.WebviewTag>('webview')) {
+  for (const webview of root.querySelectorAll<BrowserWebviewElement>('webview')) {
     retireBrowserGuestMetadata(webview)
   }
 }

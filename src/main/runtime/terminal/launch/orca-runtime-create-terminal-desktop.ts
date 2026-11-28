@@ -2,8 +2,10 @@ import { applyRemoteViewerLaunchEnv } from './remote-viewer-launch-env'
 import type { TerminalCreateOptions } from './terminal-create-options'
 import type { RuntimeTerminalCreate } from '../../../../shared/terminal/runtime/runtime-terminal-create-contract'
 import { randomUUID } from 'node:crypto'
-import { getRuntimeDesktopSurface } from '../../construction/runtime-desktop-surface'
-import type { IpcMainEvent } from 'electron'
+import {
+  getRuntimeDesktopSurface,
+  type RuntimeDesktopIpcEvent
+} from '../../construction/runtime-desktop-surface'
 import { ownerSurfacing } from './terminal-presentation'
 import type { OrcaRuntimeWithCreateTerminal } from './terminal-create'
 import type { RuntimeTerminalPresentation } from '../../../../shared/terminal/runtime/runtime-terminal-contracts'
@@ -36,7 +38,7 @@ export async function createDesktopTerminal(
       reject(new Error('Terminal creation timed out'))
     }, 10000)
     const handler = (
-      event: IpcMainEvent,
+      event: RuntimeDesktopIpcEvent,
       response: {
         requestId: string
         tabId?: string

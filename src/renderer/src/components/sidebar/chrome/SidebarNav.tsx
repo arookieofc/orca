@@ -7,7 +7,8 @@ import {
   Bot,
   Layers,
   Search,
-  Smartphone
+  Smartphone,
+  Workflow
 } from 'lucide-react'
 import { isTauriNativeHost } from '@/web/tauri-native-host'
 import { useTranslation } from 'react-i18next'
@@ -74,6 +75,7 @@ const SidebarNav = React.memo(function SidebarNav() {
   const openArtifactsPage = useAppStore((s) => s.openArtifactsPage)
   const openRoomsPage = useAppStore((s) => s.openRoomsPage)
   const openWebBotsPage = useAppStore((s) => s.openWebBotsPage)
+  const openNodeRelayPage = useAppStore((s) => s.openNodeRelayPage)
   const openSkillsPage = useAppStore((s) => s.openSkillsPage)
   const openModal = useAppStore((s) => s.openModal)
   const updateSettings = useAppStore((s) => s.updateSettings)
@@ -88,6 +90,7 @@ const SidebarNav = React.memo(function SidebarNav() {
   const artifactsActive = activeView === 'artifacts'
   const roomsActive = activeView === 'rooms'
   const webBotsActive = activeView === 'web-bots'
+  const nodeRelayActive = activeView === 'node-relay'
   const tauriNative = isTauriNativeHost()
   const skillsActive = activeView === 'skills'
   const mobileOnboardingBadge = useMobileSidebarOnboardingBadge(showMobileButton)
@@ -216,6 +219,26 @@ const SidebarNav = React.memo(function SidebarNav() {
           </span>
         </button>
       ) : null}
+      <button
+        type="button"
+        onClick={openNodeRelayPage}
+        aria-current={nodeRelayActive ? 'page' : undefined}
+        className={cn(
+          'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] font-medium tracking-tight transition-colors',
+          nodeRelayActive
+            ? 'bg-worktree-sidebar-accent text-worktree-sidebar-accent-foreground'
+            : 'text-worktree-sidebar-foreground/60 hover:bg-worktree-sidebar-foreground/8'
+        )}
+      >
+        <Workflow
+          className={cn(
+            'size-4 shrink-0',
+            !nodeRelayActive && 'text-worktree-sidebar-foreground/30'
+          )}
+          strokeWidth={nodeRelayActive ? 2.25 : 1.75}
+        />
+        <span className="flex-1">分布式接力</span>
+      </button>
       {showSkillsButton ? (
         <ContextMenu>
           <ContextMenuTrigger asChild>

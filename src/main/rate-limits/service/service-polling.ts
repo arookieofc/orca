@@ -62,10 +62,10 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
       return false
     }
     // UI-only polling pauses while inactive to save CLI/API budget; activation refreshes it.
-    if (!this.mainWindow.isVisible() || this.mainWindow.isMinimized()) {
+    if (!this.mainWindow.isVisible?.() || this.mainWindow.isMinimized?.()) {
       return false
     }
-    return this.mainWindow.isFocused()
+    return this.mainWindow.isFocused?.() ?? false
   }
 
   protected getActiveProviderState(): ActiveProviderState[] {

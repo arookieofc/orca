@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { useMemo, type RefObject } from 'react'
 import { hasBrowserClientPageAttachedGuest } from '../../host-guest/client-pages/browser-client-page-retained-elements'
 
@@ -12,7 +13,7 @@ export type BrowserPageGuestFocus = {
 
 /** Guest focus for the panes whose page is a real <webview>: local and client-hosted. */
 export function useWebviewGuestFocus(
-  webviewRef: RefObject<Electron.WebviewTag | null>
+  webviewRef: RefObject<BrowserWebviewElement | null>
 ): BrowserPageGuestFocus {
   return useMemo(
     () => ({

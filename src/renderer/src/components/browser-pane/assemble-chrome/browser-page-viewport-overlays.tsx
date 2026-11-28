@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import {
   useCallback,
   type Dispatch,
@@ -64,7 +65,7 @@ export function BrowserPageViewportOverlays({
   feedbackBadgeRef: RefObject<BrowserPageFeedbackBadgeHandle | null>
   findOpen: boolean
   setFindOpen: Dispatch<SetStateAction<boolean>>
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   showFailureOverlay: boolean
   browserTab: BrowserPageState
   failureExternalUrl: string | null

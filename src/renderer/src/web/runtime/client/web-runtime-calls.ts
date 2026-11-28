@@ -2,7 +2,7 @@ import {
   RuntimeConnectionChangedBeforeSendError,
   unwrapRuntimeRpcResult
 } from '../../../runtime/rpc/calls/runtime-rpc-result'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import type { WebRuntimeSubscribeOptions } from './web-runtime-subscription-contract'
 import {
   parseExecutionHostId,

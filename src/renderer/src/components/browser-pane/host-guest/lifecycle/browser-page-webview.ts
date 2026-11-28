@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import '../../../../../../shared/orca-profiles/constants'
 import { ORCA_BROWSER_BLANK_URL } from '../../../../../../shared/browser/browser-blank-page'
 import { ORCA_BROWSER_PAGE_GUEST_WEB_PREFERENCES_ATTRIBUTE } from '../../../../../../shared/browser/guest-lifecycle/browser-guest-web-preferences'
@@ -6,7 +7,7 @@ import { replacePersistentWebview } from '../browser-webview-disposal'
 import { handleGuestWindowCloseMessage } from './browser-page-window-close'
 
 export function setBrowserPageWebviewInputLock(
-  webview: Electron.WebviewTag,
+  webview: BrowserWebviewElement,
   inputLocked: boolean
 ): void {
   webview.style.pointerEvents = inputLocked ? 'none' : 'auto'
@@ -24,7 +25,7 @@ export function ensureBrowserPageWebview({
   inputLocked: boolean
   webviewPartition: string
   resolveContainer: () => HTMLDivElement | null
-}): { container: HTMLDivElement; created: boolean; webview: Electron.WebviewTag } | null {
+}): { container: HTMLDivElement; created: boolean; webview: BrowserWebviewElement } | null {
   let webview = webviewRegistry.get(browserTabId)
   let created = false
   let activeContainer = container
@@ -49,7 +50,7 @@ export function ensureBrowserPageWebview({
     return { container: activeContainer, created, webview }
   }
 
-  webview = document.createElement('webview') as Electron.WebviewTag
+  webview = document.createElement('webview') as BrowserWebviewElement
   webview.setAttribute('partition', webviewPartition)
   webview.setAttribute('allowpopups', '')
   // Electron spreads webpreferences verbatim; retain camelCase for fullscreen containment and keep the page canvas opaque over Orca’s themed host.

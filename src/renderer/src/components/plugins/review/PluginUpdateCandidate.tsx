@@ -1,6 +1,6 @@
 // @protected-copy
 import { Check, ChevronDown } from 'lucide-react'
-import type { PluginMarketplaceHostInstallPreview } from '../../../../../preload/api/plugins/plugin-host-api'
+import type { PluginMarketplaceHostInstallPreview } from '../../../../../shared/desktop-api/api/plugins/plugin-host-api'
 import type { PluginManifest } from '../../../../../shared/plugins/manifest/plugin-manifest'
 import type { pluginExecutionProfile } from '../../../../../shared/plugins/contributions/plugin-execution-profile'
 import { reachablePluginCapabilities } from '../../../../../shared/plugins/capabilities/plugin-capability-reach'

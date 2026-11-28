@@ -1,9 +1,7 @@
 import type { BrowserScreencastResult } from '../../../../shared/browser/runtime/runtime-browser-contracts'
 import { BrowserError } from '../../../browser/browser-error'
 import { randomUUID } from 'node:crypto'
-import { startBrowserScreencast } from '../../../browser/cdp/screencast/browser-screencast-stream'
-import { browserManager } from '../../../browser/guest-lifecycle/manager/browser-manager'
-import { rendererPublicationThrottle } from '../../../window/visibility/renderer-publication-throttle'
+import { getRuntimeBrowserDesktopAdapter } from '../installation/runtime-browser-desktop-adapter'
 import { mintBrowserScreencastSubscriptionId } from './browser-screencast-subscription-id'
 import {
   cancelScreencastSubscriberFrameRetry,
@@ -18,7 +16,6 @@ import {
   INITIAL_SCREENCAST_SUBSCRIBER_DELIVERY,
   screencastSubscriberIsGhost
 } from './browser-screencast-ghost-subscriber-eviction'
-import type { BrowserScreencastSession } from '../../../browser/cdp/screencast/browser-screencast-stream-types'
 import type { RpcBinarySender } from '../../rpc/transports/rpc-binary-sender'
 import type { RuntimeBrowserCommandHost } from '../commands/browser-command-contracts'
 import type { RuntimeBrowserCommandTargets } from '../commands/browser-command-targets'
@@ -31,6 +28,7 @@ import {
 } from './browser-screencast-budget'
 import type {
   BrowserScreencastParams,
+  BrowserScreencastSession,
   BrowserScreencastStartResult,
   ActiveBrowserScreencastSubscriber,
   ActiveBrowserScreencastPage
@@ -97,15 +95,16 @@ export class RuntimeBrowserScreencasts {
         appliedBudget: budget
       }
       // Hidden host compositors stop producing guest frames when throttled.
+      const desktop = getRuntimeBrowserDesktopAdapter()
       const win = this.host.getAvailableAuthoritativeWindow()
-      const releaseThrottle = win ? rendererPublicationThrottle.acquire(win.webContents) : () => {}
+      const releaseThrottle = win ? desktop.acquirePublicationThrottle(win.webContents) : () => {}
       // Active-tab covers hide the guest widget independently of the host.
-      const releaseGuestThrottle = rendererPublicationThrottle.acquire(guest)
-      const started = startBrowserScreencast(guest, {
+      const releaseGuestThrottle = desktop.acquirePublicationThrottle(guest)
+      const started = desktop.startScreencast(guest, {
         format: params.format,
         ...budget,
         ...viewport,
-        holdPaint: () => browserManager.holdPaintForCapture(guest.id),
+        holdPaint: () => desktop.holdPaintForCapture(guest.id),
         onFrame: (bytes) => {
           const ghosts: string[] = []
           for (const [subscriptionId, subscriber] of pendingRecord.subscribers) {

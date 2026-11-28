@@ -1,6 +1,6 @@
 import type { MarkdownDocument } from '../../../shared/file-listing/file-document'
 import { skillShareIdFromArguments } from '../../../shared/skills/sharing/skill-share-link'
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import { invokeNative, listenNative } from './tauri-native-host'
 
 const EVENT_SECOND_INSTANCE = 'app:second-instance'

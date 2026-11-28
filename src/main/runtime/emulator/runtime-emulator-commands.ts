@@ -1,5 +1,5 @@
 import { emulatorDevicePreference } from '../../emulator/emulator-opening-preference'
-import type { BrowserWindow } from 'electron'
+import type { RuntimeDesktopWindow } from '../construction/runtime-desktop-surface'
 import type { EmulatorBridge } from '../../emulator/emulator-bridge'
 import { EmulatorError } from '../../emulator/emulator-errors'
 import { emulatorFailureText } from '../../../shared/emulator/emulator-failure-copy'
@@ -29,7 +29,7 @@ export type RuntimeEmulatorCommandHost = {
   getEmulatorBridge(): EmulatorBridge | null
   resolveEmulatorWorkspaceId(selector: string): Promise<string>
   resolveEmulatorCleanupWorkspaceId(selector: string): Promise<string>
-  getAuthoritativeWindow(): BrowserWindow
+  getAuthoritativeWindow(): RuntimeDesktopWindow
   getSettings(): EmulatorHostSettings
   updateEmulatorSettings?(updates: Pick<GlobalSettings, 'mobileEmulatorRecentDevices'>): void
 }

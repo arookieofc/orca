@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import type { WorktreeAtRiskLocalFiles } from '../../../../../shared/worktree/removal/at-risk-local-files'
 import { callAbortableRuntimeEnvironment } from '../../../runtime/rpc/calls/abortable-runtime-environment-call'
 import { unwrapRuntimeRpcResult } from '../../../runtime/rpc/calls/runtime-rpc-result'

@@ -2,7 +2,7 @@
 // Plain-Node runtime/CLI and all structured-chat lanes must remain Electron-free, including lanes not yet reachable.
 // esbuild reachability catches cross-file edges lint cannot; any electron importer fails (baseline is zero).
 import { build } from 'esbuild'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import process from 'node:process'
@@ -143,23 +143,51 @@ export async function collectElectronImporters(entryPoints, { plugins = [] } = {
   return [...importers].sort()
 }
 
+export function findSrcElectronReferences(root = ROOT) {
+  const srcRoot = path.join(root, 'src')
+  if (!existsSync(srcRoot)) {
+    return []
+  }
+  const hits = []
+  const stack = [srcRoot]
+  const electronRe =
+    /(?:from|require\(|vi\.mock\()\s*['"]electron(?:\/[^'"]*)?['"]|\bElectron\.[A-Z]/
+  while (stack.length > 0) {
+    const dir = stack.pop()
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        stack.push(fullPath)
+      } else if (
+        entry.isFile() &&
+        /\.[cm]?[jt]sx?$/.test(entry.name) &&
+        !entry.name.endsWith('.d.ts')
+      ) {
+        if (electronRe.test(readFileSync(fullPath, 'utf8'))) {
+          hits.push(path.relative(root, fullPath).split(path.sep).join('/'))
+        }
+      }
+    }
+  }
+  return hits.sort()
+}
+
 export async function main({ plugins = [] } = {}) {
   const current = await collectElectronImporters(defaultEntryPoints(), {
     plugins
   })
-  if (current.length > 0) {
+  const srcHits = plugins.length > 0 ? [] : findSrcElectronReferences(ROOT)
+  const combined = [...new Set([...current, ...srcHits])].sort()
+  if (combined.length > 0) {
     console.error(
-      `[runtime-electron-ratchet] ${current.length} module(s) reachable from the Orca runtime, the CLI or structured-chat code import electron:
-${current.map((file) => `  + ${file}`).join('\n')}
-
-The runtime and structured chat must run in orcad, the headless runtime, and the CLI runs on
-plain Node; Electron is unavailable in both. That holds for structured-chat code the runtime
-doesn't load yet, so renaming or moving the file is not a fix. Put the Electron facility behind a port in src/main/host/ and
-depend on the port, or drop the import that pulls Electron in.`
+      `[runtime-electron-ratchet] ${combined.length} module(s) reference electron (Electron has been removed; use Tauri/shared desktop contracts instead):
+${combined.map((file) => `  + ${file}`).join('\n')}`
     )
     return 1
   }
-  console.log('[runtime-electron-ratchet] ok — nothing reachable imports electron.')
+  console.log(
+    '[runtime-electron-ratchet] ok — zero electron imports or namespaces anywhere in src/.'
+  )
   return 0
 }
 

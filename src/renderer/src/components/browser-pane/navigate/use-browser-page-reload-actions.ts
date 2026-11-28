@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import type { BrowserPageInitializationAction } from '../../../../../shared/browser/client-hosting/browser-page-initialization-action'
 import { useCallback, useMemo, useState, type MutableRefObject } from 'react'
 import { useShortcutLabel } from '@/lib/keyboard/useShortcutLabel'
@@ -22,7 +23,7 @@ export function useBrowserPageReloadActions({
 }: {
   browserTab: BrowserPageState
   onInitializationAction?: (action: BrowserPageInitializationAction) => void
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   retryGuestRecoveryRef: MutableRefObject<() => void>
   onUpdatePageStateRef: MutableRefObject<(tabId: string, updates: BrowserTabPageState) => void>
 }): {

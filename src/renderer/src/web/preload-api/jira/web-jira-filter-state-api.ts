@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import {
   JIRA_SAVED_FILTER_RUNTIME_CAPABILITY,
   JIRA_SAVED_FILTER_UPDATE_REQUIRED

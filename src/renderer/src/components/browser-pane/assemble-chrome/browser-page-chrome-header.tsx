@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react'
 import type { BrowserPage as BrowserPageState } from '../../../../../shared/browser/workspaces/browser-workspace-types'
 import type { ShareableBrowserArtifactFile } from '../describe-page/browser-artifact-upload'
@@ -43,7 +44,7 @@ export function BrowserPageChromeHeader({
   worktreeId: string
   sessionProfileId: string | null
   isActive: boolean
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   addressBarInputRef: MutableRefObject<HTMLInputElement | null>
   dismissAddressBarSuggestionsRef: MutableRefObject<(() => void) | null>
   reload: ReturnType<typeof useBrowserPageReloadActions>

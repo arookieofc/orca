@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../preload/api-types'
+import type { PreloadApi } from '../../../shared/desktop-api/api-types'
 import type { CliInstallStatus } from '../../../shared/cli/cli-install-types'
 import { callRuntimeResult } from './runtime/client/web-runtime-calls'
 

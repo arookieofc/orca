@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { useEffect, type MutableRefObject } from 'react'
 import { getShortcutPlatform } from '@/lib/keyboard/shortcut-platform'
 import { useAppStore } from '@/store/index'
@@ -29,7 +30,7 @@ export function useBrowserPageKeyboardShortcuts({
   chromeShortcutScope: BrowserChromeShortcutScope
   isActiveRef: MutableRefObject<boolean>
   markupIsActive: boolean
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   showBrowserZoomFeedback: (level: number) => void
   reloadWebviewOrRecoverGuest: (ignoreCache: boolean) => void
   startGrabIntent: (intent: GrabIntent) => void

@@ -1,4 +1,4 @@
-import type { AgentBrowserBridge } from '../../../browser/agent-browser/agent-browser-bridge'
+import type { RuntimeAgentBrowserBridge } from '../commands/browser-command-contracts'
 import type { BrowserBackend } from '../../../browser/browser-backend'
 import { RuntimeWorkspaceNavigation } from '../../workspaces/startup/runtime-workspace-navigation'
 
@@ -9,11 +9,11 @@ export abstract class RuntimeBrowserHostBindings extends RuntimeWorkspaceNavigat
     this.emitClientEvent({ type: 'browserProfilesChanged' })
   }
 
-  setAgentBrowserBridge(bridge: AgentBrowserBridge | null): void {
+  setAgentBrowserBridge(bridge: RuntimeAgentBrowserBridge | null): void {
     this.agentBrowserBridge = bridge
   }
 
-  getAgentBrowserBridge(): AgentBrowserBridge | null {
+  getAgentBrowserBridge(): RuntimeAgentBrowserBridge | null {
     return this.agentBrowserBridge
   }
 

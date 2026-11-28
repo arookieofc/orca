@@ -1,4 +1,11 @@
-import type { WebContents } from 'electron'
+type SerializerSender = {
+  id?: number
+  isDestroyed(): boolean
+  on?: NodeJS.EventEmitter['on']
+  removeListener?: NodeJS.EventEmitter['removeListener']
+  once?: NodeJS.EventEmitter['once']
+}
+import type { FanoutEventSource } from '../../../runtime/events/event-listener-fanout'
 import { abortWhenRendererGone } from '../../renderer-requests/renderer-lifetime-abort'
 import { RendererTerminalSerializerReadiness } from './renderer-terminal-serializer-readiness'
 import { isValidPaneKey, paneKeyPtyId } from './key-state'
@@ -25,29 +32,38 @@ export function cleanupPendingPaneSerializersForSender(ownerWebContentsId: numbe
   }
 }
 
-export function registerPendingPaneSerializerCleanup(sender: WebContents | undefined): void {
-  if (!sender || pendingPaneSerializerCleanupRegistered.has(sender.id)) {
+function isFanoutSender(sender: SerializerSender): sender is SerializerSender & FanoutEventSource {
+  return typeof sender.on === 'function' && typeof sender.removeListener === 'function'
+}
+
+export function registerPendingPaneSerializerCleanup(sender: SerializerSender | undefined): void {
+  if (
+    !sender ||
+    typeof sender.id !== 'number' ||
+    !isFanoutSender(sender) ||
+    pendingPaneSerializerCleanupRegistered.has(sender.id)
+  ) {
     return
   }
-  pendingPaneSerializerCleanupRegistered.add(sender.id)
+  const senderId = sender.id
+  pendingPaneSerializerCleanupRegistered.add(senderId)
   const lifetime = abortWhenRendererGone(sender)
-  lifetime.signal.addEventListener(
-    'abort',
-    () => cleanupPendingPaneSerializersForSender(sender.id),
-    {
-      once: true
-    }
-  )
+  const cleanup = (): void => cleanupPendingPaneSerializersForSender(senderId)
+  lifetime.signal.addEventListener('abort', cleanup, {
+    once: true
+  })
 }
 
 export function declarePendingPaneSerializer(
   paneKey: string,
-  sender: WebContents | undefined
+  sender: SerializerSender | undefined
 ): number {
   const gen = ++pendingSerializerGenSeq
   // Already-destroyed senders will never fire destroyed again; remove their declarations immediately.
   if (sender?.isDestroyed()) {
-    cleanupPendingPaneSerializersForSender(sender.id)
+    if (typeof sender.id === 'number') {
+      cleanupPendingPaneSerializersForSender(sender.id)
+    }
     return gen
   }
   registerPendingPaneSerializerCleanup(sender)

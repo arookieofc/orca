@@ -7,7 +7,7 @@
 // the same way: Windows has no named Ghostty theme dirs, so only absolute
 // `theme = <path>` references merge.
 
-import type { SettingsApi } from '../../../preload/api/preferences/settings-api'
+import type { SettingsApi } from '../../../shared/desktop-api/api/preferences/settings-api'
 import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
 
 type GhosttyImportPreview = Awaited<ReturnType<SettingsApi['previewGhosttyImport']>>

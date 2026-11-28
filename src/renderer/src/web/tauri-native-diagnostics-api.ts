@@ -1,4 +1,4 @@
-import type { DiagnosticsApi } from '../../../preload/api/diagnostics/telemetry-api'
+import type { DiagnosticsApi } from '../../../shared/desktop-api/api/diagnostics/telemetry-api'
 import { invokeNative, isTauriNativeHost } from './tauri-native-host'
 
 export function createTauriNativeDiagnosticsApi(): DiagnosticsApi | null {

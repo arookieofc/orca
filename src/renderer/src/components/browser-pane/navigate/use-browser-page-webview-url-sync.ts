@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import {
   issueBrowserGuestNavigation,
   cachedBrowserGuestMetadata
@@ -33,7 +34,7 @@ export function useBrowserPageWebviewUrlSync({
   isActive: boolean
   isPaintable: boolean
   slotViewport: HTMLDivElement | null
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   chromeHeaderRef: RefObject<HTMLDivElement | null>
   lastKnownWebviewUrlRef: MutableRefObject<string | null>
   keepAddressBarFocusRef: MutableRefObject<boolean>

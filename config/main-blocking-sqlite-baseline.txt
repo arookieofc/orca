@@ -17,10 +17,6 @@
 10 src/main/ai-vault/scanners/opencode2/session-scanner-opencode2-sqlite.ts
 47 src/main/bots/bot-group-store.ts
 18 src/main/bots/bot-work-store.ts
-5 src/main/browser-passwords/browser-password-chromium-import.ts
-1 src/main/browser/cookies/chromium/prepare-import.ts
-5 src/main/browser/cookies/sources/browser-cookie-firefox-import.ts
-25 src/main/browser/cookies/staging/browser-cookie-staged-import.ts
 5 src/main/codex/history/index/codex-state-db.ts
 44 src/main/github/pr-watch/pr-check-event-tables.ts
 14 src/main/github/pr-watch/pr-pending-actions.ts

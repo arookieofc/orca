@@ -30,6 +30,7 @@ mod browser_cdp_events;
 // mod browser_cookie_import;
 // mod browser_cookie_source_import;
 mod browser_identity;
+mod browser_partition_dir;
 // mod browser_session;
 // mod browser_session_detection;
 // mod browser_upload_staging;
@@ -1322,6 +1323,7 @@ fn main() {
         ])
         .setup(|app| {
             app.manage(browser_webview::BrowserWebviewState::default());
+            app.manage(doc_preview::DocPreviewState::default());
             app.manage(browser_cdp_events::BrowserCdpEventState::default());
             // Browser identity is still registered: webview.rs needs the
             // state to answer `poc_browser_identity_*` and to stamp the

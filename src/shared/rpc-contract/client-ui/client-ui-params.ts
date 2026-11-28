@@ -54,23 +54,8 @@ export const RightSidebarTabParam = z.custom<StaticRightSidebarTab | `plugin:${s
 
 export const AgentActivityDisplayMode = z.enum(['compact', 'full'])
 
-export const StatusBarItem = z.enum([
-  'claude',
-  'codex',
-  'gemini',
-  'antigravity',
-  'opencode-go',
-  'kimi',
-  'minimax',
-  'grok',
-  'cursor',
-  'zcode',
-  'muse',
-  'ssh',
-  'resource-usage',
-  'ports',
-  'git-blame'
-])
+export { StatusBarItem } from './status-bar-item-params'
+import { StatusBarItem } from './status-bar-item-params'
 
 export const WorkspaceStatusDefinition = z.object({
   id: z.string(),
@@ -119,7 +104,8 @@ export const TopLevelViewSchema = z
     'workbench',
     'mobile',
     'rooms',
-    'web-bots'
+    'web-bots',
+    'node-relay'
   ])
   .transform((view) => (view === 'botTemplates' ? 'terminal' : view))
 

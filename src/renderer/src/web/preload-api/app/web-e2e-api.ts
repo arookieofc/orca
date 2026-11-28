@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { webE2EConfig } from '../web-e2e-config'
 
 export function createWebE2EApi(): Partial<PreloadApi> {

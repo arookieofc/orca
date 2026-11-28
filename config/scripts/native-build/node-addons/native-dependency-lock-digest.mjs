@@ -4,14 +4,8 @@ import { join, resolve } from 'node:path'
 import { parse, parseAllDocuments } from 'yaml'
 
 // Packages whose locked dependency closure is compiled into, or compiles, the cached addons.
-export const NATIVE_MODULE_BUILD_PACKAGES = [
-  'node-pty',
-  '@vscode/windows-process-tree',
-  '@electron/rebuild',
-  'node-gyp'
-]
-// Only the release matters: it fixes the ABI and headers; its downloader closure does not.
-export const NATIVE_MODULE_TARGET_PACKAGES = ['electron']
+export const NATIVE_MODULE_BUILD_PACKAGES = ['node-pty', '@vscode/windows-process-tree', 'node-gyp']
+export const NATIVE_MODULE_TARGET_PACKAGES = []
 export const NATIVE_MODULE_WORKSPACES = [
   'native/windows-notifications',
   'native/windows-registry',

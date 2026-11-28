@@ -1,4 +1,4 @@
-import type { PluginsApi } from '../../../../../preload/api/plugins/plugin-host-api'
+import type { PluginsApi } from '../../../../../shared/desktop-api/api/plugins/plugin-host-api'
 
 /** Desktop-only: plugins run in the desktop app. Explicit because the fallback's `undefined`
  *  crashes callers expecting lists and records. */

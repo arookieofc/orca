@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { useEffect, type MutableRefObject } from 'react'
 
 const GUEST_FOCUS_FRAMES = 10
@@ -10,7 +11,7 @@ export function useDocPreviewGuestFocus({
   previewId,
   remintCount
 }: {
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   holdsGuestFocus: boolean
   ready: boolean
   previewId: string

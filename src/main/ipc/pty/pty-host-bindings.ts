@@ -1,11 +1,14 @@
-import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
+import type { RuntimeDesktopIpcEvent } from '../../runtime/construction/runtime-desktop-surface'
 
 /** Inject desktop surfaces so the same PTY controller can also serve Node-only hosts. */
 
 /** Match Electron's any[] listener arguments so the real IPC surface remains assignable without casts. */
 export type PtyIpcSurface = {
-  handle(channel: string, listener: (event: IpcMainInvokeEvent, ...args: any[]) => unknown): void
-  on(channel: string, listener: (event: IpcMainEvent, ...args: any[]) => void): void
+  handle(
+    channel: string,
+    listener: (event: RuntimeDesktopIpcEvent, ...args: any[]) => unknown
+  ): void
+  on(channel: string, listener: (event: RuntimeDesktopIpcEvent, ...args: any[]) => void): void
   removeHandler(channel: string): void
   removeAllListeners(channel: string): void
 }

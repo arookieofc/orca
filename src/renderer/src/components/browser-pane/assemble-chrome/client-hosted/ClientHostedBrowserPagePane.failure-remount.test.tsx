@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import type { BrowserGuestMetadata } from '../../../../../../shared/browser/guest-lifecycle/browser-guest-metadata'
 import {
   cachedBrowserGuestMetadata,
@@ -492,8 +493,8 @@ function certificateFailure(): BrowserCertificateFailure {
   } as BrowserCertificateFailure
 }
 
-function createWebview(): Electron.WebviewTag & { getURL: ReturnType<typeof vi.fn> } {
-  const element = document.createElement('webview') as Electron.WebviewTag & {
+function createWebview(): BrowserWebviewElement & { getURL: ReturnType<typeof vi.fn> } {
+  const element = document.createElement('webview') as unknown as BrowserWebviewElement & {
     getURL: ReturnType<typeof vi.fn>
   }
   Object.assign(element, {

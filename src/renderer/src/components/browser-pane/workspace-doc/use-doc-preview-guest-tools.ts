@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../shared/desktop-api/browser-webview-element'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { createNonSecureContextUuid as createBrowserUuid } from '../../../../../shared/identifiers/non-secure-context-uuid'
 import { useShortcutLabel } from '@/lib/keyboard/useShortcutLabel'
@@ -22,7 +23,7 @@ export function useDocPreviewGuestTools({
   previewId: string
   worktreeId: string
   grantId: string | null
-  webviewRef: MutableRefObject<Electron.WebviewTag | null>
+  webviewRef: MutableRefObject<BrowserWebviewElement | null>
   containerRef: MutableRefObject<HTMLDivElement | null>
   toolsReady: boolean
 }): {

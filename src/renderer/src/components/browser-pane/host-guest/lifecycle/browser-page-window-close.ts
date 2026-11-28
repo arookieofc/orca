@@ -1,3 +1,7 @@
+import type {
+  BrowserWebviewElement,
+  BrowserWebviewIpcMessageEvent
+} from '../../../../../../shared/desktop-api/browser-webview-element'
 import { useAppStore } from '@/store/index'
 import { dispatchWorkspaceTabCommand } from '@/lib/workspace/tabs/workspace-tab-commands'
 import { resolveBrowserWorkspaceOwner } from '@/lib/browser/workspace/browser-workspace-source-resolution'
@@ -12,8 +16,8 @@ export function markBrowserPageOpenedByPage(pageId: string): void {
 
 export function handleGuestWindowCloseMessage(
   pageId: string,
-  webview: Pick<Electron.WebviewTag, 'canGoBack' | 'canGoForward'>,
-  event: Pick<Electron.IpcMessageEvent, 'channel'>
+  webview: Pick<BrowserWebviewElement, 'canGoBack' | 'canGoForward'>,
+  event: Pick<BrowserWebviewIpcMessageEvent, 'channel'>
 ): void {
   if (event.channel !== BROWSER_GUEST_WINDOW_CLOSE_CHANNEL) {
     return

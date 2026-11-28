@@ -16,7 +16,8 @@ const RIGHT_SIDEBAR_SUPPRESSED_VIEWS = new Set<ActiveView>([
   'artifacts',
   'mobile',
   'rooms',
-  'web-bots'
+  'web-bots',
+  'node-relay'
 ])
 
 export function canShowRightSidebarForView(activeView: ActiveView): boolean {

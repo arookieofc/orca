@@ -21,7 +21,7 @@ import {
 
 export function clearDidFinishLoadHandler(): void {
   if (didFinishLoadHandler && didFinishLoadWebContents) {
-    didFinishLoadWebContents.removeListener('did-finish-load', didFinishLoadHandler)
+    didFinishLoadWebContents.removeListener?.('did-finish-load', didFinishLoadHandler)
   }
   setDidFinishLoadHandler(null, null)
 }
@@ -44,17 +44,17 @@ export function clearRendererLifecycleResetHandlers(): void {
     return
   }
   if (rendererDidStartNavigationHandler) {
-    rendererLifecycleResetWebContents.removeListener(
+    rendererLifecycleResetWebContents.removeListener?.(
       'did-start-navigation',
       rendererDidStartNavigationHandler
     )
   }
   if (rendererLifecycleResetHandler) {
-    rendererLifecycleResetWebContents.removeListener(
+    rendererLifecycleResetWebContents.removeListener?.(
       'render-process-gone',
       rendererLifecycleResetHandler
     )
-    rendererLifecycleResetWebContents.removeListener('destroyed', rendererLifecycleResetHandler)
+    rendererLifecycleResetWebContents.removeListener?.('destroyed', rendererLifecycleResetHandler)
   }
   setRendererLifecycleResetState({ contents: null, handler: null, navigation: null })
 }
@@ -79,18 +79,18 @@ export function registerRendererLifecycleResetHandlers(
     handler,
     navigation: navigationHandler
   })
-  webContents.on('did-start-navigation', navigationHandler)
-  webContents.on('render-process-gone', handler)
-  webContents.on('destroyed', handler)
+  webContents.on?.('did-start-navigation', navigationHandler)
+  webContents.on?.('render-process-gone', handler)
+  webContents.on?.('destroyed', handler)
 }
 
 export function clearRendererGateResetHandlers(): void {
   if (rendererGateResetWebContents) {
     if (rendererGateResetLoadHandler) {
-      rendererGateResetWebContents.removeListener('did-finish-load', rendererGateResetLoadHandler)
+      rendererGateResetWebContents.removeListener?.('did-finish-load', rendererGateResetLoadHandler)
     }
     if (rendererGateResetGoneHandler) {
-      rendererGateResetWebContents.removeListener(
+      rendererGateResetWebContents.removeListener?.(
         'render-process-gone',
         rendererGateResetGoneHandler
       )

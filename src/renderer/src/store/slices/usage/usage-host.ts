@@ -1,7 +1,7 @@
 import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { callRuntimeRpc } from '../../../runtime/rpc/calls/runtime-rpc-call'
 import { createRuntimeUsageProviderApi } from '../../../runtime/usage-analytics/runtime-usage-provider-api'
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 
 type UsageProviderKey = 'claudeUsage' | 'codexUsage' | 'openCodeUsage' | 'museUsage'
 

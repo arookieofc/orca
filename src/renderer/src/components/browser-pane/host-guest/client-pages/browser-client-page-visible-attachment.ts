@@ -1,3 +1,4 @@
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { registerWebviewDragPassthroughSurface } from '../drag/webview-drag-passthrough'
 import { retainWebviewDragListeners } from '../webview-registry'
 import { registerBrowserClientPagePositionSync } from '../viewport/browser-client-page-position-driver'
@@ -6,7 +7,7 @@ import type { BrowserClientPageRendererIdentity as RendererPageIdentity } from '
 import type { BrowserClientRetainedRendererPage as RetainedPage } from './browser-client-page-retained-state'
 
 export type BrowserClientPageVisibleAttachment = {
-  webview: Electron.WebviewTag
+  webview: BrowserWebviewElement
   nextMetadataRevision(): number
   detach(): void
 }

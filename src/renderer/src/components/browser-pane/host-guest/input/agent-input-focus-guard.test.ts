@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import type { BrowserWebviewElement } from '../../../../../../shared/desktop-api/browser-webview-element'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   beginAgentInputFocusGuard,
@@ -14,7 +15,7 @@ function mountPage(browserPageId: string): HTMLElement {
   webview.tabIndex = 0
   document.body.append(webview)
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the guard only uses focus and blur, which a focusable div provides.
-  webviewRegistry.set(browserPageId, webview as unknown as Electron.WebviewTag)
+  webviewRegistry.set(browserPageId, webview as unknown as BrowserWebviewElement)
   return webview
 }
 

@@ -1,15 +1,22 @@
-import type { AgentBrowserBridge } from '../../../browser/agent-browser/agent-browser-bridge'
 import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type { BrowserNetworkExecutionHost } from '../../../../shared/browser/client-hosting/browser-network-execution-host'
 import type { BrowserHostLeaseRegistry } from '../../browser-host/leases/browser-host-lease-registry'
 import type { RuntimeBrowserPageRegistry } from '../client-pages/runtime-browser-page-registry'
 import type { BrowserHostRequestRegistry } from '../../browser-host/leases/browser-host-request-registry'
-import type { BrowserWindow } from 'electron'
+import type { RuntimeDesktopWindow } from '../../construction/runtime-desktop-surface'
+import type { BrowserGuestWebContents } from '../../../browser/guest-lifecycle/browser-guest-surface-types'
 import type { BrowserBackend } from '../../../browser/browser-backend'
 import type { BrowserSessionTabSelectionOptions } from '../tabs/browser-tab-create-publication'
 import type { ServeBrowserTabs } from '../headless/serve-browser-tabs'
 import type { BrowserTabBarEntry } from '../tabs/browser-tab-listing'
 import type { BrowserPageAnnotation } from '../../../../shared/browser/element-grab/browser-grab-types'
+import type { RuntimeAgentBrowserBridge } from './runtime-agent-browser-bridge'
+
+export type {
+  BrowserDialogAnswer,
+  BrowserWaitOptions,
+  RuntimeAgentBrowserBridge
+} from './runtime-agent-browser-bridge'
 
 export type BrowserCommandTargetParams = {
   worktree?: string
@@ -28,12 +35,12 @@ export type BrowserAnswerAdmission = (
 
 export type ResolvedBrowserPageWebContents = {
   browserPageId: string
-  webContents: Electron.WebContents
+  webContents: BrowserGuestWebContents
 }
 
 export type RuntimeBrowserCommandHost = {
   getRuntimeId(): string
-  getAgentBrowserBridge(): AgentBrowserBridge | null
+  getAgentBrowserBridge(): RuntimeAgentBrowserBridge | null
   resolveWorkspaceSelector(selector: string): Promise<{
     id: string
     repoId?: string
@@ -54,8 +61,8 @@ export type RuntimeBrowserCommandHost = {
   /** The name a paired desktop registered with, for errors that must say which one. */
   getPairedDeviceName?(pairedDeviceId: string): string | null
   getRuntimeBrowserPageRegistry(): RuntimeBrowserPageRegistry
-  getAuthoritativeWindow(): BrowserWindow
-  getAvailableAuthoritativeWindow(): BrowserWindow | null
+  getAuthoritativeWindow(): RuntimeDesktopWindow
+  getAvailableAuthoritativeWindow(): RuntimeDesktopWindow | null
   /** Headless offscreen backend, or null where unsupported. */
   getOffscreenBrowserBackend(): BrowserBackend | null
   // Update snapshot focus or paired clients snap back to a terminal.

@@ -1,4 +1,4 @@
-import type { PreloadApi } from '../../../../../preload/api-types'
+import type { PreloadApi } from '../../../../../shared/desktop-api/api-types'
 import { enqueueRuntimeSubscription } from '../../../../../shared/remote-runtime/rpc/runtime-rpc-subscription-queue'
 import { isTimedPRRead } from '../../../../../shared/remote-runtime/rpc/runtime-rpc-call-queue'
 import type { WebRuntimeSubscriptionRegistration } from './web-runtime-crew-subscription'

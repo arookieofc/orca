@@ -14,7 +14,7 @@ import { RuntimeClientEventBus } from '../client/events/runtime-client-event-bus
 import { RuntimeNativeChatDraftResolutions } from '../agent-session/launch/runtime-native-chat-draft-resolutions'
 import { RuntimeWorktreeLifecycleEvents } from '../workspaces/lifecycle/runtime-worktree-lifecycle-events'
 import type { RuntimeWorktreeLifecycleEvent } from '../workspaces/lifecycle/worktree-lifecycle-event'
-import type { AgentBrowserBridge } from '../../browser/agent-browser/agent-browser-bridge'
+import type { RuntimeAgentBrowserBridge } from '../browser/commands/browser-command-contracts'
 import type { BrowserBackend } from '../../browser/browser-backend'
 import type { EmulatorBridge } from '../../emulator/emulator-bridge'
 import { RuntimeResolvedWorktreeCache } from '../workspaces/catalog/runtime-resolved-worktree-cache'
@@ -89,7 +89,7 @@ export abstract class OrcaRuntimeWithStopRequestedPtyIds extends OrcaRuntimeWith
   protected readonly worktreeLifecycleEvents =
     new RuntimeWorktreeLifecycleEvents<RuntimeWorktreeLifecycleEvent>()
 
-  protected agentBrowserBridge: AgentBrowserBridge | null = null
+  protected agentBrowserBridge: RuntimeAgentBrowserBridge | null = null
 
   protected offscreenBrowserBackend: BrowserBackend | null = null
 

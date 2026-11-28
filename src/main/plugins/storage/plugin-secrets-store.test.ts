@@ -3,9 +3,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  _resetSecretStoreForTests,
+  setSecretStore
+} from '../../../shared/secure-storage/secret-store'
+
 const storageMocks = vi.hoisted(() => ({
   available: true,
-  backend: 'gnome_libsecret',
+  gap: null as string | null,
   encryptString: vi.fn((value: string) => Buffer.from(`encrypted:${value}`, 'utf8')),
   decryptString: vi.fn((value: Buffer) => {
     const text = value.toString('utf8')
@@ -14,16 +19,6 @@ const storageMocks = vi.hoisted(() => ({
     }
     return text.slice('encrypted:'.length)
   })
-}))
-
-vi.mock('electron', () => ({
-  app: { commandLine: { hasSwitch: () => false } },
-  safeStorage: {
-    isEncryptionAvailable: () => storageMocks.available,
-    encryptString: storageMocks.encryptString,
-    decryptString: storageMocks.decryptString,
-    getSelectedStorageBackend: () => storageMocks.backend
-  }
 }))
 
 import { PluginSecretsStore } from './plugin-secrets-store'
@@ -39,7 +34,7 @@ async function tempRoot(): Promise<string> {
 
 beforeEach(() => {
   storageMocks.available = true
-  storageMocks.backend = 'gnome_libsecret'
+  storageMocks.gap = null
   storageMocks.encryptString.mockImplementation((value) =>
     Buffer.from(`encrypted:${value}`, 'utf8')
   )
@@ -50,9 +45,16 @@ beforeEach(() => {
     }
     return text.slice('encrypted:'.length)
   })
+  setSecretStore({
+    isEncryptionAvailable: () => storageMocks.available,
+    encryptString: storageMocks.encryptString,
+    decryptString: storageMocks.decryptString,
+    describeProtectionGap: () => storageMocks.gap
+  })
 })
 
 afterEach(async () => {
+  _resetSecretStoreForTests()
   Object.defineProperty(process, 'platform', { value: originalPlatform })
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })

@@ -1,5 +1,6 @@
 import { build } from 'esbuild'
-import { copyFileSync, cpSync, existsSync, mkdirSync, realpathSync, rmSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '../..')
@@ -64,16 +65,13 @@ if (process.platform === 'win32') {
   )
 }
 
-const nativePackage =
-  process.platform === 'win32' && process.arch === 'x64'
-    ? 'sherpa-onnx-win-x64'
-    : `sherpa-onnx-${process.platform}-${process.arch}`
-const nativeSource = join(root, 'node_modules', nativePackage)
-if (!existsSync(nativeSource)) {
-  throw new Error(`Missing speech native package: ${nativeSource}`)
-}
-const nativeDestination = join(resourceRoot, 'node_modules', nativePackage)
-mkdirSync(join(resourceRoot, 'node_modules'), { recursive: true })
-cpSync(realpathSync(nativeSource), nativeDestination, { recursive: true })
+const require = createRequire(import.meta.url)
+const { readPackage } = require('../../config/packaged-runtime-node-modules.cjs')
+const { copyPackagedTranscribeCpp } = require('../../config/packaged-transcribe-cpp.cjs')
+
+const nodeModulesDestination = join(resourceRoot, 'node_modules')
+rmSync(nodeModulesDestination, { recursive: true, force: true })
+mkdirSync(nodeModulesDestination, { recursive: true })
+copyPackagedTranscribeCpp(readPackage, resourceRoot, process.platform, process.arch)
 
 console.log(`Prepared Tauri runtime supervisor at ${output}`)

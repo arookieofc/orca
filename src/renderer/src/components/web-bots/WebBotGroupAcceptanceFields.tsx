@@ -65,7 +65,7 @@ export function WebBotGroupAcceptanceFields({
             id="accept-cmd"
             value={command}
             onChange={(e) => onCommandChange(e.target.value)}
-            placeholder="例如 pnpm test 或 cargo check"
+            placeholder="例如 pnpm test"
             className="h-7 font-mono text-xs"
           />
         </div>

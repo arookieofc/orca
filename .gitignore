@@ -36,6 +36,7 @@ native/windows-registry/bin/
 native/windows-security/build/
 native/windows-security/bin/
 .build/windows-security/
+.build/windows-cli-launcher/
 
 .pnpm-store/
 package-lock.json
@@ -64,6 +65,9 @@ desktop.ini
 /.cache/vite.lock/
 /.cache/*.mjs
 /.cache/tauri-env.*
+/.cache/orcad-dev/
+/.cache/tauri-orcad-profile/
+/.cache/tauri-jar-check-latest.json
 
 *.log
 *.log.*

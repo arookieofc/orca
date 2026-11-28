@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type { RuntimeRpcResponse } from '../../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 import type { RemoteRuntimeTransportSubscription } from '../../../../shared/remote-runtime/requests/remote-runtime-subscription-contract'
-import type { IpcMainInvokeEvent, WebContents } from 'electron'
+import type {
+  RuntimeDesktopIpcEvent,
+  RuntimeDesktopWebContents
+} from '../../../runtime/construction/runtime-desktop-surface'
 import {
   isAbortSignalReason,
   throwIfSignalAborted
@@ -94,9 +97,35 @@ export async function resolveSubscriptionEnvironment(
   return { environment, pairingRevision }
 }
 
+function assertWindowAndConnectionCurrent(
+  event: RuntimeDesktopIpcEvent,
+  sender: RuntimeDesktopWebContents,
+  environmentId: string
+): void {
+  if (
+    sender.isDestroyed() ||
+    !event.senderFrame ||
+    event.senderFrame.detached ||
+    event.senderFrame !== sender.mainFrame
+  ) {
+    throw new RuntimeEnvironmentSetupGuardError(
+      'The window that started this subscription went away',
+      { kind: 'source-retired' }
+    )
+  }
+  if (isRuntimeEnvironmentManuallyDisconnected(environmentId)) {
+    throw new RuntimeEnvironmentSetupGuardError('runtime_manually_disconnected', {
+      kind: 'manual-disconnect'
+    })
+  }
+}
+
 export async function assertCrewSubscriptionCurrent(
-  event: IpcMainInvokeEvent,
-  sender: WebContents,
+  event: RuntimeDesktopIpcEvent,
+  sender: RuntimeDesktopWebContents & {
+    id: number
+    once(event: 'destroyed', listener: () => void): unknown
+  },
   getUserDataPath: () => string,
   environment: Awaited<ReturnType<typeof resolveEnvironment>>,
   pairingRevision: number,
@@ -106,22 +135,7 @@ export async function assertCrewSubscriptionCurrent(
   observeFailure: (failure: RuntimeEnvironmentSetupFailure) => void
 ): Promise<void> {
   throwIfSignalAborted(signal)
-  if (
-    sender.isDestroyed() ||
-    !event.senderFrame ||
-    event.senderFrame.detached ||
-    event.senderFrame !== sender.mainFrame
-  ) {
-    throw new RuntimeEnvironmentSetupGuardError(
-      'The window that started this subscription went away',
-      { kind: 'source-retired' }
-    )
-  }
-  if (isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
-    throw new RuntimeEnvironmentSetupGuardError('runtime_manually_disconnected', {
-      kind: 'manual-disconnect'
-    })
-  }
+  assertWindowAndConnectionCurrent(event, sender, environment.id)
   let current: Awaited<ReturnType<typeof resolveEnvironment>>
   try {
     current = await resolveEnvironment(getUserDataPath(), environment.id)
@@ -130,22 +144,7 @@ export async function assertCrewSubscriptionCurrent(
     throw error
   }
   throwIfSignalAborted(signal)
-  if (
-    sender.isDestroyed() ||
-    !event.senderFrame ||
-    event.senderFrame.detached ||
-    event.senderFrame !== sender.mainFrame
-  ) {
-    throw new RuntimeEnvironmentSetupGuardError(
-      'The window that started this subscription went away',
-      { kind: 'source-retired' }
-    )
-  }
-  if (isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
-    throw new RuntimeEnvironmentSetupGuardError('runtime_manually_disconnected', {
-      kind: 'manual-disconnect'
-    })
-  }
+  assertWindowAndConnectionCurrent(event, sender, environment.id)
   if (
     !transportIsCurrent() ||
     (current.pairingRevision ?? current.createdAt) !== pairingRevision ||

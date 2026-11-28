@@ -11,7 +11,6 @@ import {
 } from './main-blocking-source-paths.mjs'
 
 const EXTERNAL = [
-  'electron',
   'node-pty',
   '@parcel/watcher',
   'better-sqlite3',
@@ -125,7 +124,7 @@ function createRequireTargets(file, contents, sources) {
   return targets
 }
 
-/** Electron main, CLI, orcad and preload entries: guarded even when a worker happens to import one. */
+/** CLI, daemon, and orcad event-loop entries: guarded even when a worker happens to import one. */
 export function eventLoopEntryFiles(root) {
   // Fixtures lack build config; a renamed main entry must not disable root validation in the real repo.
   const realRepo =
@@ -162,10 +161,7 @@ export function eventLoopEntryFiles(root) {
     ts.isArrayLiteralExpression(cliList) &&
     cliList.elements.every(ts.isStringLiteral)
   const cli = validCli ? cliList.elements.map((element) => `src/main/${element.text}.ts`) : []
-  const preload = listTrackedFiles(root, ['src/preload']).filter(
-    (file) => file.split('/').length === 3 && isMainBlockingSource(file)
-  )
-  const entries = [...built, ...cli, 'src/main/index.ts', 'src/main/orcad/main.ts', ...preload]
+  const entries = [...built, ...cli, 'src/main/orcad/main.ts']
   if (realRepo) {
     const tracked = new Set(listTrackedFiles(root, entries))
     const missing = entries.filter(
@@ -174,7 +170,7 @@ export function eventLoopEntryFiles(root) {
     // Every non-template resolve() in the entry list must be a literal we read, or a root went missing.
     const resolveCalls = (builtSource.match(/resolve\(\s*(?!`)/g) ?? []).length
     if (
-      !built.includes('src/main/index.ts') ||
+      built.length === 0 ||
       built.length !== resolveCalls ||
       !validCli ||
       cli.length === 0 ||
